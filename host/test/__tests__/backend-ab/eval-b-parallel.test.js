@@ -8,9 +8,9 @@
 import { describe, it, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { runClaw } from '../lib/claw.js';
-import * as workspace from '../lib/workspace.js';
-import { clawModel, BACKEND } from '../lib/backend.js';
+import { runClaw } from '../../lib/claw.js';
+import * as workspace from '../../lib/workspace.js';
+import { clawModel, BACKEND } from '../../lib/backend.js';
 
 // Outcome-focused prompt — naming a specific tool ("write_file") in the
 // prompt is fine for the raw-bridge wrap-rate test where we define our own

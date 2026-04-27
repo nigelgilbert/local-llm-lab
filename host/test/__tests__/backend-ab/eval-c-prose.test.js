@@ -20,7 +20,8 @@
 // Likely paths to fix:
 //   1. Model swap — bug is qwen3-coder-specific; a successor or peer model
 //      with stronger instruction-following under `tools` context may not
-//      exhibit it. Flip `it.todo` → `it` after swapping and re-evaluate.
+//      exhibit it. See host/test/__tests__/model-ab/prose-density.test.js
+//      which runs this check against qwen3.6 without the skip.
 //   2. Forking claw-code to modify its hardcoded system prompt at source
 //      (its `with_output_style` builder is unreachable from -p mode).
 //      Speculative — the prompt-position lever may not move the needle
@@ -34,8 +35,8 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { runClaw } from '../lib/claw.js';
-import { clawModel, BACKEND } from '../lib/backend.js';
+import { runClaw } from '../../lib/claw.js';
+import { clawModel, BACKEND } from '../../lib/backend.js';
 
 const PROMPT =
   'Write a short markdown explainer about React components. ' +

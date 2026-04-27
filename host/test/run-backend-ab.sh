@@ -51,7 +51,8 @@ log "[A] creating ephemeral claw-test alias from $MODELFILE..."
 ollama create claw-test -f "$MODELFILE" >/dev/null
 
 log "[A] running tests..."
-docker compose --env-file "$REPO_DIR/host/litellm/.env" -f "$COMPOSE" run --rm -e BACKEND=ollama test
+docker compose --env-file "$REPO_DIR/host/litellm/.env" -f "$COMPOSE" \
+  run --rm -e BACKEND=ollama -e TEST_SUITE=backend-ab test
 
 log "[A] unloading claw-test (free unified memory before Phase B)..."
 ollama stop claw-test >/dev/null 2>&1 || true
@@ -74,6 +75,7 @@ done
 [ "$i" -lt 60 ] || err "llama-server did not become healthy within 60s — check 'log show --predicate \"process == \\\"llama-server\\\"\" --last 2m'"
 
 log "[B] running tests..."
-docker compose --env-file "$REPO_DIR/host/litellm/.env" -f "$COMPOSE" run --rm -e BACKEND=llama-server test
+docker compose --env-file "$REPO_DIR/host/litellm/.env" -f "$COMPOSE" \
+  run --rm -e BACKEND=llama-server -e TEST_SUITE=backend-ab test
 
 log "==> Both phases complete"

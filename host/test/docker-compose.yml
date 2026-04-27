@@ -14,5 +14,7 @@ services:
       - ANTHROPIC_BASE_URL=http://host.docker.internal:4000
       - ANTHROPIC_API_KEY=${LITELLM_MASTER_KEY}
       - BACKEND=${BACKEND:-llama-server}
+      - MODEL_LABEL=${MODEL_LABEL:-}
+      - TEST_SUITE=${TEST_SUITE:-}
     extra_hosts:
       - "host.docker.internal:host-gateway"

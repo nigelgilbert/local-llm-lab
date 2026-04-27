@@ -1,23 +1,23 @@
-// Eval A: minimum-viable agent loop. One tool call, one file, done.
-// If this fails, the backend isn't usable for any agent work at all.
+// Agent single-file: minimum-viable agentic loop. One tool call, one file, done.
+// If this fails, the model isn't usable for any agent work through this stack.
 
 import { describe, it, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { runClaw } from '../lib/claw.js';
-import * as workspace from '../lib/workspace.js';
-import { clawModel, BACKEND } from '../lib/backend.js';
+import { runClaw } from '../../lib/claw.js';
+import * as workspace from '../../lib/workspace.js';
+import { clawModel, MODEL_LABEL } from '../../lib/model.js';
 
 const PROMPT  = "create hello.py with one line: print('hello')";
 const TIMEOUT = 300_000;
 
-describe(`eval A — single-file write (backend=${BACKEND}, model=${clawModel})`, () => {
+describe(`agent: single-file write (model=${MODEL_LABEL}, bridge=${clawModel})`, () => {
   beforeEach(() => workspace.reset());
 
   it('claw creates hello.py with the requested content', { timeout: TIMEOUT }, async () => {
     const r = await runClaw({ prompt: PROMPT, model: clawModel });
 
-    console.log(`\n=== eval-a (${BACKEND}) ===`);
+    console.log(`\n=== agent-single (${MODEL_LABEL}) ===`);
     console.log(`  exit=${r.code} elapsed=${r.elapsedMs}ms files=${JSON.stringify(workspace.list())}`);
     if (r.code !== 0) console.log(`  stderr (tail):\n${r.stderr.slice(-1500)}`);
 

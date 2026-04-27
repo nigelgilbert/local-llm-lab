@@ -1,18 +1,17 @@
-// Wrap rate: percentage of streamed completions where the assistant
-// terminated with `stop_reason: tool_use` for a one-tool prompt.
+// Tool-call wrapping: percentage of streamed completions that terminate with
+// `stop_reason: tool_use` for a one-tool prompt.
 //
-// This is the headline metric that motivated the llama-server backend.
-// Ollama on qwen3-coder UD-Q6_K_XL fails to emit the <tool_call>...</tool_call>
-// XML wrapper roughly 1-in-3 generations even with a TEMPLATE override; the
-// llama-server config uses a GBNF grammar that constrains decoding so the
-// wrapper is mathematically required. We expect llama-server ≈ 1.0 and Ollama
-// ≈ 0.5–0.7 (thresholds in lib/backend.js are tuned to those bands).
+// Both models run through the same GBNF grammar (claw.gbnf) which constrains
+// decoding so the <tool_call>...</tool_call> wrapper is mathematically required.
+// We expect both models to score near 1.0. A dip below the threshold signals
+// the model's native tool-call format is incompatible with the grammar's schema
+// — the grammar forces the wrapper but the model may emit malformed JSON inside.
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { streamMessage } from '../lib/bridge.js';
-import { bridgeModel, BACKEND, wrapRateThreshold } from '../lib/backend.js';
+import { streamMessage } from '../../lib/bridge.js';
+import { bridgeModel, MODEL_LABEL, wrapRateThreshold } from '../../lib/model.js';
 
 const TOOL = {
   name: 'write_file',
@@ -31,7 +30,6 @@ const PROMPT  = "Use the write_file tool to create hello.py with exactly: print(
 const N       = Number(process.env.WRAP_RATE_N) || 10;
 const TIMEOUT = 300_000;
 
-// Latency stats so a backend comparison shows speed alongside wrap discipline.
 function summarize(latenciesMs) {
   if (latenciesMs.length === 0) return { min: 0, median: 0, p95: 0, mean: 0 };
   const sorted = [...latenciesMs].sort((a, b) => a - b);
@@ -40,7 +38,7 @@ function summarize(latenciesMs) {
   return { min: sorted[0], median: at(0.5), p95: at(0.95), mean: Math.round(mean) };
 }
 
-describe(`wrap-rate (backend=${BACKEND}, model=${bridgeModel})`, () => {
+describe(`tool-call wrapping (model=${MODEL_LABEL}, bridge=${bridgeModel})`, () => {
   it(
     `${N} streamed calls land on stop_reason=tool_use ≥ ${wrapRateThreshold * 100}%`,
     { timeout: TIMEOUT },
@@ -67,12 +65,11 @@ describe(`wrap-rate (backend=${BACKEND}, model=${bridgeModel})`, () => {
         }
       }
 
-      const wraps  = results.filter((r) => r.ok).length;
-      const rate   = wraps / N;
-      const stats  = summarize(results.map((r) => r.ms));
+      const wraps = results.filter((r) => r.ok).length;
+      const rate  = wraps / N;
+      const stats = summarize(results.map((r) => r.ms));
 
-      // Surface the per-attempt detail so a failing run is debuggable from logs alone.
-      console.log(`\n=== wrap-rate (${BACKEND}) ===`);
+      console.log(`\n=== tool-wrap (${MODEL_LABEL}) ===`);
       results.forEach((r, i) => {
         console.log(`  [${i + 1}/${N}] ok=${r.ok} stop=${r.stopReason ?? '?'} tool_use=${r.hasToolUse} ${r.ms}ms${r.error ? ` err=${r.error}` : ''}`);
       });

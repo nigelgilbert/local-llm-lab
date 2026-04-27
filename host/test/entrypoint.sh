@@ -13,6 +13,10 @@
 # rewrites model names *before* request dispatch. We point every built-in
 # alias and bare claude-* id at the same anthropic/claw-<backend> route the
 # main loop is using, so all traffic exits via one bridge route.
+#
+# TEST_SUITE scoping: when TEST_SUITE is set, override $@ to run only that
+# subdirectory so run-backend-ab.sh and run-model-ab.sh each fire their own
+# tests. Unset (or "all") runs everything under __tests__/.
 
 set -eu
 
@@ -35,5 +39,13 @@ cat >/root/.claw/settings.json <<EOF
   }
 }
 EOF
+
+# Scope to a test subdirectory when TEST_SUITE is set. The glob expands
+# inside the container where the files exist.
+case "${TEST_SUITE:-}" in
+  backend-ab) set -- node --test --test-concurrency=1 --test-reporter=spec __tests__/backend-ab/*.test.js ;;
+  model-ab)   set -- node --test --test-concurrency=1 --test-reporter=spec __tests__/model-ab/*.test.js ;;
+  *)          : ;;
+esac
 
 exec "$@"
