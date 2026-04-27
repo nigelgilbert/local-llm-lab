@@ -43,9 +43,10 @@ EOF
 # Scope to a test subdirectory when TEST_SUITE is set. The glob expands
 # inside the container where the files exist.
 case "${TEST_SUITE:-}" in
-  backend-ab) set -- node --test --test-concurrency=1 --test-reporter=spec __tests__/backend-ab/*.test.js ;;
-  model-ab)   set -- node --test --test-concurrency=1 --test-reporter=spec __tests__/model-ab/*.test.js ;;
-  *)          : ;;
+  backend-ab)   set -- node --test --test-concurrency=1 --test-reporter=spec __tests__/backend-ab/*.test.js ;;
+  model-ab)     set -- node --test --test-concurrency=1 --test-reporter=spec __tests__/model-ab/*.test.js ;;
+  settings-ab)  set -- node --test --test-concurrency=1 --test-reporter=spec __tests__/settings-ab/*.test.js ;;
+  *)            : ;;
 esac
 
 exec "$@"

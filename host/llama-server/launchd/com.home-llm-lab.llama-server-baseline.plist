@@ -6,22 +6,11 @@
     <string>com.home-llm-lab.llama-server</string>
 
     <!--
-      llama.cpp server, native, dedicated to the `claw` profile.
-      See host/llama-server/README.md for setup, rollback, and rationale.
-
-      EDIT BEFORE INSTALLING — three paths assume the `nigel` home dir.
-      LaunchAgents don't expand ~ or $HOME, so absolute paths are required.
-
-        - ProgramArguments path to llama-server binary
-        - --model path to the Qwen3-Coder GGUF
-        - --grammar-file path to the claw GBNF
-        - StandardOutPath / StandardErrorPath log location
-
-      Re-install after any plist edit:
-        launchctl unload  ~/Library/LaunchAgents/com.home-llm-lab.llama-server.plist
-        cp host/llama-server/launchd/com.home-llm-lab.llama-server.plist \
-           ~/Library/LaunchAgents/
-        launchctl load -w ~/Library/LaunchAgents/com.home-llm-lab.llama-server.plist
+      BASELINE config for settings A/B test (run-model-settings-ab.sh Phase A).
+      Differences from the production plist (com.home-llm-lab.llama-server.plist):
+        - --ctx-size 131072  (production: 32768)
+        - no --batch-size    (production: 4096)
+      Everything else is identical, including the corrected grammar-file path.
     -->
 
     <key>ProgramArguments</key>
@@ -40,9 +29,9 @@
         <string>--alias</string>
         <string>claw</string>
 
-        <!-- context + memory -->
+        <!-- context + memory — BASELINE values -->
         <string>--ctx-size</string>
-        <string>32768</string>
+        <string>131072</string>
         <string>-ngl</string>
         <string>999</string>
         <string>-fa</string>
@@ -51,8 +40,7 @@
         <string>q8_0</string>
         <string>--cache-type-v</string>
         <string>q8_0</string>
-        <string>--batch-size</string>
-        <string>4096</string>
+        <!-- no --batch-size: llama-server default is 2048 -->
 
         <!-- sampler — mirrors host/ollama/Modelfiles/claw.Modelfile -->
         <string>--temp</string>
@@ -66,32 +54,24 @@
         <string>--repeat-last-n</string>
         <string>256</string>
 
-        <!-- grammar — the point of this whole directory -->
+        <!-- grammar -->
         <string>--grammar-file</string>
         <string>/Users/nigel/Desktop/bench/lab/host/llama-server/grammars/claw.gbnf</string>
-
-        <!-- Discipline rules: claw-code discovers CLAUDE.md in the workspace and
-             concatenates it to its system prompt. See README §9. (Upstream
-             llama.cpp removed `--system-prompt-file`, so per-deploy injection
-             via the server is no longer available.) -->
 
         <!-- misc -->
         <string>--metrics</string>
     </array>
 
-    <!-- Auto-start at login and revive on crash. -->
     <key>RunAtLoad</key>
     <true/>
     <key>KeepAlive</key>
     <true/>
 
-    <!-- Logs go to a known place; rotate by hand if needed. -->
     <key>StandardOutPath</key>
     <string>/tmp/llama-server.log</string>
     <key>StandardErrorPath</key>
     <string>/tmp/llama-server.log</string>
 
-    <!-- Crash backoff, in case the binary dies on bad config. -->
     <key>ThrottleInterval</key>
     <integer>10</integer>
 </dict>
