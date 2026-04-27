@@ -1,0 +1,15 @@
+#!/usr/bin/env sh
+# set-keep-alive [<duration>] — set OLLAMA_KEEP_ALIVE and restart Ollama.app.
+# Default: 1m. Values: '0' (unload now), 'Ns'/'Nm'/'Nh', '-1' (never unload).
+# Survives until reboot.
+
+set -eu
+
+VALUE="${1:-1m}"
+
+launchctl setenv OLLAMA_KEEP_ALIVE "$VALUE"
+pkill -f '/Applications/Ollama.app' || true
+sleep 2
+open -a Ollama
+
+echo "OLLAMA_KEEP_ALIVE=$VALUE"

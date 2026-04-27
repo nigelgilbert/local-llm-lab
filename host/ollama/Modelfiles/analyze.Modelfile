@@ -1,0 +1,59 @@
+# analyze — long-context interpretive reasoning over a corpus, with thinking.
+# Backing model: Qwen3-30B-A3B-Thinking-2507 UD-Q6_K_XL (HuggingFace GGUF, unsloth Dynamic 2.0).
+# Selection rationale: ../../../profiles.md.
+#
+# Sibling of `digest` (Instruct-2507, no <think> blocks). This profile uses
+# the Thinking-2507 checkpoint, which always emits <think>...</think> before
+# its answer. Trade: slower time-to-first-final-token, better multi-hop
+# reasoning across long context.
+#
+# `FROM` is rig-specific — Ollama Modelfiles do NOT expand ~ or $HOME.
+# Drop the GGUF in ~/.ollama/gguf/ first; see ../README.md §3c.
+# Forking? Edit the username in the path below to match your rig.
+
+FROM /Users/nigel/.ollama/gguf/Qwen3-30B-A3B-Thinking-2507-UD-Q6_K_XL.gguf
+
+# Qwen3 ChatML template. Ollama's GGUF importer dropped this on `ollama create`
+# (left a bare `{{ .Prompt }}` passthrough), so we restate it here. The model
+# emits `<think>\n...\n</think>\n\n<answer>` on its own once given the
+# `<|im_start|>assistant\n` cue — no opener prepended in the template.
+# Reference: tokenizer_config.json embedded in the GGUF (extracted 2026-04-26).
+TEMPLATE """{{- if .Messages }}
+{{- if .System }}<|im_start|>system
+{{ .System }}<|im_end|>
+{{ end }}
+{{- range $i, $_ := .Messages }}
+{{- $last := eq (len (slice $.Messages $i)) 1 }}
+{{- if eq .Role "user" }}<|im_start|>user
+{{ .Content }}<|im_end|>
+{{ if $last }}<|im_start|>assistant
+{{ end }}
+{{- else if eq .Role "assistant" }}<|im_start|>assistant
+{{ .Content }}{{ if not $last }}<|im_end|>
+{{ end }}
+{{- end }}
+{{- end }}
+{{- else }}
+{{- if .System }}<|im_start|>system
+{{ .System }}<|im_end|>
+{{ end }}<|im_start|>user
+{{ .Prompt }}<|im_end|>
+<|im_start|>assistant
+{{ end }}{{ .Response }}{{ if .Response }}<|im_end|>{{ end }}"""
+
+PARAMETER stop "<|im_start|>"
+PARAMETER stop "<|im_end|>"
+
+PARAMETER num_ctx 262144
+
+# Sampling: Qwen3-30B-A3B-Thinking-2507 vendor-recommended defaults.
+# https://huggingface.co/Qwen/Qwen3-30B-A3B-Thinking-2507
+PARAMETER temperature 0.6
+PARAMETER top_p 0.95
+PARAMETER top_k 20
+PARAMETER min_p 0
+
+# Vendor recommends >=32768 for standard queries, 81920 for math/programming
+# competition workloads. Thinking blocks eat real tokens — undersized
+# num_predict truncates the answer before <think> closes.
+PARAMETER num_predict 32768

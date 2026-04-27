@@ -1,0 +1,159 @@
+#!/usr/bin/env sh
+# cyberia-hostctl — host-side orchestration for Cyberia LAN AI lab.
+# Lives on the host (cyberia.local). Invoked locally or over SSH from `cyberia` client.
+#
+# Subcommands:
+#   up                              bring docker stack up (idempotent), verify health
+#   down                            stop docker stack (volume preserved)
+#   status                          health summary: container + Ollama API + loaded models
+#   warm <profile>                  preload profile model with keep_alive=30m
+#   openui-url [-p P] [-q "..."]    print canonical browser URL
+
+set -eu
+
+# ---- config (override via env) ----
+HOST_REPO="${HOST_REPO:-$HOME/Desktop/bench/local-llm-lab}"
+COMPOSE_DIR="${COMPOSE_DIR:-$HOST_REPO/host}"
+OPENUI_BASE="${OPENUI_BASE:-http://cyberia.local}"
+OLLAMA_API="${OLLAMA_API:-http://127.0.0.1:11434}"
+KEEP_ALIVE="${KEEP_ALIVE:-30m}"
+
+PROFILES="general fast reasoning digest analyze"
+
+# ---- utilities ----
+err()  { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
+log()  { printf '%s\n' "$*" >&2; }
+
+require_cmd() {
+  command -v "$1" >/dev/null 2>&1 || err "missing command: $1"
+}
+
+profile_to_model() {
+  case "$1" in
+    general|fast|reasoning|digest|analyze) printf '%s' "$1" ;;
+    *) err "unknown profile: $1 (valid: $PROFILES)" ;;
+  esac
+}
+
+url_encode() {
+  python3 -c 'import urllib.parse, sys; print(urllib.parse.quote(sys.argv[1]))' "$1"
+}
+
+# ---- subcommands ----
+
+cmd_up() {
+  require_cmd docker
+  ( cd "$COMPOSE_DIR" && docker compose up -d ) || err "docker compose up failed"
+
+  log "waiting for OWUI health..."
+  i=0
+  while [ "$i" -lt 15 ]; do
+    if curl -fsS "$OPENUI_BASE/health" >/dev/null 2>&1; then
+      log "OWUI healthy at $OPENUI_BASE"
+      break
+    fi
+    i=$((i + 1))
+    sleep 2
+  done
+  [ "$i" -lt 15 ] || err "OWUI did not become healthy within 30s — check 'docker compose logs'"
+
+  if curl -fsS "$OLLAMA_API/api/tags" >/dev/null 2>&1; then
+    log "Ollama API reachable at $OLLAMA_API"
+  else
+    log "Ollama at $OLLAMA_API not reachable — is the LaunchAgent running?"
+  fi
+}
+
+cmd_down() {
+  require_cmd docker
+  ( cd "$COMPOSE_DIR" && docker compose down ) || err "docker compose down failed"
+}
+
+cmd_status() {
+  printf '== Docker stack ==\n'
+  ( cd "$COMPOSE_DIR" && docker compose ps --format 'table {{.Name}}\t{{.Status}}\t{{.Ports}}' ) || true
+
+  printf '\n== Open WebUI ==\n'
+  if curl -fsS "$OPENUI_BASE/health" >/dev/null 2>&1; then
+    printf 'healthy: %s\n' "$OPENUI_BASE"
+  else
+    printf 'unhealthy or unreachable: %s\n' "$OPENUI_BASE"
+  fi
+
+  printf '\n== Ollama API ==\n'
+  if curl -fsS "$OLLAMA_API/api/tags" >/dev/null 2>&1; then
+    printf 'reachable: %s\n' "$OLLAMA_API"
+  else
+    printf 'unreachable: %s\n' "$OLLAMA_API"
+  fi
+
+  printf '\n== Loaded models (ollama ps) ==\n'
+  if command -v ollama >/dev/null 2>&1; then
+    ollama ps || true
+  else
+    printf '(ollama CLI not in PATH on this shell)\n'
+  fi
+}
+
+cmd_warm() {
+  [ "${1:-}" ] || err "usage: cyberia-hostctl warm <profile>"
+  model=$(profile_to_model "$1")
+  log "warming $model (keep_alive=$KEEP_ALIVE)..."
+  curl -fsS -X POST "$OLLAMA_API/api/generate" \
+    -H 'Content-Type: application/json' \
+    -d "{\"model\":\"$model\",\"prompt\":\"\",\"keep_alive\":\"$KEEP_ALIVE\"}" \
+    >/dev/null || err "warm failed for $model"
+  log "$model warmed"
+}
+
+cmd_openui_url() {
+  profile=
+  query=
+  while [ "$#" -gt 0 ]; do
+    case "$1" in
+      -p|--profile) profile="${2:-}"; shift 2 ;;
+      -q|--query)   query="${2:-}";   shift 2 ;;
+      *) err "unknown arg: $1" ;;
+    esac
+  done
+
+  url="$OPENUI_BASE"
+  if [ -n "$profile" ]; then
+    model=$(profile_to_model "$profile")
+    url="$url/?model=$model"
+    if [ -n "$query" ]; then
+      url="$url&q=$(url_encode "$query")"
+    fi
+  fi
+  printf '%s\n' "$url"
+}
+
+usage() {
+  cat <<EOF
+cyberia-hostctl — host-side orchestration for Cyberia LAN AI lab
+
+Usage:
+  cyberia-hostctl up                              bring stack up (idempotent)
+  cyberia-hostctl down                            stop stack (volume preserved)
+  cyberia-hostctl status                          health summary
+  cyberia-hostctl warm <profile>                  preload model (general|fast|reasoning|digest|analyze)
+  cyberia-hostctl openui-url [-p P] [-q "..."]    print deep-link URL
+
+Env overrides:
+  HOST_REPO     repo root (default: ~/Desktop/bench/local-llm-lab)
+  COMPOSE_DIR   compose dir (default: \$HOST_REPO/host)
+  OPENUI_BASE   external OWUI URL (default: http://cyberia.local)
+  OLLAMA_API    local Ollama API (default: http://127.0.0.1:11434)
+  KEEP_ALIVE    warm duration (default: 30m)
+EOF
+}
+
+case "${1:-}" in
+  up)         shift; cmd_up "$@" ;;
+  down)       shift; cmd_down "$@" ;;
+  status)     shift; cmd_status "$@" ;;
+  warm)       shift; cmd_warm "$@" ;;
+  openui-url) shift; cmd_openui_url "$@" ;;
+  -h|--help|help|"") usage ;;
+  *) err "unknown subcommand: $1 (try --help)" ;;
+esac

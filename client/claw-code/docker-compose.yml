@@ -1,0 +1,20 @@
+services:
+  claw:
+    build:
+      context: .
+      args:
+        CLAW_REF: ${CLAW_REF:-main}
+    image: claw-code:local
+    container_name: claw-code
+    restart: unless-stopped
+    volumes:
+      - ${WORKSPACE}:/workspace
+    working_dir: /workspace
+    environment:
+      - ANTHROPIC_BASE_URL=http://${BRIDGE_HOST}:${BRIDGE_PORT}
+      - ANTHROPIC_API_KEY=${LITELLM_MASTER_KEY}
+    extra_hosts:
+      # Lets BRIDGE_HOST=host.docker.internal work when claw runs on the lab box itself.
+      - "host.docker.internal:host-gateway"
+    # Long-lived no-op so `docker compose exec` can attach an interactive REPL.
+    command: ["sleep", "infinity"]

@@ -1,0 +1,23 @@
+#!/usr/bin/env sh
+# set-local-hostname [<name>] — claim <name>.local via mDNS. Default: cyberia.
+#
+# scutil --set returns immediately after writing to SystemConfiguration.
+# mDNSResponder probes the LAN asynchronously and, on conflict, writes back
+# an auto-bumped <name>-2 / -3 etc. (RFC 6762 §9). We sleep ~2s to let the
+# probe settle (RFC 6762 §8.1: 3 probes × 250ms ≈ 750ms + jitter), then
+# re-read; if the name was bumped, exit non-zero.
+
+set -eu
+
+DESIRED="${1:-cyberia}"
+
+scutil --set LocalHostName "$DESIRED"
+sleep 2
+actual=$(scutil --get LocalHostName)
+
+if [ "$actual" != "$DESIRED" ]; then
+  echo "conflict: $DESIRED.local is taken on the LAN — macOS bumped this rig to '$actual'" >&2
+  exit 1
+fi
+
+echo "LocalHostName=$DESIRED"

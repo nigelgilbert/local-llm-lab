@@ -1,0 +1,92 @@
+# LiteLLM proxy: accept Anthropic /v1/messages from clients, forward to Ollama /api/chat.
+# Each model_name below is what a client can request via --model <name>.
+# All names route through ollama_chat/* so tool-use / system prompts pass through cleanly.
+
+model_list:
+  - model_name: general
+    litellm_params:
+      model: ollama_chat/general
+      api_base: os.environ/OLLAMA_API_BASE
+  - model_name: fast
+    litellm_params:
+      model: ollama_chat/fast
+      api_base: os.environ/OLLAMA_API_BASE
+  - model_name: reasoning
+    litellm_params:
+      model: ollama_chat/reasoning
+      api_base: os.environ/OLLAMA_API_BASE
+  - model_name: digest
+    litellm_params:
+      model: ollama_chat/digest
+      api_base: os.environ/OLLAMA_API_BASE
+  - model_name: analyze
+    litellm_params:
+      model: ollama_chat/analyze
+      api_base: os.environ/OLLAMA_API_BASE
+
+  # `claw` is the agentic-coding profile — only profile besides `general`
+  # with `tools` capability declared. Daily driver for client/claw-code/.
+  #
+  # Routed via openai/ provider hitting Ollama's /v1/chat/completions
+  # (OpenAI-compat) endpoint. ollama_chat/* streaming drops tool_calls.arguments
+  # on the Anthropic SSE translation path; openai/* keeps them intact.
+  #
+  # NOTE: by default LiteLLM auto-routes openai/* + Anthropic /v1/messages input
+  # through the OpenAI Responses API (/v1/responses). Ollama supports it, but
+  # tool-call parsing on that path occasionally falls back to text content
+  # (raw JSON instead of function_call events) for large request shapes —
+  # claw-code's 50+ tool definitions reliably trigger this. The
+  # `use_chat_completions_url_for_anthropic_messages: true` flag in
+  # litellm_settings below opts out, pinning all openai/* traffic to
+  # /v1/chat/completions where tool_calls parse correctly.
+  - model_name: claw
+    litellm_params:
+      model: openai/claw
+      api_base: os.environ/OLLAMA_OPENAI_BASE
+      api_key: ollama-no-auth
+
+  - model_name: anthropic/claw
+    litellm_params:
+      model: openai/claw
+      api_base: os.environ/OLLAMA_OPENAI_BASE
+      api_key: ollama-no-auth
+  - model_name: anthropic/general
+    litellm_params:
+      model: ollama_chat/general
+      api_base: os.environ/OLLAMA_API_BASE
+  - model_name: anthropic/fast
+    litellm_params:
+      model: ollama_chat/fast
+      api_base: os.environ/OLLAMA_API_BASE
+  - model_name: anthropic/reasoning
+    litellm_params:
+      model: ollama_chat/reasoning
+      api_base: os.environ/OLLAMA_API_BASE
+  - model_name: anthropic/digest
+    litellm_params:
+      model: ollama_chat/digest
+      api_base: os.environ/OLLAMA_API_BASE
+  - model_name: anthropic/analyze
+    litellm_params:
+      model: ollama_chat/analyze
+      api_base: os.environ/OLLAMA_API_BASE
+
+  # Catch-all so a client's built-in aliases (sonnet -> claude-sonnet-4-6 etc.)
+  # land on `general` instead of erroring out.
+  - model_name: "*"
+    litellm_params:
+      model: ollama_chat/general
+      api_base: os.environ/OLLAMA_API_BASE
+
+litellm_settings:
+  # Drop Anthropic-only params (top_k, metadata, ...) Ollama doesn't accept.
+  drop_params: true
+  # Pin Anthropic /v1/messages → openai/* traffic to /v1/chat/completions.
+  # Without this, LiteLLM auto-routes openai/* through /v1/responses, where
+  # Ollama's tool-call parser drops to text content for large request shapes
+  # (verified with claw-code's 54-tool requests — see comment on the `claw`
+  # route above).
+  use_chat_completions_url_for_anthropic_messages: true
+
+general_settings:
+  master_key: os.environ/LITELLM_MASTER_KEY

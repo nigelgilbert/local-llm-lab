@@ -1,0 +1,43 @@
+#!/usr/bin/env sh
+# unload-ollama — force-evict all loaded Ollama models to reclaim RAM/VRAM.
+# Tries `ollama stop` per model first; if anything is still resident, kills
+# Ollama.app outright. Does not restart it — use `open -a Ollama` or
+# `set-keep-alive` to bring it back.
+
+set -eu
+
+OLLAMA_API="${OLLAMA_API:-http://127.0.0.1:11434}"
+
+list_loaded() {
+  # first column of `ollama ps`, skipping header; empty if nothing loaded
+  ollama ps 2>/dev/null | awk 'NR>1 && $1!="" {print $1}'
+}
+
+if ! command -v ollama >/dev/null 2>&1; then
+  echo "ollama CLI not found in PATH" >&2
+  exit 1
+fi
+
+loaded=$(list_loaded || true)
+
+if [ -z "$loaded" ]; then
+  echo "no models loaded"
+else
+  echo "$loaded" | while IFS= read -r m; do
+    [ -n "$m" ] || continue
+    echo "stop $m"
+    ollama stop "$m" || true
+  done
+fi
+
+# verify; escalate if anything stuck around
+sleep 1
+remaining=$(list_loaded || true)
+if [ -n "$remaining" ]; then
+  echo "still loaded after stop — killing Ollama.app:"
+  echo "$remaining" | sed 's/^/   /'
+  pkill -f '/Applications/Ollama.app' || true
+  echo "Ollama.app killed (restart with: open -a Ollama)"
+else
+  echo "all models unloaded"
+fi

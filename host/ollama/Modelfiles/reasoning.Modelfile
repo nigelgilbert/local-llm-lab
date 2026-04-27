@@ -1,0 +1,59 @@
+# reasoning — hard-thinking profile.
+# Backing model: Nemotron Super 49B v1.5 Q6_K (HuggingFace GGUF, bartowski).
+# Selection rationale: ../../../profiles.md.
+#
+# `FROM` is rig-specific — Ollama Modelfiles do NOT expand ~ or $HOME.
+# Drop the GGUF in ~/.ollama/gguf/ first; see ../README.md §3b.
+# Forking? Edit the username in the path below to match your rig.
+
+FROM /Users/nigel/.ollama/gguf/nvidia_Llama-3_3-Nemotron-Super-49B-v1_5-Q6_K.gguf
+
+# Llama-3.3 ChatML template. Adapted from Ollama's library llama3.3 template
+# with one critical change: the system header is ALWAYS emitted, even when
+# empty. Per the model card, an empty system message is what flips the model
+# into Reasoning-ON mode (and `/no_think` in the system flips it OFF). Without
+# the role envelope, the toggle never reaches the model and no <think> blocks
+# are produced.
+# Reference: https://huggingface.co/nvidia/Llama-3_3-Nemotron-Super-49B-v1_5
+TEMPLATE """{{- if .Messages }}<|start_header_id|>system<|end_header_id|>
+{{ if .System }}
+{{ .System }}
+{{- end }}<|eot_id|>
+{{- range $i, $_ := .Messages }}
+{{- $last := eq (len (slice $.Messages $i)) 1 }}
+{{- if eq .Role "user" }}<|start_header_id|>user<|end_header_id|>
+
+{{ .Content }}<|eot_id|>{{ if $last }}<|start_header_id|>assistant<|end_header_id|>
+
+{{ end }}
+{{- else if eq .Role "assistant" }}<|start_header_id|>assistant<|end_header_id|>
+
+{{ .Content }}{{ if not $last }}<|eot_id|>{{ end }}
+{{- end }}
+{{- end }}
+{{- else }}
+{{- if .System }}<|start_header_id|>system<|end_header_id|>
+
+{{ .System }}<|eot_id|>{{ end }}<|start_header_id|>user<|end_header_id|>
+
+{{ .Prompt }}<|eot_id|><|start_header_id|>assistant<|end_header_id|>
+
+{{ end }}{{ .Response }}{{ if .Response }}<|eot_id|>{{ end }}"""
+
+PARAMETER stop "<|start_header_id|>"
+PARAMETER stop "<|end_header_id|>"
+PARAMETER stop "<|eot_id|>"
+
+# Matches NVIDIA's eval context length; model supports 131072 native.
+PARAMETER num_ctx 65536
+
+# Sampling: NVIDIA-recommended Reasoning-ON profile (empty system prompt).
+# https://huggingface.co/nvidia/Llama-3_3-Nemotron-Super-49B-v1_5
+PARAMETER temperature 0.6
+PARAMETER top_p 0.95
+
+# NVIDIA does not specify the below. Neutral values for chain-of-thought work
+# (avoid penalizing legitimate intermediate-step repetition).
+PARAMETER repeat_penalty 1.0
+PARAMETER top_k 0
+PARAMETER min_p 0

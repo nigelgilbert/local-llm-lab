@@ -1,0 +1,61 @@
+# fast — quick triage profile, thinking off.
+# Backing model: Qwen3.6-35B-A3B UD-Q4_K_XL (HuggingFace GGUF, unsloth Dynamic 2.0).
+# Selection rationale: ../../../profiles.md.
+#
+# `FROM` is rig-specific — Ollama Modelfiles do NOT expand ~ or $HOME.
+# Drop the GGUF in ~/.ollama/gguf/ first; see ../README.md §3.
+# Forking? Edit the username in the path below to match your rig.
+#
+# Thinking note: Qwen3.6 does NOT support the Qwen3 /think /nothink soft
+# switch (model card explicit). Disable thinking via OWUI per-model config
+# (toggle "thinking" off → passes enable_thinking=false to Ollama), not
+# via SYSTEM prompt.
+
+FROM /Users/nigel/.ollama/gguf/Qwen3.6-35B-A3B-UD-Q4_K_XL.gguf
+
+# Qwen3 ChatML template. Ollama's GGUF importer drops this on `ollama create`
+# (leaves a bare `{{ .Prompt }}` passthrough), so we restate it here. Same
+# template as analyze.Modelfile — Qwen3.6 uses the same chat format.
+TEMPLATE """{{- if .Messages }}
+{{- if .System }}<|im_start|>system
+{{ .System }}<|im_end|>
+{{ end }}
+{{- range $i, $_ := .Messages }}
+{{- $last := eq (len (slice $.Messages $i)) 1 }}
+{{- if eq .Role "user" }}<|im_start|>user
+{{ .Content }}<|im_end|>
+{{ if $last }}<|im_start|>assistant
+{{ end }}
+{{- else if eq .Role "assistant" }}<|im_start|>assistant
+{{ .Content }}{{ if not $last }}<|im_end|>
+{{ end }}
+{{- end }}
+{{- end }}
+{{- else }}
+{{- if .System }}<|im_start|>system
+{{ .System }}<|im_end|>
+{{ end }}<|im_start|>user
+{{ .Prompt }}<|im_end|>
+<|im_start|>assistant
+{{ end }}{{ .Response }}{{ if .Response }}<|im_end|>{{ end }}"""
+
+PARAMETER stop "<|im_start|>"
+PARAMETER stop "<|im_end|>"
+
+# 32K — triage rarely needs deep context; smaller KV budget loads faster.
+# Model native is 262144. Vendor advises >=128K to preserve THINKING quality
+# — not a concern here since `fast` runs thinking-off.
+PARAMETER num_ctx 32768
+
+# Vendor recommends 32768 output length for most queries; 81920 for
+# math/programming competitions. 32K is generous for triage but matches spec.
+PARAMETER num_predict 32768
+
+# Sampling: Qwen3.6-35B-A3B vendor-recommended non-thinking profile.
+# https://huggingface.co/Qwen/Qwen3.6-35B-A3B
+PARAMETER temperature 0.7
+PARAMETER top_p 0.8
+PARAMETER top_k 20
+PARAMETER min_p 0
+PARAMETER presence_penalty 1.5
+PARAMETER repeat_penalty 1.0
