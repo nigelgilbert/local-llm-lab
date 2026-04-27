@@ -19,6 +19,7 @@ services:
     environment:
       - OLLAMA_API_BASE=http://${OLLAMA_HOST}:${OLLAMA_PORT}
       - OLLAMA_OPENAI_BASE=http://${OLLAMA_HOST}:${OLLAMA_PORT}/v1
+      - LLAMA_SERVER_BASE=http://${LLAMA_SERVER_HOST}:${LLAMA_SERVER_PORT}/v1
       - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY}
     extra_hosts:
       - "host.docker.internal:host-gateway"

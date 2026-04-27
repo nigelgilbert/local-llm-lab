@@ -27,29 +27,34 @@ model_list:
   # `claw` is the agentic-coding profile — only profile besides `general`
   # with `tools` capability declared. Daily driver for client/claw-code/.
   #
-  # Routed via openai/ provider hitting Ollama's /v1/chat/completions
-  # (OpenAI-compat) endpoint. ollama_chat/* streaming drops tool_calls.arguments
-  # on the Anthropic SSE translation path; openai/* keeps them intact.
+  # Routed via openai/ provider hitting llama.cpp's /v1/chat/completions
+  # endpoint (OpenAI-compat). Two reasons claw lives on llama-server, not Ollama:
+  #
+  #   1. Streaming tool-use: ollama_chat/* drops tool_calls.arguments on the
+  #      Anthropic SSE translation path; openai/* against either upstream keeps
+  #      them intact (with the patches/streaming_iterator.py shim — see header
+  #      of that file for the LiteLLM bug + scope).
+  #   2. Grammar-constrained decoding: llama.cpp's --grammar-file enforces the
+  #      <tool_call>...</tool_call> wrapping at sample-time, eliminating
+  #      qwen3-coder's ~1-in-3 raw-JSON wrap failures. Ollama doesn't surface
+  #      this knob yet. See ../llama-server/README.md.
   #
   # NOTE: by default LiteLLM auto-routes openai/* + Anthropic /v1/messages input
-  # through the OpenAI Responses API (/v1/responses). Ollama supports it, but
-  # tool-call parsing on that path occasionally falls back to text content
-  # (raw JSON instead of function_call events) for large request shapes —
-  # claw-code's 50+ tool definitions reliably trigger this. The
-  # `use_chat_completions_url_for_anthropic_messages: true` flag in
-  # litellm_settings below opts out, pinning all openai/* traffic to
-  # /v1/chat/completions where tool_calls parse correctly.
+  # through the OpenAI Responses API (/v1/responses), where tool-call parsing
+  # falls back to text content for large request shapes (claw's 50+ tools).
+  # The `use_chat_completions_url_for_anthropic_messages: true` flag below pins
+  # all openai/* Anthropic-input traffic to /v1/chat/completions instead.
   - model_name: claw
     litellm_params:
       model: openai/claw
-      api_base: os.environ/OLLAMA_OPENAI_BASE
-      api_key: ollama-no-auth
+      api_base: os.environ/LLAMA_SERVER_BASE
+      api_key: llama-server-no-auth
 
   - model_name: anthropic/claw
     litellm_params:
       model: openai/claw
-      api_base: os.environ/OLLAMA_OPENAI_BASE
-      api_key: ollama-no-auth
+      api_base: os.environ/LLAMA_SERVER_BASE
+      api_key: llama-server-no-auth
   - model_name: anthropic/general
     litellm_params:
       model: ollama_chat/general

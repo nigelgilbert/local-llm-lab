@@ -41,8 +41,8 @@ url_encode() {
 
 profile_to_model() {
   case "$1" in
-    general|fast|reasoning|digest|analyze) printf '%s' "$1" ;;
-    *) err "unknown profile: $1 (valid: general, fast, reasoning, digest, analyze)" ;;
+    general|fast|reasoning|digest|analyze|claw) printf '%s' "$1" ;;
+    *) err "unknown profile: $1 (valid: general, fast, reasoning, digest, analyze, claw)" ;;
   esac
 }
 
@@ -96,7 +96,8 @@ Usage:
   cyberia status                            host health summary
   cyberia warm -p <profile>                 preload model on host
 
-Profiles: general, fast, reasoning, digest, analyze
+Profiles: general, fast, reasoning, digest, analyze, claw
+  (claw is the agent-coding profile — used by claw-code, not OWUI deep-links.)
 
 Config: $CONFIG (see client/config.env.example)
 EOF
