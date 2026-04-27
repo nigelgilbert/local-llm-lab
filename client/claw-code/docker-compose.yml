@@ -10,9 +10,14 @@ services:
     volumes:
       - ${WORKSPACE}:/workspace
     working_dir: /workspace
+    # Single dev-server port. Claw runs whatever framework on this — see CLAUDE.md in the workspace.
+    ports:
+      - "8081:8081"
     environment:
       - ANTHROPIC_BASE_URL=http://${BRIDGE_HOST}:${BRIDGE_PORT}
       - ANTHROPIC_API_KEY=${LITELLM_MASTER_KEY}
+      # CRA reads HOST; harmless for others. Vite/Next still need their own --host flag.
+      - HOST=0.0.0.0
     extra_hosts:
       # Lets BRIDGE_HOST=host.docker.internal work when claw runs on the lab box itself.
       - "host.docker.internal:host-gateway"
