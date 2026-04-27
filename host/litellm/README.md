@@ -2,6 +2,8 @@
 
 Anthropic-protocol shim in front of Ollama. Lets `claw-code` and any other Anthropic-shaped CLI talk to local models without touching the Ollama API directly.
 
+The goal of this architecture — LiteLLM shim + llama-server back-end — is to improve real-world coding quality: keep the Anthropic tool-use protocol intact end-to-end so agentic coding tools work the same way locally as they do against the cloud API.
+
 ```
 ┌────────────────┐  Anthropic API   ┌──────────┐    Ollama     ┌────────┐
 │  claw / aider  │ ───────────────▶ │ LiteLLM  │ ────────────▶ │ Ollama │
