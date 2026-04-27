@@ -1,6 +1,6 @@
-# Ollama Setup — Cyberia Host
+# Ollama Setup — LLM Lab Host
 
-Installs Ollama on the **target host** (the 64 GB M5 Max Pro MBP, hostname `cyberia`), pulls or imports the three profile models, and verifies a CLI chat. Spec ref: [`spec.md` §13](../../spec.md), step 2.
+Installs Ollama on the **target host** (the 64 GB M5 Max Pro MBP, hostname `home-llm-lab`), pulls or imports the three profile models, and verifies a CLI chat. Spec ref: [`spec.md` §13](../../spec.md), step 2.
 
 > **Run this on the 64 GB target rig, not your 32 GB dev machine.** The largest profile model is ~41 GB resident.
 
@@ -17,7 +17,7 @@ Profile selection (models, quants, sizes, `num_ctx`) lives in [`../../profiles.m
 
 | | |
 |---|---|
-| Hostname `cyberia` set | `scutil --get LocalHostName` should print `cyberia` |
+| Hostname `home-llm-lab` set | `scutil --get LocalHostName` should print `home-llm-lab` |
 | macOS | 14 Sonoma or later (Ollama requirement) |
 | Free disk | ~150 GB (model blobs + Ollama re-import + headroom) |
 | Power | On AC for the initial pulls |
@@ -190,11 +190,11 @@ Quit and reopen Ollama.app (menubar → Quit, then relaunch from `/Applications`
 
 ### 5b. Other env vars (not in the GUI)
 
-The env vars the Settings UI doesn't expose live in a LaunchAgent that's tracked in this repo at [`launchd/com.cyberia.ollama-env.plist`](launchd/com.cyberia.ollama-env.plist). The repo file is the source of truth; install it by copying into `~/Library/LaunchAgents/`:
+The env vars the Settings UI doesn't expose live in a LaunchAgent that's tracked in this repo at [`launchd/com.home-llm-lab.ollama-env.plist`](launchd/com.home-llm-lab.ollama-env.plist). The repo file is the source of truth; install it by copying into `~/Library/LaunchAgents/`:
 
 ```sh
-cp host/ollama/launchd/com.cyberia.ollama-env.plist ~/Library/LaunchAgents/
-launchctl load -w ~/Library/LaunchAgents/com.cyberia.ollama-env.plist
+cp host/ollama/launchd/com.home-llm-lab.ollama-env.plist ~/Library/LaunchAgents/
+launchctl load -w ~/Library/LaunchAgents/com.home-llm-lab.ollama-env.plist
 ```
 
 This sets, at every login:
@@ -231,7 +231,7 @@ If it still shows `127.0.0.1:11434`, the GUI toggle didn't take or the daemon wa
 
 From another machine on the same network:
 ```sh
-curl http://cyberia.local:11434/api/tags
+curl http://home-llm-lab.local:11434/api/tags
 ```
 
 Returns JSON listing your models. This is the surface the Docker container will use.
@@ -244,7 +244,7 @@ Returns JSON listing your models. This is the surface the Docker container will 
 
 > **Env var summary:**
 > - `OLLAMA_HOST=0.0.0.0:11434` — bind to all interfaces (LAN reachable). Set via Settings UI.
-> - `OLLAMA_FLASH_ATTENTION=1`, `OLLAMA_KV_CACHE_TYPE=q8_0`, `OLLAMA_KEEP_ALIVE=30s` — set via the LaunchAgent at [`launchd/com.cyberia.ollama-env.plist`](launchd/com.cyberia.ollama-env.plist) (see §5b for rationale and install).
+> - `OLLAMA_FLASH_ATTENTION=1`, `OLLAMA_KV_CACHE_TYPE=q8_0`, `OLLAMA_KEEP_ALIVE=30s` — set via the LaunchAgent at [`launchd/com.home-llm-lab.ollama-env.plist`](launchd/com.home-llm-lab.ollama-env.plist) (see §5b for rationale and install).
 
 ---
 
@@ -265,10 +265,10 @@ ollama ps
 **`<think>` blocks are noisy in CLI**
 Expected for now — Qwen3.6's default. Per-profile control belongs in OWUI's per-model config, not this README.
 
-**LAN test (`curl http://cyberia.local:11434/api/tags`) hangs**
+**LAN test (`curl http://home-llm-lab.local:11434/api/tags`) hangs**
 - Confirm `lsof -nP -iTCP:11434` shows `*:11434`, not `127.0.0.1:11434`
 - macOS Application Firewall: allow inbound on :11434, or temporarily disable for the test
-- mDNS sanity: `ping cyberia.local` from the LAN client first
+- mDNS sanity: `ping home-llm-lab.local` from the LAN client first
 
 **`ollama create` fails with "no such file"**
 - Confirm the GGUF is actually there: `ls -lh ~/.ollama/gguf/`
@@ -293,7 +293,7 @@ du -sh ~/.ollama                  # confirm freed
 
 1. Modelfile aliases — `host/ollama/Modelfiles/{general,fast,reasoning,digest,analyze}.Modelfile` to bind each upstream model under a stable `<profile>` name.
 2. Open WebUI Docker stack — `host/docker-compose.yml` reaching Ollama via `host.docker.internal:11434`.
-3. Host control script — `host/scripts/cyberia-hostctl` (up / down / status / warm / openui-url).
+3. Host control script — `host/scripts/home-llm-lab-hostctl` (up / down / status / warm / openui-url).
 4. **claw-code only:** LiteLLM bridge ([`../litellm/`](../litellm/)) + llama-server native daemon ([`../llama-server/`](../llama-server/)). Not required for OWUI.
 
 See [`spec.md` §13](../../spec.md) for the full Phase 1 sequence.

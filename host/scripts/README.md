@@ -1,26 +1,26 @@
 # Host scripts
 
 Two scripts live here:
-- [`cyberia-hostctl`](cyberia-hostctl) — daily orchestration (up / down / status / warm / openui-url). Symlinked into `$PATH`.
+- [`home-llm-lab-hostctl`](home-llm-lab-hostctl) — daily orchestration (up / down / status / warm / openui-url). Symlinked into `$PATH`.
 - [`set-local-hostname`](set-local-hostname) — one-shot helper to claim `<name>.local` via mDNS. Run from the repo path; not symlinked.
 
-## Install `cyberia-hostctl` on the target host
+## Install `home-llm-lab-hostctl` on the target host
 
 ```sh
-sudo ln -s ~/Desktop/bench/local-llm-lab/host/scripts/cyberia-hostctl /usr/local/bin/cyberia-hostctl
+sudo ln -s ~/Desktop/bench/home-llm-lab/host/scripts/home-llm-lab-hostctl /usr/local/bin/home-llm-lab-hostctl
 ```
 
 (Adjust the path if you cloned the repo elsewhere. The script already has the executable bit set in the repo.)
 
 Test:
 ```sh
-cyberia-hostctl --help
-cyberia-hostctl status
+home-llm-lab-hostctl --help
+home-llm-lab-hostctl status
 ```
 
 ---
 
-## `cyberia-hostctl` — subcommands
+## `home-llm-lab-hostctl` — subcommands
 
 | | |
 |---|---|
@@ -35,9 +35,9 @@ Profiles: `general`, `fast`, `reasoning`, `digest`, `analyze`, `claw`.
 ## Env overrides
 
 ```
-HOST_REPO          repo root (default: ~/Desktop/bench/local-llm-lab)
+HOST_REPO          repo root (default: ~/Desktop/bench/home-llm-lab)
 COMPOSE_DIR        compose dir (default: $HOST_REPO/host)
-OPENUI_BASE        external OWUI URL (default: http://cyberia.local)
+OPENUI_BASE        external OWUI URL (default: http://home-llm-lab.local)
 OLLAMA_API         local Ollama API (default: http://127.0.0.1:11434)
 LLAMA_SERVER_API   local llama-server API (default: http://127.0.0.1:11435)
 KEEP_ALIVE         Ollama warm duration (default: 30m); claw is always resident.
@@ -49,9 +49,9 @@ Useful when running from a non-default repo path, or if you change any port.
 
 ## `set-local-hostname` — claim `<name>.local`
 
-Sets `LocalHostName` via `scutil`. Default `cyberia`. On LAN conflict, macOS auto-bumps to `<name>-2` and the script exits non-zero.
+Sets `LocalHostName` via `scutil`. Default `home-llm-lab`. On LAN conflict, macOS auto-bumps to `<name>-2` and the script exits non-zero.
 
 ```sh
-sudo ./host/scripts/set-local-hostname          # claim 'cyberia'
+sudo ./host/scripts/set-local-hostname          # claim 'home-llm-lab'
 sudo ./host/scripts/set-local-hostname my-rig   # claim a different name
 ```

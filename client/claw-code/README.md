@@ -5,19 +5,19 @@ Self-hosted [`claw-code`](https://github.com/ultraworkers/claw-code) in Docker, 
 ```
 ┌──────────┐  Anthropic API   ┌──────────────────┐  Ollama API   ┌────────┐
 │   claw   │ ───────────────▶ │   LiteLLM        │ ────────────▶ │ Ollama │
-│ (in box) │   /v1/messages   │ cyberia.local    │               │ :11434 │
+│ (in box) │   /v1/messages   │ home-llm-lab.local    │               │ :11434 │
 │          │                  │ :4000            │               │        │
 └──────────┘                  └──────────────────┘               └────────┘
    client                            host
 ```
 
-Profile selection is a claw flag (`--model anthropic/<profile>`); the URL is fixed. `claw` is the agentic-coding profile (Qwen3-Coder-30B-A3B), authored specifically for tool-use loops — that's the one you want for actual coding work. The five OWUI profiles (`general`, `fast`, `reasoning`, `digest`, `analyze`) are also routable but only `general` declares the `tools` capability natively. `cyberia warm -p <profile>` from [`../`](../) preheats the model before a session — pairs naturally but isn't required.
+Profile selection is a claw flag (`--model anthropic/<profile>`); the URL is fixed. `claw` is the agentic-coding profile (Qwen3-Coder-30B-A3B), authored specifically for tool-use loops — that's the one you want for actual coding work. The five OWUI profiles (`general`, `fast`, `reasoning`, `digest`, `analyze`) are also routable but only `general` declares the `tools` capability natively. `home-llm-lab warm -p <profile>` from [`../`](../) preheats the model before a session — pairs naturally but isn't required.
 
 ## Prerequisites
 
 - The bridge is running on the lab host: see [`../../host/litellm/README.md`](../../host/litellm/README.md).
 - You know the bridge's `LITELLM_MASTER_KEY` (operator hands it to you).
-- `cyberia.local` resolves from your laptop (`ping cyberia.local`), or you have the DHCP-reserved IP.
+- `home-llm-lab.local` resolves from your laptop (`ping home-llm-lab.local`), or you have the DHCP-reserved IP.
 
 ## Setup
 
@@ -29,7 +29,7 @@ mkdir -p "$(grep ^WORKSPACE= .env | cut -d= -f2)"
 docker compose up -d --build  # ~5–10 min on first build (cargo --release)
 ```
 
-`BRIDGE_HOST` defaults to `cyberia.local`. If you're running this on the lab box itself, set `BRIDGE_HOST=host.docker.internal` instead.
+`BRIDGE_HOST` defaults to `home-llm-lab.local`. If you're running this on the lab box itself, set `BRIDGE_HOST=host.docker.internal` instead.
 
 ## Usage
 
@@ -118,6 +118,6 @@ Historic qwen3-coder failure mode where the model would emit 3+ duplicate `write
 **Tool call shows up as raw text instead of executing (`<tools>` or bare JSON in the response)**
 Shouldn't happen with `--model anthropic/claw` (template override eliminates the `<tools>` tag collision; bridge pins requests to `/v1/chat/completions` so the tool-call parser fires correctly). If it does happen on another profile, that profile's Modelfile doesn't declare the `tools` capability — only `general` and `claw` do.
 
-## Phase 2 — `cyberia claw` subcommand
+## Phase 2 — `home-llm-lab claw` subcommand
 
-The vision: friends install [`../cyberia`](../cyberia) plus this image and drive it from their laptops. Today the lifecycle is raw `docker compose`; a future `cyberia claw up | down | shell | doctor` would wrap it. Schema is intentionally compose-driven so the wrapper stays thin.
+The vision: friends install [`../home-llm-lab`](../home-llm-lab) plus this image and drive it from their laptops. Today the lifecycle is raw `docker compose`; a future `home-llm-lab claw up | down | shell | doctor` would wrap it. Schema is intentionally compose-driven so the wrapper stays thin.

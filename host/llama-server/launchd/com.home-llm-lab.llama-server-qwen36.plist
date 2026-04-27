@@ -3,14 +3,14 @@
 <plist version="1.0">
 <dict>
     <key>Label</key>
-    <string>com.cyberia.llama-server-qwen36</string>
+    <string>com.home-llm-lab.llama-server-qwen36</string>
 
     <!--
       llama.cpp server variant for the qwen3.6-27B model A/B eval.
       Used only by host/test-model-ab/run.sh — never install this manually.
 
       run.sh substitutes QWEN36_GGUF_PATH at runtime via sed, then copies
-      the rendered plist to ~/Library/LaunchAgents/com.cyberia.llama-server.plist
+      the rendered plist to ~/Library/LaunchAgents/com.home-llm-lab.llama-server.plist
       (overwriting the production claw plist for the duration of Phase B).
       The cleanup trap restores the production plist when the run exits.
 
@@ -62,7 +62,7 @@
 
         <!-- grammar — same constraint as production claw -->
         <string>--grammar-file</string>
-        <string>/Users/nigel/Desktop/bench/local-llm-lab/host/llama-server/grammars/claw.gbnf</string>
+        <string>/Users/nigel/Desktop/bench/home-llm-lab/host/llama-server/grammars/claw.gbnf</string>
 
         <!-- misc -->
         <string>--metrics</string>

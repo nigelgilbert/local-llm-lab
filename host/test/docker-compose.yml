@@ -5,7 +5,7 @@ services:
   test:
     build:
       context: .
-    image: cyberia-test:local
+    image: home-llm-lab-test:local
     working_dir: /test
     env_file:
       - ../litellm/.env

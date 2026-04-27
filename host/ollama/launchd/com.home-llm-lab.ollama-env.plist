@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
     <key>Label</key>
-    <string>com.cyberia.ollama-env</string>
+    <string>com.home-llm-lab.ollama-env</string>
     <key>ProgramArguments</key>
     <array>
         <string>/bin/sh</string>

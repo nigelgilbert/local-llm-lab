@@ -1,6 +1,6 @@
-# local-llm-lab
+# home-llm-lab
 
-Local-first AI rig: **Ollama on the host** (native Apple Silicon, unified memory) + **Open WebUI in Docker** (LAN browser UI) + **[`claw-code`](https://github.com/ultraworkers/claw-code) in Docker** (agentic coding, via a LiteLLM Anthropic-API bridge), wired to a five-profile OWUI lineup plus a dedicated `claw` coding profile, picked for a 64 GB box. Branded `cyberia` here; one rename away from any other handle (see [Fork checklist](#fork-checklist)).
+Local-first AI rig: **Ollama on the host** (native Apple Silicon, unified memory) + **Open WebUI in Docker** (LAN browser UI) + **[`claw-code`](https://github.com/ultraworkers/claw-code) in Docker** (agentic coding, via a LiteLLM Anthropic-API bridge), wired to a five-profile OWUI lineup plus a dedicated `claw` coding profile, picked for a 64 GB box. Branded `home-llm-lab` here; one rename away from any other handle (see [Fork checklist](#fork-checklist)).
 
 Full plan: [`spec.md`](spec.md). Model selection: [`profiles.md`](profiles.md).
 
@@ -24,24 +24,24 @@ In order, each directory has its own README:
 2. [`host/ollama/Modelfiles/`](host/ollama/Modelfiles/) — `ollama create` the aliases
 3. [`host/`](host/) — Open WebUI Docker stack, groups, per-model config
 4. [`host/litellm/`](host/litellm/) — LiteLLM bridge (Anthropic API ↔ Ollama), required by `claw-code`
-5. [`host/scripts/`](host/scripts/) — install `cyberia-hostctl` for orchestration
-6. [`client/`](client/) — install the `cyberia` CLI on your laptop
+5. [`host/scripts/`](host/scripts/) — install `home-llm-lab-hostctl` for orchestration
+6. [`client/`](client/) — install the `home-llm-lab` CLI on your laptop
 7. [`client/claw-code/`](client/claw-code/) — containerised `claw-code`, pointed at the bridge
 
 ## Fork checklist
 
 ```sh
-# 1. Brand: replace `cyberia` everywhere (LAN hostname, script names, plist Label)
-grep -rl 'cyberia\|Cyberia' . | xargs sed -i '' 's/cyberia/your-brand/g; s/Cyberia/Your-Brand/g'
+# 1. Brand: replace `home-llm-lab` everywhere (LAN hostname, script names, plist Label)
+grep -rl 'home-llm-lab\|LLM Lab' . | xargs sed -i '' 's/home-llm-lab/your-brand/g; s/LLM Lab/Your-Brand/g'
 
 # 2. Rig username: Modelfile FROM paths point to /Users/nigel/.ollama/gguf/
 sed -i '' "s|/Users/nigel/|/Users/$USER/|g" host/ollama/Modelfiles/*.Modelfile
 
-# 3. Repo path: cyberia-hostctl defaults to ~/Desktop/bench/local-llm-lab.
+# 3. Repo path: home-llm-lab-hostctl defaults to ~/Desktop/bench/home-llm-lab.
 #    Either clone there, or set `HOST_REPO=/your/path` in your shell profile.
 ```
 
-After step 1, also rename `host/ollama/launchd/com.cyberia.ollama-env.plist` to match.
+After step 1, also rename `host/ollama/launchd/com.home-llm-lab.ollama-env.plist` to match.
 
 ## Browser
 

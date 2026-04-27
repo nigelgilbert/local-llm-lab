@@ -1,6 +1,6 @@
 #!/usr/bin/env sh
-# cyberia-hostctl — host-side orchestration for Cyberia LAN AI lab.
-# Lives on the host (cyberia.local). Invoked locally or over SSH from `cyberia` client.
+# home-llm-lab-hostctl — host-side orchestration for LLM Lab LAN AI lab.
+# Lives on the host (home-llm-lab.local). Invoked locally or over SSH from `home-llm-lab` client.
 #
 # Subcommands:
 #   up                              bring docker stack up (idempotent), verify health
@@ -12,9 +12,9 @@
 set -eu
 
 # ---- config (override via env) ----
-HOST_REPO="${HOST_REPO:-$HOME/Desktop/bench/local-llm-lab}"
+HOST_REPO="${HOST_REPO:-$HOME/Desktop/bench/home-llm-lab}"
 COMPOSE_DIR="${COMPOSE_DIR:-$HOST_REPO/host}"
-OPENUI_BASE="${OPENUI_BASE:-http://cyberia.local}"
+OPENUI_BASE="${OPENUI_BASE:-http://home-llm-lab.local}"
 OLLAMA_API="${OLLAMA_API:-http://127.0.0.1:11434}"
 LLAMA_SERVER_API="${LLAMA_SERVER_API:-http://127.0.0.1:11435}"
 KEEP_ALIVE="${KEEP_ALIVE:-30m}"
@@ -107,7 +107,7 @@ cmd_status() {
 }
 
 cmd_warm() {
-  [ "${1:-}" ] || err "usage: cyberia-hostctl warm <profile>"
+  [ "${1:-}" ] || err "usage: home-llm-lab-hostctl warm <profile>"
   profile=$(profile_to_model "$1")
   case "$profile" in
     claw)
@@ -154,19 +154,19 @@ cmd_openui_url() {
 
 usage() {
   cat <<EOF
-cyberia-hostctl — host-side orchestration for Cyberia LAN AI lab
+home-llm-lab-hostctl — host-side orchestration for LLM Lab LAN AI lab
 
 Usage:
-  cyberia-hostctl up                              bring stack up (idempotent)
-  cyberia-hostctl down                            stop stack (volume preserved)
-  cyberia-hostctl status                          health summary
-  cyberia-hostctl warm <profile>                  preload model (general|fast|reasoning|digest|analyze|claw)
-  cyberia-hostctl openui-url [-p P] [-q "..."]    print deep-link URL
+  home-llm-lab-hostctl up                              bring stack up (idempotent)
+  home-llm-lab-hostctl down                            stop stack (volume preserved)
+  home-llm-lab-hostctl status                          health summary
+  home-llm-lab-hostctl warm <profile>                  preload model (general|fast|reasoning|digest|analyze|claw)
+  home-llm-lab-hostctl openui-url [-p P] [-q "..."]    print deep-link URL
 
 Env overrides:
-  HOST_REPO          repo root (default: ~/Desktop/bench/local-llm-lab)
+  HOST_REPO          repo root (default: ~/Desktop/bench/home-llm-lab)
   COMPOSE_DIR        compose dir (default: \$HOST_REPO/host)
-  OPENUI_BASE        external OWUI URL (default: http://cyberia.local)
+  OPENUI_BASE        external OWUI URL (default: http://home-llm-lab.local)
   OLLAMA_API         local Ollama API (default: http://127.0.0.1:11434)
   LLAMA_SERVER_API   local llama-server API (default: http://127.0.0.1:11435)
   KEEP_ALIVE         Ollama warm duration (default: 30m); claw is always resident.

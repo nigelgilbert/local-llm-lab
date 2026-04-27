@@ -23,15 +23,15 @@ Two upstream paths to Ollama, picked per route in [`litellm-config.yaml`](./lite
 
 **On LiteLLM image upgrade**, re-snapshot upstream and re-apply the marked patches:
 ```sh
-docker exec cyberia-litellm cat /usr/lib/python3.13/site-packages/litellm/llms/anthropic/experimental_pass_through/adapters/streaming_iterator.py > /tmp/upstream.py
+docker exec home-llm-lab-litellm cat /usr/lib/python3.13/site-packages/litellm/llms/anthropic/experimental_pass_through/adapters/streaming_iterator.py > /tmp/upstream.py
 diff host/litellm/patches/streaming_iterator.py /tmp/upstream.py
-# re-apply the PATCH (cyberia local-llm-lab) blocks into a fresh copy, mv into place, docker compose up -d --force-recreate.
+# re-apply the PATCH (home-llm-lab home-llm-lab) blocks into a fresh copy, mv into place, docker compose up -d --force-recreate.
 ```
 If upstream fixes the bug, delete the patch file and the volume mount.
 
 **Quick verification:**
 ```sh
-docker exec cyberia-litellm grep -c "PATCH (cyberia local-llm-lab)" \
+docker exec home-llm-lab-litellm grep -c "PATCH (home-llm-lab home-llm-lab)" \
   /usr/lib/python3.13/site-packages/litellm/llms/anthropic/experimental_pass_through/adapters/streaming_iterator.py
 # Expect: 3  (header marker + sync iterator + async iterator)
 ```
@@ -52,7 +52,7 @@ Verify:
 curl -fsS http://localhost:4000/health/liveliness
 # {"status":"healthy"}
 
-curl -fsS http://cyberia.local:4000/health/liveliness
+curl -fsS http://home-llm-lab.local:4000/health/liveliness
 # same — confirms LAN reachability
 ```
 
@@ -110,4 +110,4 @@ Port `4000` is LAN-exposed. Same threat model as the Ollama port (`:11434`): any
 ## Pairs with
 
 - [`../../client/claw-code/`](../../client/claw-code/) — claw-code in Docker, points at this bridge.
-- `cyberia warm -p <profile>` from [`../../client/`](../../client/) preheats whichever Ollama model the bridge will route to.
+- `home-llm-lab warm -p <profile>` from [`../../client/`](../../client/) preheats whichever Ollama model the bridge will route to.

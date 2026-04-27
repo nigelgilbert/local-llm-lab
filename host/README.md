@@ -1,14 +1,14 @@
-# Cyberia Host — Docker Stack & Deployment Runbook
+# LLM Lab Host — Docker Stack & Deployment Runbook
 
 Brings up Open WebUI on the target host and walks through first-time admin setup. Spec ref: [`spec.md` §13](../spec.md), steps 3–4.
 
-> Run on the **64 GB target rig** with hostname `cyberia`. Assumes [`ollama/README.md`](ollama/README.md) is complete (Ollama running on `0.0.0.0:11434`, all profile models in place) and [`ollama/Modelfiles/README.md`](ollama/Modelfiles/README.md) has been applied (`general`, `fast`, `reasoning`, `digest`, `analyze` all show in `ollama list`).
+> Run on the **64 GB target rig** with hostname `home-llm-lab`. Assumes [`ollama/README.md`](ollama/README.md) is complete (Ollama running on `0.0.0.0:11434`, all profile models in place) and [`ollama/Modelfiles/README.md`](ollama/Modelfiles/README.md) has been applied (`general`, `fast`, `reasoning`, `digest`, `analyze` all show in `ollama list`).
 
 ---
 
 ## Read this first: first-signup-admin race
 
-Open WebUI's first user account becomes admin automatically. **You must sign up before sharing `http://cyberia.local` with anyone.** If a guest hits the URL first, they become admin and see all admin functions.
+Open WebUI's first user account becomes admin automatically. **You must sign up before sharing `http://home-llm-lab.local` with anyone.** If a guest hits the URL first, they become admin and see all admin functions.
 
 Bring stack up → sign up immediately → configure groups + access → *then* hand the URL to guests.
 
@@ -18,7 +18,7 @@ Bring stack up → sign up immediately → configure groups + access → *then* 
 
 | | |
 |---|---|
-| Ollama LAN-bound | `curl http://cyberia.local:11434/api/tags` returns JSON |
+| Ollama LAN-bound | `curl http://home-llm-lab.local:11434/api/tags` returns JSON |
 | Modelfile aliases applied | `ollama list` shows `general`, `fast`, `reasoning`, `digest`, `analyze` |
 | Container runtime | OrbStack (recommended) or Docker Desktop |
 | Free disk | ~5 GB for image + room for the named volume |
@@ -58,7 +58,7 @@ docker compose ps
 curl -fsS http://localhost/health
 # Expected: 200 OK with a JSON body
 
-curl -fsS http://cyberia.local/health
+curl -fsS http://home-llm-lab.local/health
 # Expected: same. If this one fails, mDNS/firewall issue (see Troubleshooting).
 ```
 
@@ -73,7 +73,7 @@ docker compose logs open-webui --tail 100
 
 > Do this **right now**, before sharing the URL.
 
-1. Open `http://cyberia.local` in your browser.
+1. Open `http://home-llm-lab.local` in your browser.
 2. Click **Sign up**.
 3. Fill in name + email + password. Use a real email — the admin email is referenced for some flows (password resets, OAuth setup if added later).
 4. The first account auto-becomes admin. You'll land in the chat UI.
@@ -96,7 +96,7 @@ Admin Panel → **Groups** → **Create Group**:
 
 After creating, click into the group. The URL will be something like:
 ```
-http://cyberia.local/admin/groups/01h...abc
+http://home-llm-lab.local/admin/groups/01h...abc
                                   ^^^^^^^^ this is the group ID
 ```
 
@@ -169,7 +169,7 @@ Admin Panel → **Models** → click `general`:
    - Expect: sensible response → spec §4.2 vision gate passes.
 
 ### 5b. Guest test (from another LAN device)
-1. From your other laptop: `http://cyberia.local` → Sign up.
+1. From your other laptop: `http://home-llm-lab.local` → Sign up.
 2. Confirm: lands in chat, **no** Admin Panel link, all five profiles visible in model picker.
 3. Send a test message → response works.
 4. Back on the admin device: Admin Panel → Users — confirm the new user is in the `Guests` group, role `user`.
@@ -182,7 +182,7 @@ docker compose up -d
 Sign back in → previous chats are still there. Volume persistence working.
 
 ### 5d. Sleep cycle (Mac sleep + wake)
-Let the host sleep, wake it, hit `http://cyberia.local` from a guest → still works.
+Let the host sleep, wake it, hit `http://home-llm-lab.local` from a guest → still works.
 - If not: macOS Energy → "Wake for network access" should be on.
 
 ---
@@ -228,9 +228,9 @@ Bump the spec version reference and verify env-var compatibility before pinning 
 
 ## Troubleshooting
 
-**`http://cyberia.local` works locally but not from another LAN device**
+**`http://home-llm-lab.local` works locally but not from another LAN device**
 mDNS not propagating. Try:
-- `ping cyberia.local` from the guest device first.
+- `ping home-llm-lab.local` from the guest device first.
 - If `ping` works but HTTP doesn't: macOS App Firewall is dropping `:80`. Approve in System Settings → Network → Firewall → Options.
 - If `ping` fails too: LAN guest-isolation, mDNS reflector disabled, or guest on a different SSID. Use the DHCP-reserved IP as fallback.
 
@@ -258,8 +258,8 @@ You shared the URL before signing up. Recovery:
 
 ## Next
 
-5. Host control script — [`scripts/cyberia-hostctl`](scripts/) (`up`, `down`, `status`, `warm`, `openui-url`).
-6. Client CLI — [`../client/`](../client/) (`cyberia chat`, `cyberia warm`, `cyberia status`).
+5. Host control script — [`scripts/home-llm-lab-hostctl`](scripts/) (`up`, `down`, `status`, `warm`, `openui-url`).
+6. Client CLI — [`../client/`](../client/) (`home-llm-lab chat`, `home-llm-lab warm`, `home-llm-lab status`).
 7. End-to-end acceptance — spec §13 step 7.
 
 **For claw-code users:** also bring up the LiteLLM bridge ([`litellm/`](litellm/)) and the llama-server native daemon ([`llama-server/`](llama-server/)). Those are independent of OWUI — you can skip them if you only need the chat UI.

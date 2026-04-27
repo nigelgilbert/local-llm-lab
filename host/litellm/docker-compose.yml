@@ -1,7 +1,7 @@
 services:
   litellm:
     image: ghcr.io/berriai/litellm:main-latest
-    container_name: cyberia-litellm
+    container_name: home-llm-lab-litellm
     restart: unless-stopped
     ports:
       - "4000:4000"

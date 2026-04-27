@@ -1,5 +1,5 @@
 #!/usr/bin/env sh
-# cyberia — thin client wrapper for the Cyberia LAN AI lab.
+# home-llm-lab — thin client wrapper for the LLM Lab LAN AI lab.
 # SSHes the host for control actions, opens the browser for chat.
 #
 # Subcommands:
@@ -9,13 +9,13 @@
 
 set -eu
 
-CONFIG="${CYBERIA_CONFIG:-$HOME/.config/cyberia/config.env}"
+CONFIG="${HOME_LLM_LAB_CONFIG:-$HOME/.config/home-llm-lab/config.env}"
 
 # Defaults — overridden by config.env if present.
-CYBERIA_HOST=cyberia.local
-CYBERIA_USER="$USER"
-CYBERIA_OPENUI_BASE=http://cyberia.local
-CYBERIA_HOSTCTL=cyberia-hostctl
+HOME_LLM_LAB_HOST=home-llm-lab.local
+HOME_LLM_LAB_USER="$USER"
+HOME_LLM_LAB_OPENUI_BASE=http://home-llm-lab.local
+HOME_LLM_LAB_HOSTCTL=home-llm-lab-hostctl
 
 [ -f "$CONFIG" ] && . "$CONFIG"
 
@@ -23,7 +23,7 @@ err() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
 
 ssh_host() {
   ssh -o BatchMode=yes -o ConnectTimeout=5 \
-    "${CYBERIA_USER}@${CYBERIA_HOST}" "$@"
+    "${HOME_LLM_LAB_USER}@${HOME_LLM_LAB_HOST}" "$@"
 }
 
 open_url() {
@@ -57,20 +57,20 @@ cmd_chat() {
     esac
   done
 
-  url="$CYBERIA_OPENUI_BASE"
+  url="$HOME_LLM_LAB_OPENUI_BASE"
   if [ -n "$profile" ]; then
     model=$(profile_to_model "$profile")
     url="$url/?model=$model"
     [ -n "$query" ] && url="$url&q=$(url_encode "$query")"
     # Fire-and-forget warm so the model is hot by the time the browser arrives.
-    ssh_host "$CYBERIA_HOSTCTL warm $profile" >/dev/null 2>&1 || true
+    ssh_host "$HOME_LLM_LAB_HOSTCTL warm $profile" >/dev/null 2>&1 || true
   fi
 
   open_url "$url"
 }
 
 cmd_status() {
-  ssh_host "$CYBERIA_HOSTCTL status"
+  ssh_host "$HOME_LLM_LAB_HOSTCTL status"
 }
 
 cmd_warm() {
@@ -81,20 +81,20 @@ cmd_warm() {
       *) err "unknown arg: $1" ;;
     esac
   done
-  [ -n "$profile" ] || err "usage: cyberia warm -p <profile>"
-  ssh_host "$CYBERIA_HOSTCTL warm $profile"
+  [ -n "$profile" ] || err "usage: home-llm-lab warm -p <profile>"
+  ssh_host "$HOME_LLM_LAB_HOSTCTL warm $profile"
 }
 
 usage() {
   cat <<EOF
-cyberia — client wrapper for Cyberia LAN AI lab
+home-llm-lab — client wrapper for LLM Lab LAN AI lab
 
 Usage:
-  cyberia chat                              open Open WebUI bare
-  cyberia chat -p <profile>                 open with model preselected
-  cyberia chat -p <profile> -q "<query>"    preselect + prefill query
-  cyberia status                            host health summary
-  cyberia warm -p <profile>                 preload model on host
+  home-llm-lab chat                              open Open WebUI bare
+  home-llm-lab chat -p <profile>                 open with model preselected
+  home-llm-lab chat -p <profile> -q "<query>"    preselect + prefill query
+  home-llm-lab status                            host health summary
+  home-llm-lab warm -p <profile>                 preload model on host
 
 Profiles: general, fast, reasoning, digest, analyze, claw
   (claw is the agent-coding profile — used by claw-code, not OWUI deep-links.)

@@ -1,13 +1,13 @@
-# Cyberia LAN AI Lab — Architecture & Build Plan
+# Home LLM Lab — Architecture & Build Plan
 
 ## 0) Goal
 
 Build a local-first AI rig around a **64 GB Apple Silicon MacBook Pro (M5 Max Pro)** that:
 
 - runs **Ollama natively on the host** for best Apple unified-memory performance
-- exposes **Open WebUI** on the LAN over **plain HTTP at port 80** via mDNS hostname `cyberia.local`
+- exposes **Open WebUI** on the LAN over **plain HTTP at port 80** via mDNS hostname `home-llm-lab.local`
 - supports five task-based profiles — `general`, `fast`, `reasoning`, `digest`, `analyze` — each backed by an upstream model picked for that job
-- ships a thin client-side shell CLI named `cyberia` that orchestrates from laptops
+- ships a thin client-side shell CLI named `home-llm-lab` that orchestrates from laptops
 - supports LAN guests in the browser without the CLI
 
 > **Model selection lives in [`profiles.md`](profiles.md).** That file is the single source of truth for upstream tags, quant levels, sizes, `num_ctx`, and per-profile rationale. This spec defers all model-specific decisions to it.
@@ -15,21 +15,21 @@ Build a local-first AI rig around a **64 GB Apple Silicon MacBook Pro (M5 Max Pr
 ### Validated assumptions
 
 - mDNS resolution works cross-device on the home LAN (verified 2026-04-25)
-- Mac's `LocalHostName` set to `cyberia` → `http://cyberia.local` resolves on any LAN client
+- Mac's `LocalHostName` set to `home-llm-lab` → `http://home-llm-lab.local` resolves on any LAN client
 - LAN is medium-security, gated by user's network device passport system. Per-device identity is established at the network layer before Open WebUI sees the request.
 
 ### Desired UX (MVP)
 
 ```sh
-cyberia chat                                 # open Open WebUI bare
-cyberia chat -p general                      # daily driver preselected
-cyberia chat -p fast                         # snappy triage preselected
-cyberia chat -p reasoning                    # math / planning preselected
-cyberia chat -p digest                       # long-context extract preselected
-cyberia chat -p analyze                      # long-context reasoning preselected
-cyberia chat -p digest -q "summarise..."     # preselect + prefilled query
-cyberia status                               # SSH host → cyberia-hostctl status
-cyberia warm -p reasoning                    # preload model
+home-llm-lab chat                                 # open Open WebUI bare
+home-llm-lab chat -p general                      # daily driver preselected
+home-llm-lab chat -p fast                         # snappy triage preselected
+home-llm-lab chat -p reasoning                    # math / planning preselected
+home-llm-lab chat -p digest                       # long-context extract preselected
+home-llm-lab chat -p analyze                      # long-context reasoning preselected
+home-llm-lab chat -p digest -q "summarise..."     # preselect + prefilled query
+home-llm-lab status                               # SSH host → home-llm-lab-hostctl status
+home-llm-lab warm -p reasoning                    # preload model
 ```
 
 ### Profiles at a glance
@@ -46,7 +46,7 @@ Specific models, quants, and sizing are in [`profiles.md`](profiles.md). One pro
 
 | Feature | Phase |
 |---|---|
-| `cyberia wake` (Wake-on-LAN), `cyberia cli` TTY tunnel | 2 |
+| `home-llm-lab wake` (Wake-on-LAN), `home-llm-lab cli` TTY tunnel | 2 |
 | Tailscale `tailscale serve` for remote HTTPS | 2 |
 | Caddy reverse proxy (only if auth / TLS / path routing wanted) | 2 |
 | RAG sidecar-loader + corpora | 3 |
@@ -63,7 +63,7 @@ Best path to stable Apple unified-memory performance; simplest model storage and
 
 ### 1.2 Open WebUI in Docker; no Caddy in MVP
 
-Open WebUI binds directly to host port 80 on the LAN interface. mDNS gives us `cyberia.local` for free; no reverse proxy needed for hostname stability. LAN-only HTTP is acceptable security given the network passport gating. Caddy retrofits cleanly later — adding it does not break the URL contract.
+Open WebUI binds directly to host port 80 on the LAN interface. mDNS gives us `home-llm-lab.local` for free; no reverse proxy needed for hostname stability. LAN-only HTTP is acceptable security given the network passport gating. Caddy retrofits cleanly later — adding it does not break the URL contract.
 
 ### 1.3 Profiles are model swaps, not finetunes
 
@@ -75,11 +75,11 @@ Multi-user with per-user private chats by default; profiles expose as models in 
 
 ### 1.5 Client CLI is a thin orchestrator
 
-`cyberia` on client machines is a small POSIX shell helper. Heavy logic lives on the host as `cyberia-hostctl`. Compose paths, model names, health checks all evolve on the host without forcing client updates.
+`home-llm-lab` on client machines is a small POSIX shell helper. Heavy logic lives on the host as `home-llm-lab-hostctl`. Compose paths, model names, health checks all evolve on the host without forcing client updates.
 
 ### 1.6 mDNS is the LAN hostname strategy (validated)
 
-Mac `LocalHostName=cyberia`; `cyberia.local` resolves cross-device on this LAN (verified 2026-04-25 — Bonjour discovery works through the AT&T gateway on the main SSID). **Fallback:** stable LAN IP via router DHCP reservation by MAC, in case mDNS fails on a guest device or guest SSID.
+Mac `LocalHostName=home-llm-lab`; `home-llm-lab.local` resolves cross-device on this LAN (verified 2026-04-25 — Bonjour discovery works through the AT&T gateway on the main SSID). **Fallback:** stable LAN IP via router DHCP reservation by MAC, in case mDNS fails on a guest device or guest SSID.
 
 ---
 
@@ -89,7 +89,7 @@ Mac `LocalHostName=cyberia`; `cyberia.local` resolves cross-device on this LAN (
 +-------------------+          +-------------------------------------------+
 | Client machine(s) |          | Host MBP (Apple Silicon M5 Max Pro, 64GB) |
 |-------------------|          |-------------------------------------------|
-| cyberia CLI       | --SSH--> | Remote Login (SSH)                        |
+| home-llm-lab CLI       | --SSH--> | Remote Login (SSH)                        |
 | browser           | --HTTP-> | Open WebUI :80 (Docker, v0.9.2)           |
 +-------------------+          |     |                                     |
                                |     v  host.docker.internal:11434         |
@@ -101,7 +101,7 @@ Mac `LocalHostName=cyberia`; `cyberia.local` resolves cross-device on this LAN (
                                |   - analyze   (→ Qwen3-30B-A3B Thinking)  |
                                +-------------------------------------------+
 
-Phase 2+ retrofits: cyberia wake (WoL), tailscale serve (remote HTTPS),
+Phase 2+ retrofits: home-llm-lab wake (WoL), tailscale serve (remote HTTPS),
 Caddy (LAN auth), sidecar-loader (RAG), SearXNG (search).
 ```
 
@@ -109,8 +109,8 @@ Concrete upstream tags, quants, and `num_ctx` per profile: [`profiles.md`](profi
 
 ### Network shape
 
-- LAN access: `http://cyberia.local` (port 80)
-- Mac hostname set via `sudo scutil --set LocalHostName cyberia`
+- LAN access: `http://home-llm-lab.local` (port 80)
+- Mac hostname set via `sudo scutil --set LocalHostName home-llm-lab`
 - DHCP reservation by MAC strongly recommended for stable IP fallback
 - Ollama bound to `0.0.0.0:11434` so the Docker bridge reaches it via `host.docker.internal` — LAN guard is the primary protection
 - Open WebUI ↔ Ollama: `OLLAMA_BASE_URL=http://host.docker.internal:11434`
@@ -157,7 +157,7 @@ Compose env:
 
 ### 3.3 Client-side components
 
-- **`cyberia` shell CLI.** Reads `~/.config/cyberia/config.env`. SSHes host for control actions (`cyberia-hostctl up | status | warm`). Opens browser to deep-link URL. Phase 2+: WoL packet, TTY chat tunnel.
+- **`home-llm-lab` shell CLI.** Reads `~/.config/home-llm-lab/config.env`. SSHes host for control actions (`home-llm-lab-hostctl up | status | warm`). Opens browser to deep-link URL. Phase 2+: WoL packet, TTY chat tunnel.
 - **Browser.** Power user via deep-link, guests via bookmark.
 
 ---
@@ -230,12 +230,12 @@ LAN-gated by user's network device passport system. Devices are admitted to the 
 
 ### 7.2 User modes
 
-- **Power-user mode** — you. `cyberia` CLI from your laptop.
-- **Guest mode** — LAN guests. Browser only, bookmark `http://cyberia.local`.
+- **Power-user mode** — you. `home-llm-lab` CLI from your laptop.
+- **Guest mode** — LAN guests. Browser only, bookmark `http://home-llm-lab.local`.
 
 ### 7.3 Open WebUI account policy
 
-- First account = admin (you) — first user to sign up at `cyberia.local` automatically becomes admin
+- First account = admin (you) — first user to sign up at `home-llm-lab.local` automatically becomes admin
 - Signup **enabled**, **no approval required**, new users auto-added to **`Guests`** group (`DEFAULT_USER_ROLE=user`)
 - `Guests` group has access to: `general`, `fast`, `reasoning`, `digest`, `analyze`, no admin functions
 - Per-user chats are private by default (you do not see guests' chats; admins see admin functions, not other users' conversations)
@@ -268,26 +268,26 @@ WoL is Phase 2. Two viable patterns for MVP:
 - **Always-on:** Mac runs with display sleep enabled; containers stay resident.
 - **Manual on:** turn on before use; "Wake for network access" enabled for sleep cycles.
 
-`cyberia chat -p X` flow (no wake):
-1. SSH host → `cyberia-hostctl up` (idempotent — verifies Open WebUI + Ollama healthy)
-2. SSH host → `cyberia-hostctl warm <profile>` (preloads via Ollama API with `keep_alive=30m`)
-3. Open browser → `http://cyberia.local/?model=<profile>`
+`home-llm-lab chat -p X` flow (no wake):
+1. SSH host → `home-llm-lab-hostctl up` (idempotent — verifies Open WebUI + Ollama healthy)
+2. SSH host → `home-llm-lab-hostctl warm <profile>` (preloads via Ollama API with `keep_alive=30m`)
+3. Open browser → `http://home-llm-lab.local/?model=<profile>`
 
-### 8.2 `cyberia chat` URL contract
+### 8.2 `home-llm-lab chat` URL contract
 
 ```text
-http://cyberia.local/                                       # bare bookmark
-http://cyberia.local/?model=general                         # profile preselect
-http://cyberia.local/?model=digest&q=Summarise...           # profile + prefilled query
+http://home-llm-lab.local/                                       # bare bookmark
+http://home-llm-lab.local/?model=general                         # profile preselect
+http://home-llm-lab.local/?model=digest&q=Summarise...           # profile + prefilled query
 ```
 
 Verify exact URL param names against Open WebUI v0.9.2 docs during implementation.
 
 ### 8.3 Warming behavior
 
-`cyberia-hostctl warm <profile>` calls Ollama's `/api/generate` with empty prompt + `keep_alive=30m`. Verify with `ollama ps` / `/api/ps`.
+`home-llm-lab-hostctl warm <profile>` calls Ollama's `/api/generate` with empty prompt + `keep_alive=30m`. Verify with `ollama ps` / `/api/ps`.
 
-### 8.4 Phase 2 — `cyberia wake`
+### 8.4 Phase 2 — `home-llm-lab wake`
 
 - Wake-on-LAN magic packet to host MAC
 - Wired Ethernet recommended (Wi-Fi WoWLAN is flaky on macOS)
@@ -297,14 +297,14 @@ Verify exact URL param names against Open WebUI v0.9.2 docs during implementatio
 
 ## 9) Host control commands
 
-`cyberia` (client) calls `cyberia-hostctl` (host) over SSH.
+`home-llm-lab` (client) calls `home-llm-lab-hostctl` (host) over SSH.
 
 ```sh
-cyberia-hostctl up              # docker compose up -d, verify Open WebUI + Ollama
-cyberia-hostctl down            # docker compose down
-cyberia-hostctl status          # health (services + ollama ps)
-cyberia-hostctl warm <profile>  # preload mapped model via Ollama API
-cyberia-hostctl openui-url      # print canonical browser URL
+home-llm-lab-hostctl up              # docker compose up -d, verify Open WebUI + Ollama
+home-llm-lab-hostctl down            # docker compose down
+home-llm-lab-hostctl status          # health (services + ollama ps)
+home-llm-lab-hostctl warm <profile>  # preload mapped model via Ollama API
+home-llm-lab-hostctl openui-url      # print canonical browser URL
 ```
 
 ---
@@ -314,7 +314,7 @@ cyberia-hostctl openui-url      # print canonical browser URL
 Monorepo. Single source of truth for client + host.
 
 ```text
-local-llm-lab/
+home-llm-lab/
   spec.md                        # this doc — architecture & build plan
   profiles.md                    # model selection (single source of truth)
 
@@ -322,7 +322,7 @@ local-llm-lab/
     docker-compose.yml
     .env.example
     scripts/
-      cyberia-hostctl
+      home-llm-lab-hostctl
       healthcheck.sh
       ensure-models.sh
     ollama/Modelfiles/
@@ -333,7 +333,7 @@ local-llm-lab/
       analyze.Modelfile
 
   client/
-    cyberia                        # single-file POSIX shell client
+    home-llm-lab                        # single-file POSIX shell client
     config.env.example
     README.md
 
@@ -353,7 +353,7 @@ local-llm-lab/
 ## 11) Implementation plan
 
 - **Phase 1 — MVP (current target):** see §13 for the concrete checklist + acceptance.
-- **Phase 2 — Wake + Remote:** WoL flow (`cyberia wake`); Tailscale + `tailscale serve` for remote HTTPS; Caddy retrofit if needed; `cyberia cli` TTY tunnel.
+- **Phase 2 — Wake + Remote:** WoL flow (`home-llm-lab wake`); Tailscale + `tailscale serve` for remote HTTPS; Caddy retrofit if needed; `home-llm-lab cli` TTY tunnel.
 - **Phase 3 — RAG sidecar:** `sidecar-loader` container; hash-manifest idempotent re-sync; initial corpora; per-profile KB attachments via OWUI API.
 - **Phase 4 — Better search:** OWUI web-search toggle; optional SearXNG; `wiki-lite` curated subset.
 - **Phase 5 — Hardening:** backup script (snapshot named volume); logging/observability; stricter auth/TLS if needed; restart policies; sleep-survival validation; permission audit.
@@ -386,7 +386,7 @@ Lower operational risk; easier to share with guests. Only add Pipes / Filters / 
 
 ### 12.5 mDNS gotchas
 
-If guest SSID isolation breaks `cyberia.local` resolution, look for "mDNS reflector" / "Bonjour gateway" setting on the AT&T residential gateway.
+If guest SSID isolation breaks `home-llm-lab.local` resolution, look for "mDNS reflector" / "Bonjour gateway" setting on the AT&T residential gateway.
 
 ---
 
@@ -397,7 +397,7 @@ Deliver Phase 1 in this order. Each step is a discrete commit.
 1. **Mac prep**
    - Install Ollama.app from [ollama.com/download](https://ollama.com/download)
    - Install OrbStack (downloaded directly from orbstack.dev — faster and lighter on Apple Silicon than Docker Desktop)
-   - `LocalHostName=cyberia` (done 2026-04-25)
+   - `LocalHostName=home-llm-lab` (done 2026-04-25)
    - Enable Remote Login (System Settings → General → Sharing → Remote Login)
    - DHCP reservation by MAC at router for stable IP fallback
 
@@ -410,7 +410,7 @@ Deliver Phase 1 in this order. Each step is a discrete commit.
 3. **Docker stack**
    - `host/docker-compose.yml` — Open WebUI v0.9.2, host :80, named volume
    - `host/.env.example` with `OLLAMA_BASE_URL=http://host.docker.internal:11434`
-   - `docker compose up -d`; verify `curl http://cyberia.local`
+   - `docker compose up -d`; verify `curl http://home-llm-lab.local`
 
 4. **Open WebUI config**
    - First signup → admin (you)
@@ -420,21 +420,21 @@ Deliver Phase 1 in this order. Each step is a discrete commit.
    - Configure model entries for all three profiles (system prompts, descriptions)
 
 5. **Host control script**
-   - `host/scripts/cyberia-hostctl` (POSIX sh): up, down, status, warm, openui-url
+   - `host/scripts/home-llm-lab-hostctl` (POSIX sh): up, down, status, warm, openui-url
    - Idempotent up; status returns clean text/JSON
 
 6. **Client CLI**
-   - `client/cyberia` (POSIX sh): chat, status, warm
+   - `client/home-llm-lab` (POSIX sh): chat, status, warm
    - `client/lib/{config,ssh,openui,profiles}.sh`
-   - `~/.config/cyberia/config.env` schema documented
+   - `~/.config/home-llm-lab/config.env` schema documented
 
 7. **End-to-end acceptance**
-   - `cyberia chat -p general` → browser opens with `general` preselected; conversation works
-   - `cyberia chat -p digest -q "..."` → preselects + prefills query
-   - LAN guest device → `http://cyberia.local` → signs up → immediately chats with all five profiles
+   - `home-llm-lab chat -p general` → browser opens with `general` preselected; conversation works
+   - `home-llm-lab chat -p digest -q "..."` → preselects + prefills query
+   - LAN guest device → `http://home-llm-lab.local` → signs up → immediately chats with all five profiles
    - The profiles behave differently — `reasoning` and `analyze` show `<think>` blocks, `digest` accepts long input without OOM, `general` and `fast` respond quickly
    - **Vision smoke test:** attach a screenshot to a `general` chat → model responds sensibly
-   - Restart: `cyberia-hostctl down && up` → state preserved (named volume)
+   - Restart: `home-llm-lab-hostctl down && up` → state preserved (named volume)
    - Sleep cycle: Mac sleeps and wakes → stack still healthy
 
 ### Explicitly NOT in Milestone 1
@@ -452,7 +452,7 @@ WoL · Tailscale · Caddy · RAG sidecars · corpora · Wikipedia · web search 
 - [ ] Confirm vision works in the `general` profile's upstream model — smoke-test via `ollama run` with image attach before locking the Modelfile
 - [ ] Verify Open WebUI URL params (`?model=`, `?q=`) against v0.9.2 docs (resolve at compose-step)
 - [ ] Draft initial system prompts for each profile (stub now, iterate)
-- [ ] DHCP reservation at router (parallel task; Ethernet + Wi-Fi MACs both reserved to `cyberia`)
+- [ ] DHCP reservation at router (parallel task; Ethernet + Wi-Fi MACs both reserved to `home-llm-lab`)
 - [ ] Pin Ollama version once stack is stable (Ollama.app updates are user-initiated; just avoid clicking "Update" when something's mid-flight)
 
 ---

@@ -2,7 +2,7 @@
 ## Translates OpenAI call to Anthropic `/v1/messages` format
 #
 # ============================================================================
-# CYBERIA LOCAL-LLM-LAB PATCH — see `PATCH (cyberia local-llm-lab)` markers
+# HOME_LLM_LAB HOME-LLM-LAB PATCH — see `PATCH (home-llm-lab home-llm-lab)` markers
 # below for the actual edits. This header explains scope and maintenance.
 #
 # Bug fixed:
@@ -38,7 +38,7 @@
 #   This file is mounted over the upstream copy in docker-compose. On LiteLLM
 #   image upgrades, re-snapshot the upstream file and re-apply the patches at
 #   the marked sites:
-#     docker exec cyberia-litellm cat /usr/lib/python3.13/site-packages/\
+#     docker exec home-llm-lab-litellm cat /usr/lib/python3.13/site-packages/\
 #       litellm/llms/anthropic/experimental_pass_through/adapters/\
 #       streaming_iterator.py > /tmp/upstream.py
 #     diff host/litellm/patches/streaming_iterator.py /tmp/upstream.py
@@ -176,7 +176,7 @@ class AnthropicStreamWrapper(AdapterCompletionStreamWrapper):
                     # Queue the sequence: content_block_stop -> content_block_start
                     # -> [content_block_delta if trigger chunk had args].
                     #
-                    # PATCH (cyberia local-llm-lab): for tool_use blocks, the
+                    # PATCH (home-llm-lab home-llm-lab): for tool_use blocks, the
                     # trigger chunk often *does* carry the args (Ollama emits
                     # the entire <tool_call> in a single chunk). The original
                     # upstream code dropped processed_chunk here on the
@@ -365,7 +365,7 @@ class AnthropicStreamWrapper(AdapterCompletionStreamWrapper):
 
                 if not self.queued_usage_chunk:
                     if should_start_new_block and not self.sent_content_block_finish:
-                        # PATCH (cyberia local-llm-lab): same bug as the sync
+                        # PATCH (home-llm-lab home-llm-lab): same bug as the sync
                         # iterator above. Re-emit the trigger chunk as a
                         # content_block_delta(input_json_delta) when it carries
                         # tool_call args — Ollama-style providers emit the

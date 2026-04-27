@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
     <key>Label</key>
-    <string>com.cyberia.llama-server</string>
+    <string>com.home-llm-lab.llama-server</string>
 
     <!--
       llama.cpp server, native, dedicated to the `claw` profile.
@@ -18,10 +18,10 @@
         - StandardOutPath / StandardErrorPath log location
 
       Re-install after any plist edit:
-        launchctl unload  ~/Library/LaunchAgents/com.cyberia.llama-server.plist
-        cp host/llama-server/launchd/com.cyberia.llama-server.plist \
+        launchctl unload  ~/Library/LaunchAgents/com.home-llm-lab.llama-server.plist
+        cp host/llama-server/launchd/com.home-llm-lab.llama-server.plist \
            ~/Library/LaunchAgents/
-        launchctl load -w ~/Library/LaunchAgents/com.cyberia.llama-server.plist
+        launchctl load -w ~/Library/LaunchAgents/com.home-llm-lab.llama-server.plist
     -->
 
     <key>ProgramArguments</key>
@@ -66,7 +66,7 @@
 
         <!-- grammar — the point of this whole directory -->
         <string>--grammar-file</string>
-        <string>/Users/nigel/Desktop/bench/local-llm-lab/host/llama-server/grammars/claw.gbnf</string>
+        <string>/Users/nigel/Desktop/bench/home-llm-lab/host/llama-server/grammars/claw.gbnf</string>
 
         <!-- Discipline rules: claw-code discovers CLAUDE.md in the workspace and
              concatenates it to its system prompt. See README §9. (Upstream
