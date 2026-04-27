@@ -5,9 +5,12 @@
 // three distinct write_files. We verify the *outcome* (three correct files);
 // duplicate-call avoidance shows up as a faster wall time.
 
-const { runClaw }   = require('../lib/claw');
-const workspace     = require('../lib/workspace');
-const { clawModel, BACKEND } = require('../lib/backend');
+import { describe, it, beforeEach } from 'node:test';
+import assert from 'node:assert/strict';
+
+import { runClaw } from '../lib/claw.js';
+import * as workspace from '../lib/workspace.js';
+import { clawModel, BACKEND } from '../lib/backend.js';
 
 // Outcome-focused prompt — naming a specific tool ("write_file") in the
 // prompt is fine for the raw-bridge wrap-rate test where we define our own
@@ -28,22 +31,22 @@ const EXPECTED = [
   { file: 'c.py', match: /print\(\s*3\s*\)/ },
 ];
 
+const TIMEOUT = 300_000;
+
 describe(`eval B — three parallel writes (backend=${BACKEND}, model=${clawModel})`, () => {
   beforeEach(() => workspace.reset());
 
-  test('claw creates a.py, b.py, c.py with matching contents', async () => {
+  it('claw creates a.py, b.py, c.py with matching contents', { timeout: TIMEOUT }, async () => {
     const r = await runClaw({ prompt: PROMPT, model: clawModel });
 
-    /* eslint-disable no-console */
     console.log(`\n=== eval-b (${BACKEND}) ===`);
     console.log(`  exit=${r.code} elapsed=${r.elapsedMs}ms files=${JSON.stringify(workspace.list())}`);
     if (r.code !== 0) console.log(`  stderr (tail):\n${r.stderr.slice(-1500)}`);
-    /* eslint-enable no-console */
 
-    expect(r.code).toBe(0);
+    assert.equal(r.code, 0);
     for (const { file, match } of EXPECTED) {
-      expect(workspace.exists(file)).toBe(true);
-      expect(workspace.read(file)).toMatch(match);
+      assert.equal(workspace.exists(file), true, `expected ${file} to exist`);
+      assert.match(workspace.read(file), match);
     }
   });
 });

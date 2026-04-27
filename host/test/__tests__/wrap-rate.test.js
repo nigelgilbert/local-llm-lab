@@ -8,8 +8,11 @@
 // wrapper is mathematically required. We expect llama-server ≈ 1.0 and Ollama
 // ≈ 0.5–0.7 (thresholds in lib/backend.js are tuned to those bands).
 
-const { streamMessage } = require('../lib/bridge');
-const { bridgeModel, BACKEND, wrapRateThreshold } = require('../lib/backend');
+import { describe, it } from 'node:test';
+import assert from 'node:assert/strict';
+
+import { streamMessage } from '../lib/bridge.js';
+import { bridgeModel, BACKEND, wrapRateThreshold } from '../lib/backend.js';
 
 const TOOL = {
   name: 'write_file',
@@ -24,46 +27,62 @@ const TOOL = {
   },
 };
 
-const PROMPT = "Use the write_file tool to create hello.py with exactly: print('hi')";
+const PROMPT  = "Use the write_file tool to create hello.py with exactly: print('hi')";
+const N       = Number(process.env.WRAP_RATE_N) || 10;
+const TIMEOUT = 300_000;
 
-const N = 10;
+// Latency stats so a backend comparison shows speed alongside wrap discipline.
+function summarize(latenciesMs) {
+  if (latenciesMs.length === 0) return { min: 0, median: 0, p95: 0, mean: 0 };
+  const sorted = [...latenciesMs].sort((a, b) => a - b);
+  const at = (q) => sorted[Math.min(sorted.length - 1, Math.floor(q * sorted.length))];
+  const mean = sorted.reduce((s, x) => s + x, 0) / sorted.length;
+  return { min: sorted[0], median: at(0.5), p95: at(0.95), mean: Math.round(mean) };
+}
 
 describe(`wrap-rate (backend=${BACKEND}, model=${bridgeModel})`, () => {
-  test(`${N} streamed calls land on stop_reason=tool_use ≥ ${wrapRateThreshold * 100}%`, async () => {
-    const results = [];
+  it(
+    `${N} streamed calls land on stop_reason=tool_use ≥ ${wrapRateThreshold * 100}%`,
+    { timeout: TIMEOUT },
+    async () => {
+      const results = [];
 
-    for (let i = 0; i < N; i++) {
-      const t0 = Date.now();
-      try {
-        const r = await streamMessage({
-          model: bridgeModel,
-          messages: [{ role: 'user', content: PROMPT }],
-          tools:    [TOOL],
-          maxTokens: 256,
-        });
-        results.push({
-          ok: r.stopReason === 'tool_use' && r.hasToolUse,
-          stopReason: r.stopReason,
-          hasToolUse: r.hasToolUse,
-          ms: Date.now() - t0,
-        });
-      } catch (err) {
-        results.push({ ok: false, error: err.message, ms: Date.now() - t0 });
+      for (let i = 0; i < N; i++) {
+        const t0 = Date.now();
+        try {
+          const r = await streamMessage({
+            model: bridgeModel,
+            messages: [{ role: 'user', content: PROMPT }],
+            tools:    [TOOL],
+            maxTokens: 256,
+          });
+          results.push({
+            ok: r.stopReason === 'tool_use' && r.hasToolUse,
+            stopReason: r.stopReason,
+            hasToolUse: r.hasToolUse,
+            ms: Date.now() - t0,
+          });
+        } catch (err) {
+          results.push({ ok: false, error: err.message, ms: Date.now() - t0 });
+        }
       }
-    }
 
-    const wraps = results.filter((r) => r.ok).length;
-    const rate  = wraps / N;
+      const wraps  = results.filter((r) => r.ok).length;
+      const rate   = wraps / N;
+      const stats  = summarize(results.map((r) => r.ms));
 
-    // Surface the per-attempt detail so a failing run is debuggable from logs alone.
-    /* eslint-disable no-console */
-    console.log(`\n=== wrap-rate (${BACKEND}) ===`);
-    results.forEach((r, i) => {
-      console.log(`  [${i + 1}/${N}] ok=${r.ok} stop=${r.stopReason || '?'} tool_use=${r.hasToolUse} ${r.ms}ms${r.error ? ` err=${r.error}` : ''}`);
-    });
-    console.log(`  rate = ${wraps}/${N} = ${rate.toFixed(2)}  (threshold ${wrapRateThreshold})`);
-    /* eslint-enable no-console */
+      // Surface the per-attempt detail so a failing run is debuggable from logs alone.
+      console.log(`\n=== wrap-rate (${BACKEND}) ===`);
+      results.forEach((r, i) => {
+        console.log(`  [${i + 1}/${N}] ok=${r.ok} stop=${r.stopReason ?? '?'} tool_use=${r.hasToolUse} ${r.ms}ms${r.error ? ` err=${r.error}` : ''}`);
+      });
+      console.log(`  rate    = ${wraps}/${N} = ${rate.toFixed(2)}  (threshold ${wrapRateThreshold})`);
+      console.log(`  latency = min ${stats.min}ms · median ${stats.median}ms · p95 ${stats.p95}ms · mean ${stats.mean}ms`);
 
-    expect(rate).toBeGreaterThanOrEqual(wrapRateThreshold);
-  });
+      assert.ok(
+        rate >= wrapRateThreshold,
+        `wrap rate ${rate.toFixed(2)} below threshold ${wrapRateThreshold}`,
+      );
+    },
+  );
 });

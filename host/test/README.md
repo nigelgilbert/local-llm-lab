@@ -1,6 +1,6 @@
 # A/B test harness — Ollama vs llama-server `claw`
 
-Runs the same three Jest suites against both backends back-to-back so you can compare wrap-rate and behaviour without poking around by hand.
+Runs the same three suites against both backends back-to-back so you can compare wrap-rate and behaviour without poking around by hand. Tests are ESM and use Node 24's built-in test runner (`node --test`) — no Jest, no `npm install`.
 
 ```
 ┌────────────┐        ┌────────────────┐

@@ -13,98 +13,121 @@ if (!API_KEY) {
   throw new Error('ANTHROPIC_API_KEY not set — docker-compose.yml should pull this from ../litellm/.env');
 }
 
-async function streamMessage({ model, messages, tools, system, maxTokens = 512 }) {
-  const res = await fetch(`${BRIDGE_URL}/v1/messages`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': API_KEY,
-      'anthropic-version': '2023-06-01',
-    },
-    body: JSON.stringify({
-      model,
-      max_tokens: maxTokens,
-      messages,
-      ...(tools  ? { tools }  : {}),
-      ...(system ? { system } : {}),
-      stream: true,
-    }),
-  });
+export async function streamMessage({
+  model,
+  messages,
+  tools,
+  system,
+  maxTokens = 512,
+  // Per-request abort: protects a single attempt against a stalled stream
+  // so the wrap-rate suite can record an error and move on, instead of
+  // hanging the whole 5-min test budget on one wedged request.
+  requestTimeoutMs = 60_000,
+} = {}) {
+  const ac    = new AbortController();
+  const timer = setTimeout(() => ac.abort(), requestTimeoutMs);
 
-  if (!res.ok) {
-    const body = await res.text().catch(() => '');
-    throw new Error(`bridge ${res.status} ${res.statusText}: ${body.slice(0, 500)}`);
-  }
+  try {
+    const res = await fetch(`${BRIDGE_URL}/v1/messages`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': API_KEY,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({
+        model,
+        max_tokens: maxTokens,
+        messages,
+        ...(tools  ? { tools }  : {}),
+        ...(system ? { system } : {}),
+        stream: true,
+      }),
+      signal: ac.signal,
+    });
 
-  const events = [];
-  const blocks = [];          // accumulated content blocks, indexed
-  let stopReason = null;
+    if (!res.ok) {
+      const body = await res.text().catch(() => '');
+      throw new Error(`bridge ${res.status} ${res.statusText}: ${body.slice(0, 500)}`);
+    }
 
-  const reader  = res.body.getReader();
-  const decoder = new TextDecoder();
-  let buf = '';
+    const events = [];
+    const blocks = [];          // accumulated content blocks, indexed
+    let stopReason = null;
 
-  while (true) {
-    const { value, done } = await reader.read();
-    if (done) break;
-    buf += decoder.decode(value, { stream: true });
+    const reader  = res.body.getReader();
+    const decoder = new TextDecoder();
+    let buf = '';
 
-    let sep;
-    while ((sep = buf.indexOf('\n\n')) !== -1) {
-      const raw = buf.slice(0, sep);
-      buf = buf.slice(sep + 2);
-      const evt = parseSSE(raw);
-      if (!evt) continue;
-      events.push(evt);
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buf += decoder.decode(value, { stream: true });
 
-      // Accumulate enough state to expose a usable final message at end of stream.
-      switch (evt.type) {
-        case 'content_block_start': {
-          blocks[evt.index] = { ...evt.content_block, _text: '', _json: '' };
-          break;
-        }
-        case 'content_block_delta': {
-          const b = blocks[evt.index] || (blocks[evt.index] = { type: 'text', _text: '', _json: '' });
-          if (evt.delta.type === 'text_delta')        b._text += evt.delta.text || '';
-          else if (evt.delta.type === 'input_json_delta') b._json += evt.delta.partial_json || '';
-          break;
-        }
-        case 'message_delta': {
-          if (evt.delta && evt.delta.stop_reason) stopReason = evt.delta.stop_reason;
-          break;
+      let sep;
+      while ((sep = buf.indexOf('\n\n')) !== -1) {
+        const raw = buf.slice(0, sep);
+        buf = buf.slice(sep + 2);
+        const evt = parseSSE(raw);
+        if (!evt) continue;
+        events.push(evt);
+
+        // Accumulate enough state to expose a usable final message at end of stream.
+        switch (evt.type) {
+          case 'content_block_start': {
+            blocks[evt.index] = { ...evt.content_block, _text: '', _json: '' };
+            break;
+          }
+          case 'content_block_delta': {
+            const b = blocks[evt.index] ?? (blocks[evt.index] = { type: 'text', _text: '', _json: '' });
+            if (evt.delta.type === 'text_delta')             b._text += evt.delta.text ?? '';
+            else if (evt.delta.type === 'input_json_delta')  b._json += evt.delta.partial_json ?? '';
+            break;
+          }
+          case 'message_delta': {
+            if (evt.delta?.stop_reason) stopReason = evt.delta.stop_reason;
+            break;
+          }
         }
       }
     }
-  }
 
-  // Finalize block payloads.
-  const content = blocks.filter(Boolean).map((b) => {
-    if (b.type === 'tool_use') {
-      let input = b.input;
-      if ((!input || Object.keys(input || {}).length === 0) && b._json) {
-        try { input = JSON.parse(b._json); } catch { /* leave raw _json visible for debugging */ }
+    // Finalize block payloads.
+    const content = blocks.filter(Boolean).map((b) => {
+      if (b.type === 'tool_use') {
+        let input = b.input;
+        if ((!input || Object.keys(input ?? {}).length === 0) && b._json) {
+          try { input = JSON.parse(b._json); } catch { /* leave raw _json visible for debugging */ }
+        }
+        return { type: 'tool_use', id: b.id, name: b.name, input };
       }
-      return { type: 'tool_use', id: b.id, name: b.name, input };
-    }
-    if (b.type === 'text') {
-      return { type: 'text', text: b._text };
-    }
-    return b;
-  });
+      if (b.type === 'text') {
+        return { type: 'text', text: b._text };
+      }
+      return b;
+    });
 
-  return {
-    events,
-    stopReason,
-    content,
-    hasToolUse: content.some((c) => c.type === 'tool_use'),
-  };
+    return {
+      events,
+      stopReason,
+      content,
+      hasToolUse: content.some((c) => c.type === 'tool_use'),
+    };
+  } catch (err) {
+    if (err.name === 'AbortError') {
+      throw new Error(`bridge request timed out after ${requestTimeoutMs}ms`);
+    }
+    throw err;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 function parseSSE(raw) {
   let event = 'message';
   const dataLines = [];
   for (const line of raw.split('\n')) {
-    if (line.startsWith('event:')) event = line.slice(6).trim();
+    if (line.startsWith('event:'))     event = line.slice(6).trim();
     else if (line.startsWith('data:')) dataLines.push(line.slice(5).trim());
   }
   if (dataLines.length === 0) return null;
@@ -117,5 +140,3 @@ function parseSSE(raw) {
     return null;
   }
 }
-
-module.exports = { streamMessage };
