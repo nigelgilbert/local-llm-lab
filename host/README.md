@@ -261,3 +261,5 @@ You shared the URL before signing up. Recovery:
 5. Host control script — [`scripts/cyberia-hostctl`](scripts/) (`up`, `down`, `status`, `warm`, `openui-url`).
 6. Client CLI — [`../client/`](../client/) (`cyberia chat`, `cyberia warm`, `cyberia status`).
 7. End-to-end acceptance — spec §13 step 7.
+
+**For claw-code users:** also bring up the LiteLLM bridge ([`litellm/`](litellm/)) and the llama-server native daemon ([`llama-server/`](llama-server/)). Those are independent of OWUI — you can skip them if you only need the chat UI.

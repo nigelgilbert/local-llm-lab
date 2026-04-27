@@ -294,5 +294,6 @@ du -sh ~/.ollama                  # confirm freed
 1. Modelfile aliases — `host/ollama/Modelfiles/{general,fast,reasoning,digest,analyze}.Modelfile` to bind each upstream model under a stable `<profile>` name.
 2. Open WebUI Docker stack — `host/docker-compose.yml` reaching Ollama via `host.docker.internal:11434`.
 3. Host control script — `host/scripts/cyberia-hostctl` (up / down / status / warm / openui-url).
+4. **claw-code only:** LiteLLM bridge ([`../litellm/`](../litellm/)) + llama-server native daemon ([`../llama-server/`](../llama-server/)). Not required for OWUI.
 
 See [`spec.md` §13](../../spec.md) for the full Phase 1 sequence.
