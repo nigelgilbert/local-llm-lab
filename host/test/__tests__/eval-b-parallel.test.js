@@ -9,10 +9,18 @@ const { runClaw }   = require('../lib/claw');
 const workspace     = require('../lib/workspace');
 const { clawModel, BACKEND } = require('../lib/backend');
 
+// Outcome-focused prompt — naming a specific tool ("write_file") in the
+// prompt is fine for the raw-bridge wrap-rate test where we define our own
+// tool, but here the model is using claw's built-in tool registry (Write,
+// Edit, Read, Bash). Asking for `write_file` makes the model emit calls to
+// a non-existent tool, claw silently rejects them, and the agent ends the
+// turn with zero files written. Describe the outcome instead and let the
+// model pick its native tool.
 const PROMPT =
-  "Use write_file to create three files in parallel: " +
-  "a.py with print(1), b.py with print(2), c.py with print(3). " +
-  "Issue all three tool calls in one response.";
+  "Create three files in one response: " +
+  "a.py with one line print(1), " +
+  "b.py with one line print(2), " +
+  "c.py with one line print(3).";
 
 const EXPECTED = [
   { file: 'a.py', match: /print\(\s*1\s*\)/ },

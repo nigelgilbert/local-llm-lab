@@ -19,9 +19,11 @@ WORKDIR /test
 COPY package.json jest.config.js ./
 RUN npm install
 
-COPY lib       ./lib
-COPY __tests__ ./__tests__
+COPY lib        ./lib
+COPY __tests__  ./__tests__
+COPY entrypoint.sh /usr/local/bin/entrypoint.sh
 
 RUN mkdir -p /workspace
 
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]
 CMD ["npx", "jest", "--config=jest.config.js"]
