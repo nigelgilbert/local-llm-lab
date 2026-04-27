@@ -1,0 +1,18 @@
+# Ephemeral test container. Always invoked via `docker compose run --rm test`,
+# never `up -d`. BACKEND is set per-phase by run.sh.
+
+services:
+  test:
+    build:
+      context: .
+    image: cyberia-test:local
+    working_dir: /test
+    env_file:
+      - ../litellm/.env
+    environment:
+      - BRIDGE_URL=http://host.docker.internal:4000
+      - ANTHROPIC_BASE_URL=http://host.docker.internal:4000
+      - ANTHROPIC_API_KEY=${LITELLM_MASTER_KEY}
+      - BACKEND=${BACKEND:-llama-server}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"

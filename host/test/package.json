@@ -1,0 +1,12 @@
+{
+  "name": "cyberia-claw-ab-tests",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A/B harness comparing the two claw backends (Ollama vs llama-server) over the LiteLLM bridge.",
+  "scripts": {
+    "test": "jest"
+  },
+  "dependencies": {
+    "jest": "^29.7.0"
+  }
+}

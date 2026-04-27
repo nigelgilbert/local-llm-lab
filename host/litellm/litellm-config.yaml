@@ -55,6 +55,31 @@ model_list:
       model: openai/claw
       api_base: os.environ/LLAMA_SERVER_BASE
       api_key: llama-server-no-auth
+
+  # A/B test routes for host/test/. Same upstream targets as `claw`, but
+  # explicitly named so a single test run can route at both backends without
+  # touching production. `claw-ollama` points at the ephemeral `claw-test`
+  # Ollama alias that host/test/run.sh creates and tears down per-run.
+  - model_name: claw-llama
+    litellm_params:
+      model: openai/claw
+      api_base: os.environ/LLAMA_SERVER_BASE
+      api_key: llama-server-no-auth
+  - model_name: anthropic/claw-llama
+    litellm_params:
+      model: openai/claw
+      api_base: os.environ/LLAMA_SERVER_BASE
+      api_key: llama-server-no-auth
+  - model_name: claw-ollama
+    litellm_params:
+      model: openai/claw-test
+      api_base: os.environ/OLLAMA_OPENAI_BASE
+      api_key: ollama-no-auth
+  - model_name: anthropic/claw-ollama
+    litellm_params:
+      model: openai/claw-test
+      api_base: os.environ/OLLAMA_OPENAI_BASE
+      api_key: ollama-no-auth
   - model_name: anthropic/general
     litellm_params:
       model: ollama_chat/general
