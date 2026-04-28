@@ -13,7 +13,7 @@ client/.env
 *.swp
 
 # Claude Code local state
-.claude/settings.local.json
+.claude/
 
 # Python (Phase 3+ sidecar-loader)
 __pycache__/
