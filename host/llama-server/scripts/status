@@ -1,7 +1,7 @@
 #!/usr/bin/env sh
 # status — show LaunchAgent state + reachability of the claw endpoint.
 set -eu
-LABEL="com.home-llm-lab.llama-server"
+LABEL="com.mac-llm-lab.llama-server"
 API="${LLAMA_SERVER_API:-http://127.0.0.1:11435}"
 
 if launchctl print "gui/$(id -u)/$LABEL" >/dev/null 2>&1; then

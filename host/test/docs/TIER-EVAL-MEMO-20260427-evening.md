@@ -139,7 +139,7 @@ flaky test.
   `Qwen2.5-7B-Instruct-Q5_K_M.gguf` plus rationale comment.
 - `host/llama-server/README.md` — tier table updated; download instructions
   updated; rationale link to this memo added.
-- `host/llama-server/launchd/com.home-llm-lab.llama-server.plist` — reverted to
+- `host/llama-server/launchd/com.mac-llm-lab.llama-server.plist` — reverted to
   baseline (no `--reasoning` flag); flag is unnecessary because the 7B is
   non-thinking and the 14B/30B finish thinking within budget. Earlier
   experiments with `--reasoning off` and `--reasoning-budget 128` are documented

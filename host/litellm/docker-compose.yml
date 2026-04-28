@@ -1,7 +1,7 @@
 services:
   litellm:
     image: ghcr.io/berriai/litellm:main-stable
-    container_name: home-llm-lab-litellm
+    container_name: mac-llm-lab-litellm
     restart: unless-stopped
     mem_limit: 512m
     memswap_limit: 512m

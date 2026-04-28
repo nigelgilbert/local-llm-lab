@@ -18,9 +18,9 @@ set -eu
 
 SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
 REPO_DIR=$(cd "$SCRIPT_DIR/../.." && pwd)
-PLIST_INSTALL="$HOME/Library/LaunchAgents/com.home-llm-lab.llama-server.plist"
-PLIST_CODER="$REPO_DIR/host/llama-server/launchd/com.home-llm-lab.llama-server.plist"
-PLIST_QWEN36_TMPL="$REPO_DIR/host/llama-server/launchd/com.home-llm-lab.llama-server-qwen36.plist"
+PLIST_INSTALL="$HOME/Library/LaunchAgents/com.mac-llm-lab.llama-server.plist"
+PLIST_CODER="$REPO_DIR/host/llama-server/launchd/com.mac-llm-lab.llama-server.plist"
+PLIST_QWEN36_TMPL="$REPO_DIR/host/llama-server/launchd/com.mac-llm-lab.llama-server-qwen36.plist"
 COMPOSE="$SCRIPT_DIR/docker-compose.yml"
 LLAMA_HEALTH="http://127.0.0.1:11435/health"
 BRIDGE_HEALTH="http://127.0.0.1:4000/health/liveliness"
@@ -88,10 +88,10 @@ launchctl unload "$PLIST_INSTALL"
 # ---- Phase B: qwen3.6-35B ----
 log "==> Phase B: qwen3.6-35B"
 log "[B] generating qwen36 plist (model=$QWEN36_GGUF)..."
-sed "s|QWEN36_GGUF_PATH|$QWEN36_GGUF|g" "$PLIST_QWEN36_TMPL" > /tmp/home-llm-lab-llama-qwen36.plist
+sed "s|QWEN36_GGUF_PATH|$QWEN36_GGUF|g" "$PLIST_QWEN36_TMPL" > /tmp/mac-llm-lab-llama-qwen36.plist
 
 log "[B] installing and loading qwen36 plist..."
-cp /tmp/home-llm-lab-llama-qwen36.plist "$PLIST_INSTALL"
+cp /tmp/mac-llm-lab-llama-qwen36.plist "$PLIST_INSTALL"
 launchctl load -w "$PLIST_INSTALL"
 
 log "[B] waiting for llama-server health..."

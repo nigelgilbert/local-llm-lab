@@ -19,9 +19,9 @@ set -eu
 SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
 REPO_DIR=$(cd "$SCRIPT_DIR/../.." && pwd)
 
-PLIST_INSTALL="${HOME}/Library/LaunchAgents/com.home-llm-lab.llama-server.plist"
-PLIST_BASELINE="${REPO_DIR}/host/llama-server/launchd/com.home-llm-lab.llama-server-baseline.plist"
-PLIST_OPTIMISED="${REPO_DIR}/host/llama-server/launchd/com.home-llm-lab.llama-server.plist"
+PLIST_INSTALL="${HOME}/Library/LaunchAgents/com.mac-llm-lab.llama-server.plist"
+PLIST_BASELINE="${REPO_DIR}/host/llama-server/launchd/com.mac-llm-lab.llama-server-baseline.plist"
+PLIST_OPTIMISED="${REPO_DIR}/host/llama-server/launchd/com.mac-llm-lab.llama-server.plist"
 
 COMPOSE="${SCRIPT_DIR}/docker-compose.yml"
 LLAMA_HEALTH="http://127.0.0.1:11435/health"
@@ -42,7 +42,7 @@ curl -fsS "$BRIDGE_HEALTH" >/dev/null 2>&1 \
 # ---- cleanup: always restore production (optimised) plist ----
 cleanup() {
   log "[cleanup] restoring optimised (production) plist..."
-  launchctl bootout "gui/$(id -u)/com.home-llm-lab.llama-server" >/dev/null 2>&1 || true
+  launchctl bootout "gui/$(id -u)/com.mac-llm-lab.llama-server" >/dev/null 2>&1 || true
   cp "$PLIST_OPTIMISED" "$PLIST_INSTALL"
   launchctl bootstrap "gui/$(id -u)" "$PLIST_INSTALL" >/dev/null 2>&1 || true
 }
@@ -69,7 +69,7 @@ swap_plist() {
   src="$1"
   label="$2"
   log "[$label] stopping llama-server..."
-  launchctl bootout "gui/$(id -u)/com.home-llm-lab.llama-server" >/dev/null 2>&1 || true
+  launchctl bootout "gui/$(id -u)/com.mac-llm-lab.llama-server" >/dev/null 2>&1 || true
   sleep 2
   log "[$label] installing plist: $(basename "$src")"
   cp "$src" "$PLIST_INSTALL"

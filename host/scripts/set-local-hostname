@@ -1,5 +1,5 @@
 #!/usr/bin/env sh
-# set-local-hostname [<name>] — claim <name>.local via mDNS. Default: home-llm-lab.
+# set-local-hostname [<name>] — claim <name>.local via mDNS. Default: mac-llm-lab.
 #
 # scutil --set returns immediately after writing to SystemConfiguration.
 # mDNSResponder probes the LAN asynchronously and, on conflict, writes back
@@ -9,7 +9,7 @@
 
 set -eu
 
-DESIRED="${1:-home-llm-lab}"
+DESIRED="${1:-mac-llm-lab}"
 
 scutil --set LocalHostName "$DESIRED"
 sleep 2

@@ -3,11 +3,11 @@
 <plist version="1.0">
 <dict>
     <key>Label</key>
-    <string>com.home-llm-lab.llama-server</string>
+    <string>com.mac-llm-lab.llama-server</string>
 
     <!--
       BASELINE config for settings A/B test (run-model-settings-ab.sh Phase A).
-      Differences from the production plist (com.home-llm-lab.llama-server.plist):
+      Differences from the production plist (com.mac-llm-lab.llama-server.plist):
         - --ctx-size 131072  (production: 32768)
         - no --batch-size    (production: 4096)
       Everything else is identical, including the corrected grammar-file path.

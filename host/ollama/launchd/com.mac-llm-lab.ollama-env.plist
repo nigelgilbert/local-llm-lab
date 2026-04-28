@@ -3,7 +3,7 @@
 <plist version="1.0">
 <dict>
     <key>Label</key>
-    <string>com.home-llm-lab.ollama-env</string>
+    <string>com.mac-llm-lab.ollama-env</string>
     <key>ProgramArguments</key>
     <array>
         <string>/bin/sh</string>

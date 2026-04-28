@@ -14,7 +14,7 @@ set -eu
 
 SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
 REPO_DIR=$(cd "$SCRIPT_DIR/../.." && pwd)
-PLIST="$HOME/Library/LaunchAgents/com.home-llm-lab.llama-server.plist"
+PLIST="$HOME/Library/LaunchAgents/com.mac-llm-lab.llama-server.plist"
 MODELFILE="$REPO_DIR/host/ollama/Modelfiles/claw.Modelfile"
 COMPOSE="$SCRIPT_DIR/docker-compose.yml"
 LLAMA_HEALTH="http://127.0.0.1:11435/health"

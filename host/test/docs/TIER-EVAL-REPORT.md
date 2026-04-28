@@ -20,7 +20,7 @@ Suite: 7 tests across 8 `it()` blocks (`latency.test.js` is two suites in one fi
 | 64 (Qwen3-Coder-30B)        | 7/8 | 7/8     | prose unchanged (2/2/2) |
 
 The single change (`repeat-penalty 1.2 → 1.05` in
-[`host/llama-server/launchd/com.home-llm-lab.llama-server.plist`](../../llama-server/launchd/com.home-llm-lab.llama-server.plist))
+[`host/llama-server/launchd/com.mac-llm-lab.llama-server.plist`](../../llama-server/launchd/com.mac-llm-lab.llama-server.plist))
 moved tier-16 from the worst-performing tier (3 fails) to a clean sweep, and
 partially helped tier-32. tier-64's prose smush is *not* sampler-side — see
 [TODO-PROSE-SMUSH.md](../../llama-server/docs/TODO-PROSE-SMUSH.md) for the next-step

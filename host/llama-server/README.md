@@ -8,8 +8,8 @@ Apple Silicon Mac (lab host)
 ├── llama-server   :11435  native  →  claw  (this README)
 │
 └── Docker (thin layer, no models)
-    ├── home-llm-lab-litellm   bridge — routes anthropic/claw → :11435
-    ├── home-llm-lab-openwebui talks to Ollama only
+    ├── mac-llm-lab-litellm   bridge — routes anthropic/claw → :11435
+    ├── mac-llm-lab-openwebui talks to Ollama only
     └── claw-code         talks to bridge
 ```
 
@@ -242,10 +242,10 @@ test "$(cat $WORKSPACE/hello.py)" = "print('hello')" && echo PASS || echo FAIL
 
 | | |
 |---|---|
-| Status | `launchctl list \| grep home-llm-lab.llama-server` |
-| Restart | `launchctl kickstart -k gui/$(id -u)/com.home-llm-lab.llama-server` |
-| Stop | `launchctl unload ~/Library/LaunchAgents/com.home-llm-lab.llama-server.plist` |
-| Start (after stop) | `launchctl load -w ~/Library/LaunchAgents/com.home-llm-lab.llama-server.plist` |
+| Status | `launchctl list \| grep mac-llm-lab.llama-server` |
+| Restart | `launchctl kickstart -k gui/$(id -u)/com.mac-llm-lab.llama-server` |
+| Stop | `launchctl unload ~/Library/LaunchAgents/com.mac-llm-lab.llama-server.plist` |
+| Start (after stop) | `launchctl load -w ~/Library/LaunchAgents/com.mac-llm-lab.llama-server.plist` |
 | Logs | `tail -f /tmp/llama-server.log` |
 | Live process check | `lsof -nP -iTCP:11435 \| grep LISTEN` |
 | Manual run (debugging) | unload the plist first, then run the binary by hand with the same args |
@@ -285,8 +285,8 @@ If grammar-constrained decoding doesn't pull its weight on the eval suite, or yo
 
 ```sh
 # 1. Stop llama-server
-launchctl unload ~/Library/LaunchAgents/com.home-llm-lab.llama-server.plist
-rm ~/Library/LaunchAgents/com.home-llm-lab.llama-server.plist
+launchctl unload ~/Library/LaunchAgents/com.mac-llm-lab.llama-server.plist
+rm ~/Library/LaunchAgents/com.mac-llm-lab.llama-server.plist
 
 # 2. Recreate the Ollama claw alias
 ollama create claw -f host/ollama/Modelfiles/claw.Modelfile
@@ -319,8 +319,8 @@ cp host/llama-server/docs/system-prompt.md path/to/workspace/CLAUDE.md
 
 Two existing CLIs route around the host stack:
 
-- [`../scripts/home-llm-lab-hostctl`](../scripts/home-llm-lab-hostctl) — runs on the lab host. Manages the docker stack and warms Ollama profiles.
-- [`../../client/home-llm-lab`](../../client/home-llm-lab) — runs on client laptops. SSHes the host to call hostctl.
+- [`../scripts/mac-llm-lab-hostctl`](../scripts/mac-llm-lab-hostctl) — runs on the lab host. Manages the docker stack and warms Ollama profiles.
+- [`../../client/mac-llm-lab`](../../client/mac-llm-lab) — runs on client laptops. SSHes the host to call hostctl.
 
 Today both whitelist five profiles (`general fast reasoning digest analyze`). `claw` is intentionally absent because it's only consumed via the bridge by `claw-code`, never via OWUI's chat URL. After llama-server is in place, `claw` joins the whitelist and the `warm` command becomes profile-aware about which daemon it reaches.
 
@@ -328,20 +328,20 @@ Concrete edit list (deferred to the implementation pass):
 
 | Script | Change |
 |---|---|
-| `home-llm-lab-hostctl` | Add `claw` to `PROFILES` |
-| `home-llm-lab-hostctl` | Add `LLAMA_SERVER_API="${LLAMA_SERVER_API:-http://127.0.0.1:11435}"` next to `OLLAMA_API` |
-| `home-llm-lab-hostctl` | Make `cmd_warm` route by profile: `claw` → llama-server `/v1/chat/completions`, others → Ollama `/api/generate` |
-| `home-llm-lab-hostctl` | Extend `cmd_status` with a `== llama-server ==` block: `curl :11435/health`, show advertised model |
-| `client/home-llm-lab` | Add `claw` to `profile_to_model` validator |
-| `client/home-llm-lab` | Update `usage()` profile list |
+| `mac-llm-lab-hostctl` | Add `claw` to `PROFILES` |
+| `mac-llm-lab-hostctl` | Add `LLAMA_SERVER_API="${LLAMA_SERVER_API:-http://127.0.0.1:11435}"` next to `OLLAMA_API` |
+| `mac-llm-lab-hostctl` | Make `cmd_warm` route by profile: `claw` → llama-server `/v1/chat/completions`, others → Ollama `/api/generate` |
+| `mac-llm-lab-hostctl` | Extend `cmd_status` with a `== llama-server ==` block: `curl :11435/health`, show advertised model |
+| `client/mac-llm-lab` | Add `claw` to `profile_to_model` validator |
+| `client/mac-llm-lab` | Update `usage()` profile list |
 
-Behavioral note for `warm claw`: llama-server runs with `KeepAlive=true` in the launchd plist, so the model is always resident. Warming is a reachability + first-token-latency probe rather than an actual load, but the user-visible UX stays identical (`home-llm-lab warm -p claw` returns when the model is responsive — typically <100 ms vs. ~5 s for an Ollama cold load).
+Behavioral note for `warm claw`: llama-server runs with `KeepAlive=true` in the launchd plist, so the model is always resident. Warming is a reachability + first-token-latency probe rather than an actual load, but the user-visible UX stays identical (`mac-llm-lab warm -p claw` returns when the model is responsive — typically <100 ms vs. ~5 s for an Ollama cold load).
 
 Reference shape for the modified `cmd_warm`:
 
 ```sh
 cmd_warm() {
-  [ "${1:-}" ] || err "usage: home-llm-lab-hostctl warm <profile>"
+  [ "${1:-}" ] || err "usage: mac-llm-lab-hostctl warm <profile>"
   profile=$(profile_to_model "$1")
   case "$profile" in
     claw)
@@ -375,9 +375,9 @@ Net surface: same verbs (`warm`, `status`), one new profile in the whitelist, sm
 4. Eval A (the one-shot `hello.py` test) passes in ≤2 turns.
 5. Eval B (3 parallel files) passes in ≤2 turns.
 6. Claw `doctor` from inside `client/claw-code/` reports green.
-7. `home-llm-lab-hostctl warm claw` returns success in <500ms (warm is a probe, not a load).
-8. `home-llm-lab-hostctl status` includes a `== llama-server ==` block showing healthy + model `claw`.
-9. `home-llm-lab warm -p claw` from a client laptop returns success (proves SSH path + hostctl edits land together).
+7. `mac-llm-lab-hostctl warm claw` returns success in <500ms (warm is a probe, not a load).
+8. `mac-llm-lab-hostctl status` includes a `== llama-server ==` block showing healthy + model `claw`.
+9. `mac-llm-lab warm -p claw` from a client laptop returns success (proves SSH path + hostctl edits land together).
 
 ---
 

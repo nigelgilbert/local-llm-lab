@@ -22,7 +22,7 @@ set -eu
 SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
 REPO_DIR=$(cd "$SCRIPT_DIR/../.." && pwd)
 INSTALL="$REPO_DIR/host/llama-server/scripts/install"
-LABEL="com.home-llm-lab.llama-server"
+LABEL="com.mac-llm-lab.llama-server"
 
 COMPOSE="$SCRIPT_DIR/docker-compose.yml"
 LLAMA_HEALTH="http://127.0.0.1:11435/health"
@@ -38,8 +38,8 @@ err() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
 # ---- preflight ----
 command -v docker >/dev/null 2>&1 || err "missing: docker"
 [ -x "$INSTALL" ] || err "missing or non-executable install script: $INSTALL"
-docker image inspect home-llm-lab-test:local >/dev/null 2>&1 \
-  || err "missing image home-llm-lab-test:local — build it: (cd $SCRIPT_DIR && docker compose build)"
+docker image inspect mac-llm-lab-test:local >/dev/null 2>&1 \
+  || err "missing image mac-llm-lab-test:local — build it: (cd $SCRIPT_DIR && docker compose build)"
 curl -fsS "$BRIDGE_HEALTH" >/dev/null 2>&1 \
   || err "bridge unreachable at $BRIDGE_HEALTH — start it: (cd $REPO_DIR/host/litellm && docker compose up -d)"
 

@@ -24,7 +24,7 @@ Raw transcripts:
 
 ## What changed (committed)
 
-- `host/llama-server/launchd/com.home-llm-lab.llama-server.plist` —
+- `host/llama-server/launchd/com.mac-llm-lab.llama-server.plist` —
   `repeat-penalty 1.2 → 1.05`. Comment added pointing at the TODO memo.
 - `host/llama-server/models.conf` — comment-only annotation logging the
   Qwen2.5-Coder rejection so we don't repeat it.

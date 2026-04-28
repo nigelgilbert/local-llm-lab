@@ -3,25 +3,18 @@
 <plist version="1.0">
 <dict>
     <key>Label</key>
-    <string>com.home-llm-lab.llama-server-qwen14</string>
+    <string>com.mac-llm-lab.llama-server</string>
 
     <!--
-      llama.cpp server variant for the Qwen3-14B Q4_K_M model A/B eval.
-      Used only by host/test/run-model-qwen14-ab.sh — never install this manually.
+      Template — do not install directly. Placeholders are filled by:
+        ./host/llama-server/scripts/install [--size 16|32|64]
 
-      run-model-qwen14-ab.sh substitutes QWEN14_GGUF_PATH at runtime via sed, then copies
-      the rendered plist to ~/Library/LaunchAgents/com.home-llm-lab.llama-server.plist
-      (overwriting the production claw plist for the duration of Phase B).
-      The cleanup trap restores the production plist when the run exits.
-
-      All other flags are identical to the production claw plist so the two
-      models are tested under the same conditions (same grammar, same sampler,
-      same context size, same port).
+      Placeholders: __BINARY__  __GGUF_PATH__  __CTX_SIZE__  __BATCH_SIZE__  __GRAMMAR_PATH__
     -->
 
     <key>ProgramArguments</key>
     <array>
-        <string>/Users/nigel/.local/bin/llama-server</string>
+        <string>__BINARY__</string>
 
         <!-- network -->
         <string>--host</string>
@@ -29,15 +22,15 @@
         <string>--port</string>
         <string>11435</string>
 
-        <!-- model — substituted by run-model-qwen14-ab.sh from QWEN14_GGUF env var -->
+        <!-- model -->
         <string>--model</string>
-        <string>QWEN14_GGUF_PATH</string>
+        <string>__GGUF_PATH__</string>
         <string>--alias</string>
         <string>claw</string>
 
         <!-- context + memory -->
         <string>--ctx-size</string>
-        <string>32768</string>
+        <string>__CTX_SIZE__</string>
         <string>-ngl</string>
         <string>999</string>
         <string>-fa</string>
@@ -47,39 +40,50 @@
         <string>--cache-type-v</string>
         <string>q8_0</string>
         <string>--batch-size</string>
-        <string>4096</string>
+        <string>__BATCH_SIZE__</string>
 
-        <!-- sampler — mirrors host/ollama/Modelfiles/claw.Modelfile so both
-             models are tested with the same sampling conditions -->
+        <!-- sampler — mirrors host/ollama/Modelfiles/claw.Modelfile -->
         <string>--temp</string>
         <string>0.4</string>
         <string>--top-p</string>
         <string>0.8</string>
         <string>--top-k</string>
         <string>20</string>
+        <!-- repeat-penalty 1.2 was over-suppressing the `\n` token in
+             structured-markdown responses (it appears 8–15× in a 250-word
+             reply, all inside the 256-token window). 1.05 keeps a mild
+             anti-loop nudge without smushing prose. See TODO-PROSE-SMUSH.md. -->
         <string>--repeat-penalty</string>
-        <string>1.2</string>
+        <string>1.05</string>
         <string>--repeat-last-n</string>
         <string>256</string>
 
-        <!-- grammar — same constraint as production claw -->
+        <!-- grammar — the point of this whole directory -->
         <string>--grammar-file</string>
-        <string>/Users/nigel/Desktop/bench/lab/host/llama-server/grammars/claw.gbnf</string>
+        <string>__GRAMMAR_PATH__</string>
+
+        <!-- Discipline rules: claw-code discovers CLAUDE.md in the workspace and
+             concatenates it to its system prompt. See README §9. (Upstream
+             llama.cpp removed `--system-prompt-file`, so per-deploy injection
+             via the server is no longer available.) -->
 
         <!-- misc -->
         <string>--metrics</string>
     </array>
 
+    <!-- Auto-start at login and revive on crash. -->
     <key>RunAtLoad</key>
     <true/>
     <key>KeepAlive</key>
     <true/>
 
+    <!-- Logs go to a known place; rotate by hand if needed. -->
     <key>StandardOutPath</key>
     <string>/tmp/llama-server.log</string>
     <key>StandardErrorPath</key>
     <string>/tmp/llama-server.log</string>
 
+    <!-- Crash backoff, in case the binary dies on bad config. -->
     <key>ThrottleInterval</key>
     <integer>10</integer>
 </dict>

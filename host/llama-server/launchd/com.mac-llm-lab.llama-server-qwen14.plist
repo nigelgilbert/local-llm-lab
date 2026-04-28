@@ -3,14 +3,14 @@
 <plist version="1.0">
 <dict>
     <key>Label</key>
-    <string>com.home-llm-lab.llama-server-qwen36</string>
+    <string>com.mac-llm-lab.llama-server-qwen14</string>
 
     <!--
-      llama.cpp server variant for the qwen3.6-27B model A/B eval.
-      Used only by host/test-model-ab/run.sh — never install this manually.
+      llama.cpp server variant for the Qwen3-14B Q4_K_M model A/B eval.
+      Used only by host/test/run-model-qwen14-ab.sh — never install this manually.
 
-      run.sh substitutes QWEN36_GGUF_PATH at runtime via sed, then copies
-      the rendered plist to ~/Library/LaunchAgents/com.home-llm-lab.llama-server.plist
+      run-model-qwen14-ab.sh substitutes QWEN14_GGUF_PATH at runtime via sed, then copies
+      the rendered plist to ~/Library/LaunchAgents/com.mac-llm-lab.llama-server.plist
       (overwriting the production claw plist for the duration of Phase B).
       The cleanup trap restores the production plist when the run exits.
 
@@ -29,15 +29,15 @@
         <string>--port</string>
         <string>11435</string>
 
-        <!-- model — substituted by run.sh from QWEN36_GGUF env var -->
+        <!-- model — substituted by run-model-qwen14-ab.sh from QWEN14_GGUF env var -->
         <string>--model</string>
-        <string>QWEN36_GGUF_PATH</string>
+        <string>QWEN14_GGUF_PATH</string>
         <string>--alias</string>
         <string>claw</string>
 
         <!-- context + memory -->
         <string>--ctx-size</string>
-        <string>131072</string>
+        <string>32768</string>
         <string>-ngl</string>
         <string>999</string>
         <string>-fa</string>
@@ -46,6 +46,8 @@
         <string>q8_0</string>
         <string>--cache-type-v</string>
         <string>q8_0</string>
+        <string>--batch-size</string>
+        <string>4096</string>
 
         <!-- sampler — mirrors host/ollama/Modelfiles/claw.Modelfile so both
              models are tested with the same sampling conditions -->
@@ -62,7 +64,7 @@
 
         <!-- grammar — same constraint as production claw -->
         <string>--grammar-file</string>
-        <string>/Users/nigel/Desktop/bench/home-llm-lab/host/llama-server/grammars/claw.gbnf</string>
+        <string>/Users/nigel/Desktop/bench/lab/host/llama-server/grammars/claw.gbnf</string>
 
         <!-- misc -->
         <string>--metrics</string>

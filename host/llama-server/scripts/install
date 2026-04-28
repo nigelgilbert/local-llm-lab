@@ -6,9 +6,9 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$SCRIPT_DIR/.."
-PLIST_TEMPLATE="$ROOT/launchd/com.home-llm-lab.llama-server.plist"
-PLIST_DEST="$HOME/Library/LaunchAgents/com.home-llm-lab.llama-server.plist"
-LABEL="com.home-llm-lab.llama-server"
+PLIST_TEMPLATE="$ROOT/launchd/com.mac-llm-lab.llama-server.plist"
+PLIST_DEST="$HOME/Library/LaunchAgents/com.mac-llm-lab.llama-server.plist"
+LABEL="com.mac-llm-lab.llama-server"
 
 # shellcheck source=../models.conf
 source "$ROOT/models.conf"

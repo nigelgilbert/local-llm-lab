@@ -19,7 +19,7 @@ Two phases per run, because both 26 GB GGUF runners can't be resident in 64 GB u
 | Phase | Backend | How loaded                                                              |
 |-------|---------|-------------------------------------------------------------------------|
 | A     | Ollama  | `ollama create claw-test -f host/ollama/Modelfiles/claw.Modelfile`      |
-| B     | llama-server | `launchctl load ~/Library/LaunchAgents/com.home-llm-lab.llama-server.plist` |
+| B     | llama-server | `launchctl load ~/Library/LaunchAgents/com.mac-llm-lab.llama-server.plist` |
 
 `run.sh` swaps them: unload llama-server, run Phase A, tear down `claw-test`, load llama-server, run Phase B. A `trap` restores production state on early exit.
 

@@ -3,18 +3,25 @@
 <plist version="1.0">
 <dict>
     <key>Label</key>
-    <string>com.home-llm-lab.llama-server</string>
+    <string>com.mac-llm-lab.llama-server-qwen36</string>
 
     <!--
-      Template — do not install directly. Placeholders are filled by:
-        ./host/llama-server/scripts/install [--size 16|32|64]
+      llama.cpp server variant for the qwen3.6-27B model A/B eval.
+      Used only by host/test-model-ab/run.sh — never install this manually.
 
-      Placeholders: __BINARY__  __GGUF_PATH__  __CTX_SIZE__  __BATCH_SIZE__  __GRAMMAR_PATH__
+      run.sh substitutes QWEN36_GGUF_PATH at runtime via sed, then copies
+      the rendered plist to ~/Library/LaunchAgents/com.mac-llm-lab.llama-server.plist
+      (overwriting the production claw plist for the duration of Phase B).
+      The cleanup trap restores the production plist when the run exits.
+
+      All other flags are identical to the production claw plist so the two
+      models are tested under the same conditions (same grammar, same sampler,
+      same context size, same port).
     -->
 
     <key>ProgramArguments</key>
     <array>
-        <string>__BINARY__</string>
+        <string>/Users/nigel/.local/bin/llama-server</string>
 
         <!-- network -->
         <string>--host</string>
@@ -22,15 +29,15 @@
         <string>--port</string>
         <string>11435</string>
 
-        <!-- model -->
+        <!-- model — substituted by run.sh from QWEN36_GGUF env var -->
         <string>--model</string>
-        <string>__GGUF_PATH__</string>
+        <string>QWEN36_GGUF_PATH</string>
         <string>--alias</string>
         <string>claw</string>
 
         <!-- context + memory -->
         <string>--ctx-size</string>
-        <string>__CTX_SIZE__</string>
+        <string>131072</string>
         <string>-ngl</string>
         <string>999</string>
         <string>-fa</string>
@@ -39,51 +46,38 @@
         <string>q8_0</string>
         <string>--cache-type-v</string>
         <string>q8_0</string>
-        <string>--batch-size</string>
-        <string>__BATCH_SIZE__</string>
 
-        <!-- sampler — mirrors host/ollama/Modelfiles/claw.Modelfile -->
+        <!-- sampler — mirrors host/ollama/Modelfiles/claw.Modelfile so both
+             models are tested with the same sampling conditions -->
         <string>--temp</string>
         <string>0.4</string>
         <string>--top-p</string>
         <string>0.8</string>
         <string>--top-k</string>
         <string>20</string>
-        <!-- repeat-penalty 1.2 was over-suppressing the `\n` token in
-             structured-markdown responses (it appears 8–15× in a 250-word
-             reply, all inside the 256-token window). 1.05 keeps a mild
-             anti-loop nudge without smushing prose. See TODO-PROSE-SMUSH.md. -->
         <string>--repeat-penalty</string>
-        <string>1.05</string>
+        <string>1.2</string>
         <string>--repeat-last-n</string>
         <string>256</string>
 
-        <!-- grammar — the point of this whole directory -->
+        <!-- grammar — same constraint as production claw -->
         <string>--grammar-file</string>
-        <string>__GRAMMAR_PATH__</string>
-
-        <!-- Discipline rules: claw-code discovers CLAUDE.md in the workspace and
-             concatenates it to its system prompt. See README §9. (Upstream
-             llama.cpp removed `--system-prompt-file`, so per-deploy injection
-             via the server is no longer available.) -->
+        <string>/Users/nigel/Desktop/bench/mac-llm-lab/host/llama-server/grammars/claw.gbnf</string>
 
         <!-- misc -->
         <string>--metrics</string>
     </array>
 
-    <!-- Auto-start at login and revive on crash. -->
     <key>RunAtLoad</key>
     <true/>
     <key>KeepAlive</key>
     <true/>
 
-    <!-- Logs go to a known place; rotate by hand if needed. -->
     <key>StandardOutPath</key>
     <string>/tmp/llama-server.log</string>
     <key>StandardErrorPath</key>
     <string>/tmp/llama-server.log</string>
 
-    <!-- Crash backoff, in case the binary dies on bad config. -->
     <key>ThrottleInterval</key>
     <integer>10</integer>
 </dict>

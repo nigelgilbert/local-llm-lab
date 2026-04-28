@@ -81,7 +81,7 @@ fi
 # --- related containers ---
 hdr "Related containers"
 docker ps --format "    {{.Names}}\t{{.Status}}\t{{.Image}}" \
-  | grep -E "litellm|ollama|openwebui|home-llm-lab" \
+  | grep -E "litellm|ollama|openwebui|mac-llm-lab" \
   | while IFS=$'\t' read -r name status image; do
       if [[ "$status" == Up* ]]; then ok "$name  ($status)  $image"
       else fail "$name  ($status)  $image"
@@ -91,7 +91,7 @@ docker ps --format "    {{.Names}}\t{{.Status}}\t{{.Image}}" \
 # --- bridge reachability ---
 # Check from host using localhost (host.docker.internal is container-only).
 hdr "LiteLLM bridge"
-BRIDGE_URL="http://${BRIDGE_HOST:-home-llm-lab.local}:${BRIDGE_PORT:-4000}"
+BRIDGE_URL="http://${BRIDGE_HOST:-mac-llm-lab.local}:${BRIDGE_PORT:-4000}"
 HOST_BRIDGE_URL="http://localhost:${BRIDGE_PORT:-4000}"
 if curl -sf --max-time 3 "$HOST_BRIDGE_URL/health/liveliness" &>/dev/null; then
   ok "Bridge reachable at $HOST_BRIDGE_URL (container address: $BRIDGE_URL)"

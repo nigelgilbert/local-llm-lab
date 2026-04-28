@@ -5,7 +5,7 @@ services:
   test:
     build:
       context: .
-    image: home-llm-lab-test:local
+    image: mac-llm-lab-test:local
     working_dir: /test
     env_file:
       - ../litellm/.env
