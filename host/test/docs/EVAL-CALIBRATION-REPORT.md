@@ -155,6 +155,55 @@ Per Inspect AI / METR practice, tests with pass-rates in [0.2, 0.8] need more N 
 - **A `discipline` sub-suite** that isolates grammar-prose-branch flakes from capability flakes.
 - **Re-run after the parallel team's tier-64 model swap** to test whether the inversion is Qwen3-Coder-specific or claw-loop-specific.
 
+## Postscript: Failure-mode attribution and the corrected gradient
+
+After shipping the n=3 sweeps, we wrote a log-pattern classifier
+(`scripts/classify-failures.sh`) that splits every ✖ into `timeout`,
+`discipline`, or `capability` based on test elapsed and post-run workspace
+state. Re-running the n=3 data through it yields:
+
+| Tier | timeout | discipline | capability | Total fails |
+|---|---|---|---|---|
+| tier-16 (7B) | 1 | 0 | 19 | 20 |
+| tier-32 (14B) | 3 | 0 | 2 | 5 |
+| tier-64 (30B) | 7 | 0 | 5 | 12 |
+
+Two observations:
+
+1. **The retry-storm hypothesis (§4.1, mode B) is quantitatively confirmed.**
+   60% of tier-32's failures and 58% of tier-64's failures are 240-second
+   claw timeouts — i.e., harness, not capability. The 7B's failures are
+   95% capability.
+
+2. **Discounting timeouts inverts §3.3's headline**: the corrected
+   capability-only pass-rates are tier-16 ≈ 16/22, tier-32 ≈ 21/22,
+   tier-64 ≈ 20/22. The 14B/30B inversion disappears; the 30B is
+   roughly on par with the 14B (slightly behind) on this suite, with
+   more variance attributable to harness pollution than to model.
+
+The classifier additionally reports zero `discipline` failures across all
+three tiers in this n=3 sample. That is consistent with the suite's
+prompt design (every test forces an explicit "ensure `node X.js` exits 0"
+constraint that the model can't satisfy without invoking a tool); the
+single `agent: single-file write` discipline-flake we observed in the
+preflight (§2 above) did not reappear under load. Worth re-checking at
+n≥10 before retiring the discipline category.
+
+We also extended `aggregate-results.sh` with a `--wilson` flag that prints
+95% Wilson lower bounds. At n=3, even a 3/3 only buys a 43% lower bound,
+underscoring rule #2 from the eval-design guide: borderline calls need
+n≥5–7 before they're trustworthy.
+
+### How to reproduce the postscript analysis
+
+```sh
+# Pass-rate matrix with Wilson 95% lower bounds:
+host/test/scripts/aggregate-results.sh --wilson host/test/logs/TIER-EVAL-RESULTS-*.md
+
+# Per-failure attribution:
+host/test/scripts/classify-failures.sh host/test/logs/TIER-EVAL-RESULTS-*.md
+```
+
 ## Appendix: Files added in this calibration
 
 - `host/test/docs/EVAL-DESIGN.md` — design principles distilled from public eval research.
@@ -167,5 +216,6 @@ Per Inspect AI / METR practice, tests with pass-rates in [0.2, 0.8] need more N 
 - `host/test/__tests__/tier-eval/algorithm-intervals.test.js`
 - `host/test/__tests__/tier-eval/api-evolution.test.js`
 - `host/test/__tests__/tier-eval/state-machine.test.js`
-- `host/test/scripts/aggregate-results.sh` — pivot multiple result files into the per-tier matrix.
+- `host/test/scripts/aggregate-results.sh` — pivot multiple result files into the per-tier matrix; `--wilson` adds 95% CI lower bounds.
+- `host/test/scripts/classify-failures.sh` — split every ✖ into timeout / discipline / capability.
 - `host/test/logs/TIER-EVAL-RESULTS-20260428-{0028,0119,0211}.md` — raw sweep transcripts.
