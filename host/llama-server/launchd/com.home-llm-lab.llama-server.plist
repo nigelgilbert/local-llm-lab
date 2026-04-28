@@ -49,8 +49,12 @@
         <string>0.8</string>
         <string>--top-k</string>
         <string>20</string>
+        <!-- repeat-penalty 1.2 was over-suppressing the `\n` token in
+             structured-markdown responses (it appears 8–15× in a 250-word
+             reply, all inside the 256-token window). 1.05 keeps a mild
+             anti-loop nudge without smushing prose. See TODO-PROSE-SMUSH.md. -->
         <string>--repeat-penalty</string>
-        <string>1.2</string>
+        <string>1.05</string>
         <string>--repeat-last-n</string>
         <string>256</string>
 

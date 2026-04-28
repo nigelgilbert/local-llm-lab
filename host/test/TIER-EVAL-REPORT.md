@@ -1,7 +1,32 @@
 # Tier Eval Report — 2026-04-27
 
-Source data: [TIER-EVAL-RESULTS-20260427-2034.md](TIER-EVAL-RESULTS-20260427-2034.md).
+Two passes documented here:
+- **Baseline:** [TIER-EVAL-RESULTS-20260427-2034.md](TIER-EVAL-RESULTS-20260427-2034.md)
+  — Qwen3-14B / Qwen3-30B-A3B-Instruct / Qwen3-Coder-30B with
+  `repeat-penalty=1.2`.
+- **After fix:** [TIER-EVAL-RESULTS-20260427-2059.md](TIER-EVAL-RESULTS-20260427-2059.md)
+  — same models, `repeat-penalty=1.05`. (An intermediate run with
+  Qwen2.5-Coder-14B-Instruct on tier-16 regressed to 1/8 pass and was
+  reverted; details below.)
+
 Suite: 7 tests across 8 `it()` blocks (`latency.test.js` is two suites in one file).
+
+## After-fix scoreboard
+
+| Tier | Baseline | After fix | Δ |
+|------|----------|-----------|---|
+| 16 (Qwen3-14B)              | 5/8 | **8/8** | tool-discipline + roundtrip + prose all flipped to ✔ |
+| 32 (Qwen3-30B-A3B-Instr MoE)| 7/8 | 7/8     | prose still flaky (5/2/5 vs 2/2/2) |
+| 64 (Qwen3-Coder-30B)        | 7/8 | 7/8     | prose unchanged (2/2/2) |
+
+The single change (`repeat-penalty 1.2 → 1.05` in
+[`host/llama-server/launchd/com.home-llm-lab.llama-server.plist`](../llama-server/launchd/com.home-llm-lab.llama-server.plist))
+moved tier-16 from the worst-performing tier (3 fails) to a clean sweep, and
+partially helped tier-32. tier-64's prose smush is *not* sampler-side — see
+[TODO-PROSE-SMUSH.md](../llama-server/TODO-PROSE-SMUSH.md) for the next-step
+diagnostic.
+
+
 
 ## Models
 
@@ -232,22 +257,48 @@ quant-bound.
 **7. Smaller 7B coder.** Qwen2.5-Coder-7B at Q5 is ~5 GB — leaves ~10 GB free,
 which is wasted on a 16 GB box. Not the right shape for this tier.
 
-## Suggested next experiment
+## Experiments attempted
 
-A two-cell A/B: same 16 GB budget, two candidates.
+### Cell A (rejected): Qwen2.5-Coder-14B-Instruct-Q4_K_M for tier-16
 
-1. **Cell A:** swap to `Qwen2.5-Coder-14B-Instruct-Q4_K_M` (one-line change in
-   `models.conf`). Re-run `EVAL_TIERS="16" ./host/test/run-tier-eval.sh`.
-   Hypothesis: tool-discipline 0% → ≥90%, roundtrip 10% → ≥90%, agent latencies
-   roughly unchanged (it's the same scale).
+Hypothesis was: a coder-tuned 14B should wrap into `<tool_call>` natively,
+fixing tier-16's wrap-rate. Result was the *opposite* — 1/8 pass, only TTFT.
+Every failed call ended with `stop=end_turn`, latencies of ~800 ms, and
+`files=[".claw"]` only (no `hello.py`, no `a.py`, no `fib.js`).
 
-2. **Cell B (parallel, if Cell A doesn't fully fix it):** keep Qwen3-14B but
-   raise `max_tokens` and tighten the grammar. Hypothesis: tool-discipline rises
-   into 30–60% range — better, but still not production-grade.
+Diagnosis: Qwen2.5-Coder uses a different tool-call format than Qwen3-Coder's
+`<tool_call>...</tool_call>` (likely Hermes-style `<|tool_call_begin|>`).
+`claw.gbnf` blocks the native format, so the model drops into the prose
+branch, ends the turn cleanly, and claw believes "task done" and exits
+without writing any files.
 
-If Cell A clears the bar, that's the new tier-16 default. If it doesn't, the
-16 GB tier should be honestly labelled "agent-capable, not tool-strict" and
-some tests should be marked tier-conditional.
+Reverted to Qwen3-14B. The 8.4 GB GGUF stays on disk — it's a candidate for
+a future grammar-side experiment, but is not a drop-in.
+
+### Cell B (accepted): `repeat-penalty 1.2 → 1.05`
+
+The actual fix. One line in the plist template. Ran against the original
+Qwen3-14B + Qwen3-30B-A3B-Instruct-2507 + Qwen3-Coder-30B:
+
+- **tier-16: 5/8 → 8/8.** The penalty was suppressing both `\n` (prose) *and*
+  the wrapper-format chars (`<`, `>`, `"`, `{`, `}` recur in
+  `<tool_call>{"name":...}</tool_call>`). Lowering it released both at once:
+  tool-discipline 0/10 → 10/10, tool-roundtrip 2/20 → 20/20, prose newlines
+  17/10/4 → 8/10/10 (now consistent).
+- **tier-32: 7/8 → 7/8** (prose still ✖). Newlines went 2/2/2 → 5/2/5 —
+  visible improvement, but run 2 still smushes. Penalty was a partial cause.
+- **tier-64: 7/8 → 7/8** (prose still ✖). Newlines unchanged at 2/2/2.
+  Penalty was *not* the cause for the 30B coder model.
+
+## Remaining work
+
+Tier-32 and tier-64 still fail prose-quality. The cross-tier differential
+(14B fully fixed, MoE partially, coder-30B not at all) localises the
+remaining cause to **claw renderer or chat template**, not the sampler. Next
+step (documented in
+[host/llama-server/TODO-PROSE-SMUSH.md](../llama-server/TODO-PROSE-SMUSH.md)):
+direct `streamMessage()` against `claw-llama` for the same prose prompt and
+byte-compare versus `runClaw()` output.
 
 ## Followups (out of scope for this report)
 
