@@ -20,9 +20,7 @@ rejected mid-run.
 | 64   | 7 / 8    | 7 / 8     | prose-quality unchanged (newlines 2/2/2, was 2/5/2) |
 
 Raw transcripts:
-- [TIER-EVAL-RESULTS-20260427-2034.md](../logs/TIER-EVAL-RESULTS-20260427-2034.md) — baseline
-- [TIER-EVAL-RESULTS-20260427-2056.md](../logs/TIER-EVAL-RESULTS-20260427-2056.md) — Qwen2.5-Coder side experiment (rejected)
-- [TIER-EVAL-RESULTS-20260427-2059.md](../logs/TIER-EVAL-RESULTS-20260427-2059.md) — fix pass
+- [TIER-EVAL-RESULTS-20260427-2059.md](../logs/TIER-EVAL-RESULTS-20260427-2059.md) — fix pass (kept; baseline + Qwen2.5-Coder rejection logs were trimmed)
 
 ## What changed (committed)
 

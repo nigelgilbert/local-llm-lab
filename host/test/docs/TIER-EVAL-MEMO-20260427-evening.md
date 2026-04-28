@@ -33,10 +33,8 @@ With thinking off the 8B isn't strong enough to spot the seeded off-by-one in
 one pass; with thinking on it can't finish thinking + emit `<tool_call>` inside
 256 tokens. Ergonomics-wise, neither setting is acceptable.
 
-Raw transcripts:
-- [TIER-EVAL-RESULTS-20260427-2211.md](../logs/TIER-EVAL-RESULTS-20260427-2211.md) — full sweep, 8B fails tool-discipline
-- [TIER-EVAL-RESULTS-20260427-2222.md](../logs/TIER-EVAL-RESULTS-20260427-2222.md) — 8B + `--reasoning off`, fails refactor
-- [TIER-EVAL-RESULTS-20260427-2225.md](../logs/TIER-EVAL-RESULTS-20260427-2225.md) — 8B + `--reasoning-budget 128`, fails both
+Raw transcripts: trimmed (8B rejection trail recoverable from git history;
+the rejection table above captures the salient pass/fail data).
 
 ## Replacement search
 
@@ -96,10 +94,11 @@ existing suite doesn't:
 | Tier total | 11/11 | 9/11 | 10/11 | 11/11 | 10/11 |
 
 Result files:
-[20260427-2252.md](../logs/TIER-EVAL-RESULTS-20260427-2252.md) (7B run 1, lucky pass),
-[20260427-2302.md](../logs/TIER-EVAL-RESULTS-20260427-2302.md) (14B tier-16),
-[20260427-2309.md](../logs/TIER-EVAL-RESULTS-20260427-2309.md) (7B run 2, both new ✖),
-[20260427-2313.md](../logs/TIER-EVAL-RESULTS-20260427-2313.md) (tier-32 + tier-64).
+[20260427-2313.md](../logs/TIER-EVAL-RESULTS-20260427-2313.md) — tier-32 + tier-64
+final harder-evals run (kept). Per-candidate harder-eval runs on tier-16
+(7B run 1 lucky pass, 14B at tier-16, 7B run 2 with both new ✖) were trimmed;
+the per-run timings in the table above are the salient signal and the raw
+logs are git-recoverable.
 
 ### Read on the harder evals
 
