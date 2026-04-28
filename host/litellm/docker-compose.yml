@@ -1,8 +1,10 @@
 services:
   litellm:
-    image: ghcr.io/berriai/litellm:main-latest
+    image: ghcr.io/berriai/litellm:main-stable
     container_name: home-llm-lab-litellm
     restart: unless-stopped
+    mem_limit: 512m
+    memswap_limit: 512m
     ports:
       - "4000:4000"
     volumes:
@@ -15,7 +17,15 @@ services:
       # which is what Anthropic clients (claw-code, etc.) expect. See
       # ./patches/streaming_iterator.py for the diff.
       - ./patches/streaming_iterator.py:/usr/lib/python3.13/site-packages/litellm/llms/anthropic/experimental_pass_through/adapters/streaming_iterator.py:ro
-    command: ["--config", "/app/config.yaml", "--port", "4000"]
+    command:
+      - "--config"
+      - "/app/config.yaml"
+      - "--port"
+      - "4000"
+      - "--num_workers"
+      - "1"
+      - "--max_requests_before_restart"
+      - "1000"
     environment:
       - OLLAMA_API_BASE=http://${OLLAMA_HOST}:${OLLAMA_PORT}
       - OLLAMA_OPENAI_BASE=http://${OLLAMA_HOST}:${OLLAMA_PORT}/v1
