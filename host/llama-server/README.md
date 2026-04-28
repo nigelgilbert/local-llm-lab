@@ -256,7 +256,7 @@ test "$(cat $WORKSPACE/hello.py)" = "print('hello')" && echo PASS || echo FAIL
 
 ## Configuration
 
-The plist embeds all tunables. Edit and re-load to change. Defaults match `host/ollama/Modelfiles/claw.Modelfile`:
+The plist embeds all tunables. Edit and re-load to change. Most defaults mirror `host/ollama/Modelfiles/claw.Modelfile` (kept in lockstep so the backend-A/B harness measures backend differences, not config differences) — exception: `repeat-penalty` here is `1.05`, vs `1.2` in the Modelfile, since the grammar enforces single-tool emission and the higher penalty was suppressing `\n`. See [docs/TODO-PROSE-SMUSH.md](docs/TODO-PROSE-SMUSH.md) for the sampler history.
 
 | Flag | Value | Notes |
 |---|---|---|
@@ -271,7 +271,7 @@ The plist embeds all tunables. Edit and re-load to change. Defaults match `host/
 | `--temp` | `0.4` | Matches Modelfile |
 | `--top-p` | `0.8` | " |
 | `--top-k` | `20` | " |
-| `--repeat-penalty` | `1.2` | " |
+| `--repeat-penalty` | `1.05` | Lowered from 1.2 (2026-04-27) — see docs/TODO-PROSE-SMUSH.md sampler-history section |
 | `--repeat-last-n` | `256` | " |
 | `--grammar-file` | `host/llama-server/grammars/claw.gbnf` | The point of all this |
 
@@ -306,9 +306,9 @@ The TEMPLATE-baked discipline rules from [`../ollama/Modelfiles/claw.Modelfile`]
 
 The original spec called for `--system-prompt-file` to inject the rules at server level. That flag has been removed from upstream llama.cpp — the smoke test on this commit (`5594d13`) errors out on it. The remaining hook is **workspace `CLAUDE.md`**: claw-code already discovers `CLAUDE.md` in the workspace root and concatenates it to the system prompt it sends. Drop the rules there and they apply per workspace.
 
-The canonical text of the rules lives at [`system-prompt.md`](system-prompt.md) — it's the same six lines that used to live in the Modelfile TEMPLATE. To use them in a workspace:
+The canonical text of the rules lives at [`docs/system-prompt.md`](docs/system-prompt.md) — it's the same six lines that used to live in the Modelfile TEMPLATE. To use them in a workspace:
 ```sh
-cp host/llama-server/system-prompt.md path/to/workspace/CLAUDE.md
+cp host/llama-server/docs/system-prompt.md path/to/workspace/CLAUDE.md
 ```
 
 (If a future llama.cpp restores a `--system-prompt-file`-equivalent flag, fold the rules back into the plist and remove this step.)

@@ -93,7 +93,7 @@ Model routing lives on the bridge, not here. Edit [`../../host/litellm/litellm-c
 
 claw has no `--system` flag and the static system-prompt sections are hardcoded in its source. The supported customisation point is `CLAUDE.md` (or `.claw/CLAUDE.md`, `CLAUDE.local.md`, `.claw/instructions.md`) in the workspace — claw discovers these from `cwd` and its parents and appends them under a `# Claude instructions` section. Verify with `docker compose exec claw claw system-prompt`.
 
-The `claw` Ollama profile already enforces tool-use discipline at the Modelfile-template layer (rules ride inside the tools block where they survive any client system override), so a workspace `CLAUDE.md` is optional and is the right place for project-specific guidance rather than core agent rules.
+**Tool-use discipline rules live in `host/llama-server/docs/system-prompt.md`** and need to be planted per workspace to take effect. claw on the production path runs through llama-server, which reads its chat template from GGUF metadata and ignores the Ollama Modelfile `SYSTEM` / `TEMPLATE`. Upstream llama.cpp also dropped `--system-prompt-file`. The remaining hook is workspace-side: `cp ../../host/llama-server/docs/system-prompt.md $WORKSPACE/CLAUDE.md`. Project-specific guidance can be added to the same file alongside the discipline rules.
 
 ## Troubleshooting
 

@@ -20,9 +20,9 @@ rejected mid-run.
 | 64   | 7 / 8    | 7 / 8     | prose-quality unchanged (newlines 2/2/2, was 2/5/2) |
 
 Raw transcripts:
-- [TIER-EVAL-RESULTS-20260427-2034.md](TIER-EVAL-RESULTS-20260427-2034.md) — baseline
-- [TIER-EVAL-RESULTS-20260427-2056.md](TIER-EVAL-RESULTS-20260427-2056.md) — Qwen2.5-Coder side experiment (rejected)
-- [TIER-EVAL-RESULTS-20260427-2059.md](TIER-EVAL-RESULTS-20260427-2059.md) — fix pass
+- [TIER-EVAL-RESULTS-20260427-2034.md](../logs/TIER-EVAL-RESULTS-20260427-2034.md) — baseline
+- [TIER-EVAL-RESULTS-20260427-2056.md](../logs/TIER-EVAL-RESULTS-20260427-2056.md) — Qwen2.5-Coder side experiment (rejected)
+- [TIER-EVAL-RESULTS-20260427-2059.md](../logs/TIER-EVAL-RESULTS-20260427-2059.md) — fix pass
 
 ## What changed (committed)
 
@@ -30,11 +30,11 @@ Raw transcripts:
   `repeat-penalty 1.2 → 1.05`. Comment added pointing at the TODO memo.
 - `host/llama-server/models.conf` — comment-only annotation logging the
   Qwen2.5-Coder rejection so we don't repeat it.
-- `host/llama-server/TODO-PROSE-SMUSH.md` — new TODO memo capturing the
+- `host/llama-server/docs/TODO-PROSE-SMUSH.md` — new TODO memo capturing the
   remaining tier-32 / tier-64 prose smush, with an updated experiment trail.
 - `host/test/run-tier-eval.sh` — `set -o pipefail` around the docker run so
   per-tier exit codes propagate truthfully.
-- `host/test/TIER-EVAL-REPORT.md` — updated with the after-fix scoreboard
+- `host/test/docs/TIER-EVAL-REPORT.md` — updated with the after-fix scoreboard
   and the Qwen2.5-Coder writeup.
 
 ## Bugs fixed during the run
@@ -77,7 +77,7 @@ Raw transcripts:
   the MoE half-fixes; the 30B coder doesn't fix at all. The differential
   rules out sampler as the *only* cause and points at the claw renderer or
   chat template for the residual cases. Next-step diagnostic is documented
-  in [`host/llama-server/TODO-PROSE-SMUSH.md`](../llama-server/TODO-PROSE-SMUSH.md).
+  in [`host/llama-server/docs/TODO-PROSE-SMUSH.md`](../../llama-server/docs/TODO-PROSE-SMUSH.md).
 
 ## What's left
 

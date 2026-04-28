@@ -1,8 +1,16 @@
 # claw — agentic-coding profile, optimised for tool-use loops.
 # Backing model: Qwen3-Coder-30B-A3B-Instruct UD-Q6_K_XL (Unsloth Dynamic 2.0).
 # Selection rationale: tools capability native, no thinking, MoE A3B → fast
-# inference despite 30B total. Used by client/claw-code/ via the LiteLLM
-# bridge (anthropic/claw route in host/litellm/litellm-config.yaml).
+# inference despite 30B total.
+#
+# NOTE: production claw runs through llama-server (host/llama-server/), not
+# Ollama. This Modelfile is retained for (a) rollback from llama-server, and
+# (b) the Ollama-vs-llama-server A/B harness in host/test/run-backend-ab.sh,
+# which creates an ephemeral `claw-test` alias from it. The TEMPLATE rules
+# below apply only on the Ollama path — llama-server reads its chat template
+# from GGUF metadata and ignores Modelfile directives. Production discipline
+# rules live in host/llama-server/system-prompt.md (planted per workspace as
+# CLAUDE.md).
 
 FROM hf.co/unsloth/Qwen3-Coder-30B-A3B-Instruct-GGUF:UD-Q6_K_XL
 

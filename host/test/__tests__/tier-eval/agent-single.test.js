@@ -1,6 +1,14 @@
 // Agent single-file: minimum-viable agentic loop. One tool call, one file, done.
 // If this fails the model is not usable for any agent work through this stack.
 // elapsedMs doubles as a throughput signal when comparing tiers.
+//
+// Prompt is INTENTIONALLY minimal — no "Use the write_file tool…" framing.
+// A real user asking the agent for a one-line file shouldn't need to spell
+// out the tool name. Qwen3-Coder on tier-64 flakes here ~1-in-3 (exits with
+// prose, no tool call); we keep this test sensitive to that behavior rather
+// than masking it. Same fingerprint as host/test/docs/SETTINGS-AB-RESULTS.md
+// "838 ms, only `.claw/` written" note. Tracked in
+// host/llama-server/docs/TODO-AGENT-SINGLE-FLAKE.md.
 
 import { describe, it, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';

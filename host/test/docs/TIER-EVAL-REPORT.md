@@ -1,10 +1,10 @@
 # Tier Eval Report — 2026-04-27
 
 Two passes documented here:
-- **Baseline:** [TIER-EVAL-RESULTS-20260427-2034.md](TIER-EVAL-RESULTS-20260427-2034.md)
+- **Baseline:** [TIER-EVAL-RESULTS-20260427-2034.md](../logs/TIER-EVAL-RESULTS-20260427-2034.md)
   — Qwen3-14B / Qwen3-30B-A3B-Instruct / Qwen3-Coder-30B with
   `repeat-penalty=1.2`.
-- **After fix:** [TIER-EVAL-RESULTS-20260427-2059.md](TIER-EVAL-RESULTS-20260427-2059.md)
+- **After fix:** [TIER-EVAL-RESULTS-20260427-2059.md](../logs/TIER-EVAL-RESULTS-20260427-2059.md)
   — same models, `repeat-penalty=1.05`. (An intermediate run with
   Qwen2.5-Coder-14B-Instruct on tier-16 regressed to 1/8 pass and was
   reverted; details below.)
@@ -20,10 +20,10 @@ Suite: 7 tests across 8 `it()` blocks (`latency.test.js` is two suites in one fi
 | 64 (Qwen3-Coder-30B)        | 7/8 | 7/8     | prose unchanged (2/2/2) |
 
 The single change (`repeat-penalty 1.2 → 1.05` in
-[`host/llama-server/launchd/com.home-llm-lab.llama-server.plist`](../llama-server/launchd/com.home-llm-lab.llama-server.plist))
+[`host/llama-server/launchd/com.home-llm-lab.llama-server.plist`](../../llama-server/launchd/com.home-llm-lab.llama-server.plist))
 moved tier-16 from the worst-performing tier (3 fails) to a clean sweep, and
 partially helped tier-32. tier-64's prose smush is *not* sampler-side — see
-[TODO-PROSE-SMUSH.md](../llama-server/TODO-PROSE-SMUSH.md) for the next-step
+[TODO-PROSE-SMUSH.md](../../llama-server/docs/TODO-PROSE-SMUSH.md) for the next-step
 diagnostic.
 
 
@@ -296,7 +296,7 @@ Tier-32 and tier-64 still fail prose-quality. The cross-tier differential
 (14B fully fixed, MoE partially, coder-30B not at all) localises the
 remaining cause to **claw renderer or chat template**, not the sampler. Next
 step (documented in
-[host/llama-server/TODO-PROSE-SMUSH.md](../llama-server/TODO-PROSE-SMUSH.md)):
+[host/llama-server/docs/TODO-PROSE-SMUSH.md](../../llama-server/docs/TODO-PROSE-SMUSH.md)):
 direct `streamMessage()` against `claw-llama` for the same prose prompt and
 byte-compare versus `runClaw()` output.
 

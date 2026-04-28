@@ -29,7 +29,8 @@ LLAMA_HEALTH="http://127.0.0.1:11435/health"
 BRIDGE_HEALTH="http://127.0.0.1:4000/health/liveliness"
 
 EVAL_TIERS="${EVAL_TIERS:-16 32 64}"
-RESULTS_FILE="$SCRIPT_DIR/TIER-EVAL-RESULTS-$(date +%Y%m%d-%H%M).md"
+RESULTS_FILE="$SCRIPT_DIR/logs/TIER-EVAL-RESULTS-$(date +%Y%m%d-%H%M).md"
+mkdir -p "$SCRIPT_DIR/logs"
 
 log() { printf '%s\n' "$*" >&2; }
 err() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
