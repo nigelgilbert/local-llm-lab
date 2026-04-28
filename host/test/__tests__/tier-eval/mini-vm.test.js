@@ -1,0 +1,203 @@
+// Mini bytecode VM: stack machine with 12 opcodes, function calls, errors.
+//
+// Difficulty knob: 12 distinct opcodes, each with explicit semantics.
+// Several opcodes interact (CALL/RET use a separate call stack; JMP_IF
+// pops the condition; LOAD/STORE address local frames). Verify suite
+// has 12+ programs that each exercise a different aspect; missing any
+// single opcode behavior fails one or more programs.
+//
+// Target: very hard (frontier ceiling).
+
+import { describe, it, beforeEach } from 'node:test';
+import assert from 'node:assert/strict';
+import { spawnSync } from 'node:child_process';
+import fs from 'node:fs';
+import path from 'node:path';
+
+import { runClaw } from '../../lib/claw.js';
+import * as workspace from '../../lib/workspace.js';
+import { clawModel, TIER_LABEL } from '../../lib/tier.js';
+
+const VERIFY_JS = `\
+import assert from 'node:assert/strict';
+import { run } from './vm.js';
+
+// Each program is an array of [opcode, ...args]. run(program, [args])
+// returns the value left on the data stack at HALT.
+
+// (1) PUSH + HALT.
+assert.equal(run([['PUSH', 42], ['HALT']]), 42, 'push+halt');
+
+// (2) ADD.
+assert.equal(run([['PUSH', 2], ['PUSH', 3], ['ADD'], ['HALT']]), 5, 'add');
+
+// (3) SUB (operand order: top is RHS).
+assert.equal(run([['PUSH', 10], ['PUSH', 3], ['SUB'], ['HALT']]), 7, 'sub');
+
+// (4) MUL, DIV.
+assert.equal(run([['PUSH', 4], ['PUSH', 5], ['MUL'], ['HALT']]), 20, 'mul');
+assert.equal(run([['PUSH', 20], ['PUSH', 4], ['DIV'], ['HALT']]),  5, 'div');
+
+// (5) DUP, DROP.
+assert.equal(run([['PUSH', 7], ['DUP'], ['ADD'], ['HALT']]), 14, 'dup');
+assert.equal(run([['PUSH', 1], ['PUSH', 9], ['DROP'], ['HALT']]), 1, 'drop');
+
+// (6) JMP — unconditional, by absolute index.
+//     PUSH 1; JMP 4; PUSH 99; HALT; PUSH 7; HALT
+//     Should jump over the 99 and end with 7 on top.
+assert.equal(
+  run([['PUSH', 1], ['JMP', 4], ['PUSH', 99], ['HALT'], ['PUSH', 7], ['HALT']]),
+  7,
+  'jmp',
+);
+
+// (7) JMP_IF — pops top; if truthy, jump.
+//     PUSH 0; JMP_IF 5; PUSH 1; HALT; PUSH 2; HALT  (cond falsy → continues)
+assert.equal(
+  run([['PUSH', 0], ['JMP_IF', 5], ['PUSH', 1], ['HALT'], ['PUSH', 2], ['HALT']]),
+  1,
+  'jmp_if not taken',
+);
+
+//     PUSH 1; JMP_IF 5; PUSH 1; HALT; PUSH 2; HALT  (cond truthy → jumps)
+assert.equal(
+  run([['PUSH', 1], ['JMP_IF', 5], ['PUSH', 1], ['HALT'], ['PUSH', 2], ['HALT']]),
+  2,
+  'jmp_if taken',
+);
+
+// (8) LOAD/STORE — local variables (indexed slots).
+//     STORE 0 pops top into slot 0; LOAD 0 pushes slot 0.
+assert.equal(
+  run([['PUSH', 99], ['STORE', 0], ['LOAD', 0], ['HALT']]),
+  99,
+  'load/store',
+);
+
+// (9) Argument passing: run(program, [args]) places args in slots 0..n-1.
+assert.equal(
+  run([['LOAD', 0], ['LOAD', 1], ['ADD'], ['HALT']], [40, 2]),
+  42,
+  'args into slots',
+);
+
+// (10) CALL/RET — function call with local frame.
+//      Program with main + sub: main pushes 5, calls sub; sub doubles top, returns.
+//      CALL <addr> args N — pops N args, pushes new frame at <addr>.
+//      RET pops one value from current frame's stack and returns it on caller stack.
+//
+//      [0] PUSH 5
+//      [1] CALL 4 1
+//      [2] HALT          ; final value 10
+//      [3] (unused)
+//      [4] LOAD 0
+//      [5] LOAD 0
+//      [6] ADD
+//      [7] RET
+const callProg = [
+  ['PUSH', 5],
+  ['CALL', 4, 1],
+  ['HALT'],
+  ['NOP'],
+  ['LOAD', 0],
+  ['LOAD', 0],
+  ['ADD'],
+  ['RET'],
+];
+assert.equal(run(callProg), 10, 'call/ret double');
+
+// (11) Recursive factorial via call/ret. Slot 0 = n.
+//      if n <= 1 return 1 else return n * fact(n-1)
+const factProg = [
+  // entry [0]: LOAD 0; PUSH 1; SUB; JMP_IF 5; PUSH 1; RET
+  ['LOAD', 0],     // [0]
+  ['PUSH', 1],     // [1]
+  ['SUB'],         // [2]      n-1, used as the condition: 0 if n==1 → falls through
+  ['JMP_IF', 6],   // [3]      truthy → jump to recursive case
+  ['PUSH', 1],     // [4]
+  ['RET'],         // [5]
+  // recursive case [6]: result = n * fact(n-1); RET
+  ['LOAD', 0],     // [6]      n
+  ['LOAD', 0],     // [7]      n
+  ['PUSH', 1],     // [8]
+  ['SUB'],         // [9]      n-1
+  ['CALL', 0, 1],  // [10]     fact(n-1)
+  ['MUL'],         // [11]     n * fact(n-1)
+  ['RET'],         // [12]
+];
+assert.equal(run(factProg, [5]), 120, 'fact(5) via recursion');
+
+// (12) Errors — must throw with a descriptive message.
+assert.throws(() => run([['ADD'], ['HALT']]),         /stack|underflow/i, 'add on empty stack');
+assert.throws(() => run([['PUSH', 1], ['DIV'], ['HALT']]), /stack|underflow/i, 'div with one operand');
+assert.throws(() => run([['PUSH', 5], ['PUSH', 0], ['DIV'], ['HALT']]), /zero|divide/i, 'div by zero');
+assert.throws(() => run([['BOGUS']]),                /unknown.*op|opcode|invalid/i, 'unknown opcode');
+assert.throws(() => run([['JMP', 99]]),              /addr|bound|range/i, 'jmp out of range');
+
+// (13) Programs without HALT throw at end-of-program.
+assert.throws(() => run([['PUSH', 1]]), /halt|end|terminate/i, 'no halt');
+`;
+
+const PROMPT =
+  'Create vm.js that exports `run(program, args = [])`. Implement a stack-' +
+  'based bytecode interpreter. The program is an array of instructions; ' +
+  'each instruction is an array [OPCODE, ...operands].\n' +
+  'Opcodes:\n' +
+  '  PUSH n        — push numeric literal n\n' +
+  '  ADD           — pop b, pop a, push a+b\n' +
+  '  SUB           — pop b, pop a, push a-b (top is RHS)\n' +
+  '  MUL           — pop b, pop a, push a*b\n' +
+  '  DIV           — pop b, pop a, push a/b (throw on b==0)\n' +
+  '  DUP           — duplicate top\n' +
+  '  DROP          — discard top\n' +
+  '  JMP addr      — set instruction pointer to addr (absolute index)\n' +
+  '  JMP_IF addr   — pop top; if truthy, jump to addr; else continue\n' +
+  '  LOAD slot     — push the value of local slot in the current frame\n' +
+  '  STORE slot    — pop and store in local slot in the current frame\n' +
+  '  CALL addr n   — pop n args, push a new frame whose locals are those ' +
+  'n args (in order; first popped becomes the LAST slot, OR the most natural ' +
+  'order for your implementation — but slots 0..n-1 must be addressable as ' +
+  'shown in the verify suite). Set IP to addr. Save return IP on call stack.\n' +
+  '  RET           — pop top of CURRENT data stack as the return value, ' +
+  'discard the current frame, restore caller IP, push return value on ' +
+  'caller data stack\n' +
+  '  HALT          — stop the VM; return top of data stack\n' +
+  '  NOP           — do nothing\n' +
+  'When `args` is provided, place them into local slots 0..args.length-1 of ' +
+  'the initial frame (so `run(prog, [40, 2])` makes LOAD 0 → 40 and LOAD 1 → 2).\n' +
+  'Errors that must throw with a descriptive message:\n' +
+  '  - data stack underflow (binary op with too few operands): "stack" or "underflow"\n' +
+  '  - division by zero: "zero" or "divide"\n' +
+  '  - unknown opcode: "unknown opcode", "invalid", or similar\n' +
+  '  - JMP/JMP_IF target out of range: "addr", "bound", or "range"\n' +
+  '  - program terminates without HALT: "halt", "end", or "terminate"\n' +
+  'Then ensure `node verify.js` exits 0. Do not edit verify.js.';
+
+const TIMEOUT = 300_000;
+
+describe(`mini-vm: bytecode interpreter (tier=${TIER_LABEL})`, () => {
+  beforeEach(() => {
+    workspace.reset();
+    fs.writeFileSync(path.join(workspace.WORKSPACE, 'verify.js'), VERIFY_JS);
+  });
+
+  it('claw implements run handling all 13 opcodes + error cases', { timeout: TIMEOUT }, async () => {
+    const r = await runClaw({ prompt: PROMPT, model: clawModel });
+
+    console.log(`\n=== mini-vm (${TIER_LABEL}) ===`);
+    console.log(`  claw: exit=${r.code} elapsed=${r.elapsedMs}ms files=${JSON.stringify(workspace.list())}`);
+    if (r.code !== 0) console.log(`  claw stderr (tail):\n${r.stderr.slice(-1500)}`);
+
+    assert.equal(r.code, 0, 'claw must exit cleanly');
+    assert.equal(workspace.exists('vm.js'), true, 'vm.js must be created');
+
+    const post = spawnSync('node', [path.join(workspace.WORKSPACE, 'verify.js')], {
+      encoding: 'utf8',
+      timeout:  5_000,
+    });
+
+    console.log(`  node post-fix: exit=${post.status} stderr=${post.stderr.slice(0, 400).trim()}`);
+
+    assert.equal(post.status, 0, `verify.js failed:\n${post.stderr.slice(0, 800)}`);
+  });
+});
