@@ -173,11 +173,11 @@ Compressed 5-day cadence assuming 24/7 M5 Max utilization, weekend work, and the
 
 | Day | M5 Max (24h) | Engineer (concurrent) | Outputs |
 |---|---|---|---|
-| 1 (Sat) | **P0.1 sweep** — tier-16 + tier-32 × 11 evals × n=5 (~8h) → rolls into **P0.2 sampler grid prep run** (3 baseline cells × n=5, ~12h) | Land P0.3 (per-turn telemetry in `runClaw`); start drafting `EVAL-CALIBRATION-REPORT-v2.md` skeleton from streaming P0.1 data | Telemetry shipped; partial P0.1 matrix |
-| 2 (Sun) | Finish remaining **P0.2 sampler grid** (6 cells × n=5, ~6h) → start **P1.1 grammar-prelude A/B** (control + cap × 33 tests × 3 tiers × n=5, runs ~24h, spans into Day 3) | Aggregate P0.1 with `--wilson`; classify gradient; finalize report v2; pick P0.2 winning cell from streaming heatmap | `EVAL-CALIBRATION-REPORT-v2.md` complete; latency heatmap; winning sampler chosen |
-| 3 (Mon) | Continue P1.1 (~remaining 18h) | P1.2 TTFT direct-vs-bridge benchmark (no M5 needed — bridge + curl loop only); promote P0.2 winning cell to `models.conf` (commit when M5 frees up) | TTFT attribution memo; sampler promoted |
-| 4 (Tue) | P1.1 finish + **P1.4 tier-conditional CLAUDE.md plant** A/B at tier-16 (n=5, ~5h) → **stability re-confirm sweep** under new sampler at tier-64 (n=7, ~12h) | P1.3 compaction-or-iter-cap design memo (pure design work); analyze P1.1 results when they land | P1.1 verdict (cap or revert); plant verdict; design memo |
-| 5 (Wed) | **Verification full sweep** — all 33 tests × 3 tiers × n=5 with all P0/P1 changes baked in (~24h, runs into Day 6 morning) | Write session report consolidating all P0/P1 outcomes; update `profiles.md` and `README.md` if model/sampler choices shifted | Final session report; rig in known-good state |
+| 1 | **P0.1 sweep** — tier-16 + tier-32 × 11 evals × n=5 (~8h) → rolls into **P0.2 sampler grid prep run** (3 baseline cells × n=5, ~12h) | Land P0.3 (per-turn telemetry in `runClaw`); start drafting `EVAL-CALIBRATION-REPORT-v2.md` skeleton from streaming P0.1 data | Telemetry shipped; partial P0.1 matrix |
+| 2 | Finish remaining **P0.2 sampler grid** (6 cells × n=5, ~6h) → start **P1.1 grammar-prelude A/B** (control + cap × 33 tests × 3 tiers × n=5, runs ~24h, spans into Day 3) | Aggregate P0.1 with `--wilson`; classify gradient; finalize report v2; pick P0.2 winning cell from streaming heatmap | `EVAL-CALIBRATION-REPORT-v2.md` complete; latency heatmap; winning sampler chosen |
+| 3 | Continue P1.1 (~remaining 18h) | P1.2 TTFT direct-vs-bridge benchmark (no M5 needed — bridge + curl loop only); promote P0.2 winning cell to `models.conf` (commit when M5 frees up) | TTFT attribution memo; sampler promoted |
+| 4 | P1.1 finish + **P1.4 tier-conditional CLAUDE.md plant** A/B at tier-16 (n=5, ~5h) → **stability re-confirm sweep** under new sampler at tier-64 (n=7, ~12h) | P1.3 compaction-or-iter-cap design memo (pure design work); analyze P1.1 results when they land | P1.1 verdict (cap or revert); plant verdict; design memo |
+| 5 | **Verification full sweep** — all 33 tests × 3 tiers × n=5 with all P0/P1 changes baked in (~24h, runs into Day 6 morning) | Write session report consolidating all P0/P1 outcomes; update `profiles.md` and `README.md` if model/sampler choices shifted | Final session report; rig in known-good state |
 
 ### What got compressed
 
