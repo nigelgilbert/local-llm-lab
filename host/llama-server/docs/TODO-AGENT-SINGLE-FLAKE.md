@@ -1,8 +1,28 @@
 # TODO — qwen3-coder agent-single early-exit flake
 
-Status: **open 2026-04-27**. Test left intentionally sensitive to the
-flake — a real user typing a short request shouldn't have to spell out
-the tool name.
+Status: **closed 2026-04-28** (re-verified). Under tier-64 = Qwen3.6-35B-A3B
+at sampler v2 (`temp=0.5, presence=0, ctx=65536`) the test passes **10/10**
+on the exact prompt below, range 1219–5175ms, median ~1.3s. Note: production
+sampler was reverted v2 → v1 (`temp=0.7, presence=1.5`) post-data-collection
+pending an n=7 confirmation between the three tied cells; v1 vs v2 was not
+significant at n=3, so the closure should hold under v1 too — but n=10
+re-verification at v1 is cheap if anyone wants the receipts.
+The grammar's `trailing-text` branch is not reproducibly observed at n=10 on
+this prompt shape — if the prior rate was ~33%, the probability of zero
+observations across 10 trials is ~1.8%, so a real rate change is likely.
+Lower-rate residual flake (~few-percent) remains plausible and would need
+n≥30 to rule out; the agent-single test stays intentionally sensitive so any
+return shows up. Receipts in
+[`../../test/docs/QWEN3.6-MODEL-REPORT.md`](../../test/docs/QWEN3.6-MODEL-REPORT.md)
+"C5 re-check" addendum + raw log
+[`../../test/logs/a2/C5-MINIVM-20260428-1528.md`](../../test/logs/a2/C5-MINIVM-20260428-1528.md).
+
+The agent-single test remains intentionally sensitive — if a future model
+swap regresses, this TODO is the breadcrumb.
+
+---
+
+(Original analysis below, kept for historical context.)
 
 ## Symptom
 

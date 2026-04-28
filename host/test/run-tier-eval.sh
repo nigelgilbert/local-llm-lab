@@ -88,7 +88,7 @@ wait_llama() {
   echo "Models (per models.conf):"
   echo "- 16GB → Qwen2.5-7B-Instruct Q5_K_M"
   echo "- 32GB → Qwen3-14B Q4_K_M"
-  echo "- 64GB → Qwen3-Coder-30B Q6_K_XL"
+  echo "- 64GB → Qwen3.6-35B-A3B-UD-Q4_K_XL"
   echo ""
 } > "$RESULTS_FILE"
 

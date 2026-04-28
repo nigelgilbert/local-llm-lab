@@ -2,7 +2,72 @@
 
 ## Status
 
-Open. Discovered 2026-04-27 evening when extending the tier-eval suite with
+**Closed 2026-04-28** for the tier-64 question; **a new tier-32 issue is opened** by the closure data — see "New finding" below.
+
+### tier-64 (the original load-bearing failure)
+
+The original 240s timeout was n=1 on Qwen3-Coder-30B. Under tier-64
+= Qwen3.6-35B-A3B at sampler v2 (`temp=0.5, presence=0, ctx=65536`),
+**10/10 pass, median ~7.1s, range 6.1–8.3s.** The failure mode does not reproduce
+against the new model at n=10; the original n=1 observation may have been a
+Qwen3-Coder-30B issue, but we did not re-test that model to confirm causation.
+Production sampler was reverted v2 → v1 (`temp=0.7, presence=1.5`) post-data-collection;
+the closure should hold under v1 too, but n≥5 re-verification at v1 is cheap
+if anyone wants the receipts.
+Receipts: [`../../test/docs/QWEN3.6-MODEL-REPORT.md`](../../test/docs/QWEN3.6-MODEL-REPORT.md)
+"C5 re-check" addendum + raw log [`../../test/logs/a2/C5-MINIVM-20260428-1528.md`](../../test/logs/a2/C5-MINIVM-20260428-1528.md).
+
+### 7B/14B reliability at n=5 (new data, closes the question)
+
+Run 2026-04-28: multi-file-rename × n=5 at tier-16 and tier-32. Driver:
+[`../../test/logs/a2/run-multifile-lower-tier.sh`](../../test/logs/a2/run-multifile-lower-tier.sh).
+Raw log: [`../../test/logs/a2/MULTIFILE-LOWER-TIER-20260428-1630.md`](../../test/logs/a2/MULTIFILE-LOWER-TIER-20260428-1630.md).
+
+| Tier | Model | Pass rate | Times (s) | Spread |
+|---|---|---|---|---|
+| 16 | Qwen2.5-7B-Instruct Q5_K_M | **5/5** | 15.4, 72.8, 33.0, 33.5, 13.9 | 5.2× |
+| 32 | Qwen3-14B Q4_K_M | **0/5** | 10.4, 5.8, 5.8, 5.8, 6.0 (all fail, same fingerprint) | — |
+
+The 7B is reliable. The 5.2× spread is the same iteration-count variance pattern
+characterized at tier-64 in [`../../test/docs/QWEN3.6-MODEL-REPORT.md`](../../test/docs/QWEN3.6-MODEL-REPORT.md)
+A2 — not specific to multi-file-rename.
+
+### New finding: tier-32 (14B) deterministic confident-wrong failure
+
+The 14B fails 0/5 with the **same fingerprint every iteration**: claw exits 0
+in 5–10s thinking it's done, but verify rejects because `service.js` still
+imports `{ compute }` from `lib.js` while `lib.js` was renamed. Fast,
+confident-and-wrong — not a timeout, not stochastic.
+
+This is worse than the original tier-64 timeout pattern: a 240s wallclock
+timeout is at least *legibly* a failure to the harness; a 5s exit=0 with a
+verify-rejection means the model believes the task is complete. If anything
+in production downstream of claw trusts the exit code without re-verifying
+file state, this fails silently.
+
+**Action items spawned:**
+
+- A new TODO file should be opened for the tier-32 14B confident-wrong
+  failure mode; this TODO is not the right home for it because the original
+  scope was tier-64.
+- The failure fingerprint (model edits `lib.js` rename target but does not
+  update the `import` in `service.js`) is a clean test case for the
+  iteration-distribution work's W4 Class A (verify-loop) or a new class
+  ("declared-done-without-verify"). Cross-reference when
+  [`TODO-ITERATION-DISTRIBUTION-TEST.md`](TODO-ITERATION-DISTRIBUTION-TEST.md) lands.
+- Worth checking whether the 14B's tier-32 sampler (per `models.conf`) is
+  the cause vs. the model itself — same prompt at the v2-style sampler
+  shape (low temp, presence=0) at tier-32 would isolate that.
+
+The original "7B/14B reliability at n=5+" question is now answered: 7B is
+fine, 14B is broken on this test in a specific reproducible way. That answer
+unblocks closing this TODO and opens a narrower one against the new finding.
+
+---
+
+(Original analysis below, kept for historical context.)
+
+Discovered 2026-04-27 evening when extending the tier-eval suite with
 two harder tests. See [`TIER-EVAL-MEMO-20260427-evening.md`](../../test/docs/TIER-EVAL-MEMO-20260427-evening.md)
 for full context.
 

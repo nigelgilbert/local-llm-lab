@@ -84,6 +84,41 @@ One test outside the new-evals scope flaked once in six sweeps: `prose quality v
 4. **Re-run round 2 and 3 against tier-32 and tier-16** to confirm the gradient. Expected: tier-32 fails round 3 entirely and is variable on round 2; tier-16 fails most of round 2 and all of round 3.
 5. **Consider one more round.** Even at 64k context the tier-64 model passed 32/33. To stress harder, candidates are (a) genuinely long-horizon multi-day tasks (not feasible in this harness), (b) tasks requiring algorithmic correctness against tight performance budgets, (c) pure-prose tasks with strict structural floors. The current suite is already past the previous calibration paper's ceiling — further escalation has diminishing returns.
 
+## Addendum 2026-04-28 — lower-tier calibration (recommendation #4 closure)
+
+Round-2 + round-3 evals run at tier-32 (Qwen3-14B Q4_K_M, sampler temp=0.4 presence=0) and tier-16 (Qwen2.5-7B-Instruct Q5_K_M, same sampler), n=3 each. Driver: [host/test/logs/a2/LOWER-TIER-CALIB-20260428-1407.md](../logs/a2/LOWER-TIER-CALIB-20260428-1407.md).
+
+| Test | Round | tier-64 (sampler v2) | tier-32 (n=3) | tier-16 (n=3) |
+|---|---|---|---|---|
+| `csv-parser`           | 2 | 7/7 (A2) | **0/3** (35–36s, fails fast) | **0/3** (125s P+, 171s F, 240s timeout) |
+| `lru-cache`            | 2 | 7/7 (A2) | 1/3 (94s P, 217s F, 155s F) | 1/3 (32s P, 128s F, 57s F) |
+| `json-schema-validate` | 2 | 7/7 (A2) | **0/3** (151s F, 22s F, 229s F) | **0/3** (44s F, 171s F, 35s F) |
+| `cascading-bugs`       | 2 | clean | **3/3** (39–42s) | **3/3** (33–51s) |
+| `expression-eval`      | 3 | 100% (A1) | 1/3 (152s P, 222s F, 240s timeout) | **0/3** (21s F, 240s timeout, 240s timeout) |
+| `mini-vm`              | 3 | 0/n (ceiling) | 0/3 (~36s — model writes vm.js as CommonJS, not ESM; verify.js import fails) | 1/3 (lucky 32s pass; others 170s/50s fail) |
+
+### Findings vs. predicted gradient
+
+The original prediction (NEW-EVALS-REPORT recommendation #4) was: *tier-32 fails round-3 entirely and is variable on round-2; tier-16 fails most of round-2 and all of round-3.*
+
+That's broadly confirmed, with two surprises:
+
+1. **`cascading-bugs` is passable at every tier** (3/3 at tier-32 and tier-16). It was placed in round-2, but its run-fix-iterate loop is something the smaller models do reliably — they're not asked to *design*, only to *react* to one assert at a time. Re-classify as round-1.5 or call it out as a low-bar instrumentation test rather than a discriminator.
+2. **`csv-parser` is the cleanest tier-64-vs-lower discriminator.** It saturates (7/7) at tier-64 v2 and is 0/6 at lower tiers. RFC 4180 quoting + 11 verify cases is exactly the spec-density that distinguishes 35B from 7–14B.
+
+`json-schema-validate` is also 0/6 at lower tiers — the recursive validator with accumulated error paths is past the smaller models' working set.
+
+`mini-vm` deserves a footnote: at tier-32 it fails uniformly with the same fingerprint (model emits `module.exports = { run }` instead of `export const run`, so `verify.js`'s ESM import throws). This is a vendor-side trait of Qwen3-14B's coding default; not a verify-suite bug. The 1/3 lucky pass at tier-16 is sampler stochasticity at temp=0.4.
+
+### Updated discriminator map
+
+- **Round-1 (5 tests)** — calibration anchors. tier-64 saturates. Use for tier-16 acceptance, since tier-16 should approach 100% on these.
+- **`cascading-bugs`** — passes everywhere. Move to round-1.5 in the gradient view; effectively a smoke test for iterative-fix behavior.
+- **`csv-parser`, `json-schema-validate`** — sharp tier-64 vs lower-tier discriminators. **Use these for sampler/model regressions at tier-64.**
+- **`lru-cache`** — partial gradient (1/3 at lower tiers, 7/7 at tier-64). Useful but noisier discriminator.
+- **`expression-eval`** — context-budget canary (was the 32k→64k flipping test). Now deterministic at tier-64 v2; partial at tier-32; effectively unreachable at tier-16.
+- **`mini-vm`, `multi-bug-decoy`** — frontier ceiling and 64k-headroom long-tail respectively. Top-end probes.
+
 ## Files
 
 All 11 new tests live in [host/test/__tests__/tier-eval/](../__tests__/tier-eval/). Each follows the same shape as the existing tests: seed workspace → run claw → exec a `node verify.js` post-condition.
