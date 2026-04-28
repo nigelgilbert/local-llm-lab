@@ -167,22 +167,37 @@ The 32k → 64k bump was forced by `expression-eval` running out of room mid-dec
 
 ## Suggested sequenced plan
 
-A two-week reasonable cadence given a single engineer + the M5 Max:
+Compressed 5-day cadence assuming 24/7 M5 Max utilization, weekend work, and the engineer pipelining analysis alongside running sweeps. The M5 is the only serial resource (one llama-server resident at a time) — everything else parallelizes.
 
-| Week | Day | Action | Owner | Output |
-|---|---|---|---|---|
-| 1 | M | Land P0.3 (per-turn telemetry) | engineer | `runClaw` emits sidecar JSON |
-| 1 | T | P0.1 sweep — tier-16 + tier-32 × 11 new evals × n=5 | M5 Max overnight | new pass-rate matrix |
-| 1 | W | Aggregate P0.1, classify gradient | engineer | `EVAL-CALIBRATION-REPORT-v2.md` |
-| 1 | Th | P0.2 sampler grid setup (3×3) | engineer | grid harness ready |
-| 1 | F | P0.2 grid run (×9 cells × n=5) | M5 Max overnight | latency heatmap |
-| 2 | M | P0.2 winning-cell promotion | engineer | `models.conf` updated |
-| 2 | T | P1.1 grammar prelude A/B | M5 Max | prelude-cap A/B results |
-| 2 | W | P1.2 TTFT direct-vs-bridge | engineer | TTFT attribution |
-| 2 | Th | P1.3 design sketch (compaction or iter-cap) | engineer | design memo |
-| 2 | F | Buffer / write up | engineer | session report |
+**Sequencing rule:** the M5 is never idle. Engineer work runs *concurrently* with whichever sweep is in flight, not sequentially after it.
 
-This sequence keeps the M5 Max running unattended overnight where possible, the engineer doing analysis during the day, and locks in P0 wins before risking the more behaviorally-load-bearing P1 changes.
+| Day | M5 Max (24h) | Engineer (concurrent) | Outputs |
+|---|---|---|---|
+| 1 (Sat) | **P0.1 sweep** — tier-16 + tier-32 × 11 evals × n=5 (~8h) → rolls into **P0.2 sampler grid prep run** (3 baseline cells × n=5, ~12h) | Land P0.3 (per-turn telemetry in `runClaw`); start drafting `EVAL-CALIBRATION-REPORT-v2.md` skeleton from streaming P0.1 data | Telemetry shipped; partial P0.1 matrix |
+| 2 (Sun) | Finish remaining **P0.2 sampler grid** (6 cells × n=5, ~6h) → start **P1.1 grammar-prelude A/B** (control + cap × 33 tests × 3 tiers × n=5, runs ~24h, spans into Day 3) | Aggregate P0.1 with `--wilson`; classify gradient; finalize report v2; pick P0.2 winning cell from streaming heatmap | `EVAL-CALIBRATION-REPORT-v2.md` complete; latency heatmap; winning sampler chosen |
+| 3 (Mon) | Continue P1.1 (~remaining 18h) | P1.2 TTFT direct-vs-bridge benchmark (no M5 needed — bridge + curl loop only); promote P0.2 winning cell to `models.conf` (commit when M5 frees up) | TTFT attribution memo; sampler promoted |
+| 4 (Tue) | P1.1 finish + **P1.4 tier-conditional CLAUDE.md plant** A/B at tier-16 (n=5, ~5h) → **stability re-confirm sweep** under new sampler at tier-64 (n=7, ~12h) | P1.3 compaction-or-iter-cap design memo (pure design work); analyze P1.1 results when they land | P1.1 verdict (cap or revert); plant verdict; design memo |
+| 5 (Wed) | **Verification full sweep** — all 33 tests × 3 tiers × n=5 with all P0/P1 changes baked in (~24h, runs into Day 6 morning) | Write session report consolidating all P0/P1 outcomes; update `profiles.md` and `README.md` if model/sampler choices shifted | Final session report; rig in known-good state |
+
+### What got compressed
+
+- **Originally 10 working days → 5 calendar days.** The M5 was idle ~14h/day in the original plan (overnights only); now it runs continuously.
+- **P0.1 + P0.2 parallelize with P0.3 (telemetry).** Telemetry is pure code-side work; no reason to serialize it before sweeps.
+- **P1.1 (24h M5 sweep) overlaps engineer-side analysis.** Day 3 has no M5-bound engineer work — TTFT investigation is pure bridge-vs-direct curl.
+- **Day 5 verification sweep** is new — gives a single clean run that proves the stack still passes everything end-to-end after all changes land. Worth the day; without it, regressions hide.
+
+### What did NOT compress, and why
+
+- **P1.1 grammar A/B is the hard floor.** 2 cells × 33 tests × 3 tiers × n=5 ≈ 990 test-runs ≈ 24h M5 wall-clock. This is the binding constraint. Can't be parallelized (one llama-server at a time) and shrinking n below 5 would put the borderline calls back into Wilson-CI noise.
+- **Engineer cognitive load.** Day 2 (analysis + sampler choice + concurrent prelude A/B kickoff) is the heaviest day. If the engineer is solo and tired, slipping Day 2 by 12h is fine — the M5 doesn't care.
+
+### Risk: what to do if a sweep wedges
+
+The M5 can't be split, so a wedged sweep costs the rest of the day. Mitigations:
+
+- **Daily checkpoint at 06:00 local.** Engineer glance at `tail /tmp/llama-server.log` and `host/test/logs/`; if a sweep is dead, kick the next one off rather than waiting.
+- **Bound each cell to 90min via the existing `cleanup` trap in `run-tier-eval.sh`.** A wedged single tier kills the cell, not the whole sweep.
+- **Keep the rollback `git checkout` on the sampler change at hand** — the per-tier sampler refactor means a bad cell on tier-64 doesn't poison tier-16/32 reads.
 
 ## Open research questions (longer-horizon)
 
