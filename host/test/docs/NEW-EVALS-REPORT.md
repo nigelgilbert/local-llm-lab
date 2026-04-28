@@ -74,7 +74,7 @@ Pass/fail across six sweeps (n=5 at 32k context, n=1 at 64k context):
 
 Of the failures observed in this session, **zero are discipline failures** (no instances of `<5s claw + .claw-only files`, the signature of a model emitting prose without tool calls). All failures are either context-exhaustion or task-too-long-to-converge — both meaningful signal that the test surface is at the model's ceiling.
 
-One test outside the new-evals scope flaked once in six sweeps: `prose quality via raw bridge` (S5 only). Linked to the known prose-smush issue in [host/llama-server/docs/TODO-PROSE-SMUSH.md](../../llama-server/docs/TODO-PROSE-SMUSH.md), not a new-eval design issue.
+One test outside the new-evals scope flaked once in six sweeps: `prose quality via raw bridge` (S5 only). Linked to the known prose-smush issue (`host/llama-server/docs/TODO-PROSE-SMUSH.md`, since deleted as resolved upstream), not a new-eval design issue.
 
 ## Recommendations
 

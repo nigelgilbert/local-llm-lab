@@ -68,7 +68,7 @@ unblocks closing this TODO and opens a narrower one against the new finding.
 (Original analysis below, kept for historical context.)
 
 Discovered 2026-04-27 evening when extending the tier-eval suite with
-two harder tests. See [`TIER-EVAL-MEMO-20260427-evening.md`](../../test/docs/TIER-EVAL-MEMO-20260427-evening.md)
+two harder tests. See `TIER-EVAL-MEMO-20260427-evening.md` (since deleted)
 for full context.
 
 ## What we observed

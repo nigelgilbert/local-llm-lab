@@ -44,7 +44,7 @@ Across the four sweeps where round-3 tests ran (S3, S4, S5, S6):
 
 ### Other variance observed
 
-- **`prose quality via raw bridge`** failed once in 6 sweeps (sweep 5 only: one of three markdown samples missed the newline-count floor). Known intermittent linked to the prose-smush issue in [host/llama-server/docs/TODO-PROSE-SMUSH.md](../../llama-server/docs/TODO-PROSE-SMUSH.md). Not a model regression — flake rate consistent with prior runs.
+- **`prose quality via raw bridge`** failed once in 6 sweeps (sweep 5 only: one of three markdown samples missed the newline-count floor). Known intermittent linked to the prose-smush issue (`host/llama-server/docs/TODO-PROSE-SMUSH.md`, since deleted). Not a model regression — flake rate consistent with prior runs.
 - **csv-parser, lru-cache, json-schema-validate** show 2–8× variance in claw elapsed across the same prompt. All pass; the variance is in tool-call iteration count, not correctness. csv-parser's 89s outlier (S3) is the high-water mark.
 
 ## Strengths observed
@@ -141,7 +141,7 @@ Two TODOs predating Qwen3.6 documented tier-64 flakes against the prior model (Q
 
 | TODO | Prior fingerprint (Qwen3-Coder-30B) | Current (Qwen3.6 at v2 sampler, n=10) |
 |---|---|---|
-| [TODO-AGENT-SINGLE-FLAKE.md](../../llama-server/docs/TODO-AGENT-SINGLE-FLAKE.md) — prose-only completion on short prompts | ~1-in-3: 930ms exit=0, no `hello.py`, model emitted prose | **10/10 pass** (1219–5175ms, median ~1.3s) |
+| `TODO-AGENT-SINGLE-FLAKE.md` (since deleted) — prose-only completion on short prompts | ~1-in-3: 930ms exit=0, no `hello.py`, model emitted prose | **10/10 pass** (1219–5175ms, median ~1.3s) |
 | [TODO-MULTI-FILE-RENAME-FLAKE.md](../../llama-server/docs/TODO-MULTI-FILE-RENAME-FLAKE.md) — claw 240s timeout on 3-file rename | 1-of-1 hit 240s wallclock | **10/10 pass** (6138–8310ms, median ~7.1s) |
 
 Both flakes are gone under Qwen3.6 + v2 sampler. The grammar+model+sampler combination no longer permits the failure modes the TODOs describe. Both TODOs can be closed; this addendum + the n=10 evidence are the receipts.

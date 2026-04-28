@@ -1,6 +1,6 @@
 # Memo: Qwen3.6-35B-A3B sniff test on tier-64 — 2026-04-28
 
-Continuation of [`TIER-EVAL-MEMO-20260427-evening.md`](TIER-EVAL-MEMO-20260427-evening.md).
+Continuation of `TIER-EVAL-MEMO-20260427-evening.md` (since deleted).
 This session sniff-tested **Qwen3.6-35B-A3B-UD-Q4_K_XL** (unsloth Dynamic 2.0,
 ~21 GB) as a candidate replacement for the production tier-64 model
 (Qwen3-Coder-30B-A3B-Instruct UD-Q6_K_XL). All numbers are n=1 — directional,
@@ -169,7 +169,7 @@ through LiteLLM (suspect `drop_params: true` at line 113 of bridge config).
   recommended regularization for instruct tuning. presence_penalty counts
   each token once instead of penalizing per-occurrence — works better for
   this model's chat tuning. Production's 1.05 repeat-penalty was selected
-  to avoid suppressing `\n` in structured prose ([`TODO-PROSE-SMUSH.md`](../../llama-server/docs/TODO-PROSE-SMUSH.md)),
+  to avoid suppressing `\n` in structured prose (`TODO-PROSE-SMUSH.md`, since deleted),
   but with this model the prose-quality test passed clean at the vendor
   config — the prose-smush concern doesn't reproduce.
 - **enable_thinking=false**: Qwen3.6 explicitly does not honor `/think`
@@ -306,7 +306,7 @@ flipping back and forth.
 3. **Production swap decision.** If knob-2 holds at ≥18/20 mean, swap
    tier-64 to 3.6-35B-A3B in `models.conf`. Update [`README.md`](../../llama-server/README.md)
    tier table, [`profiles.md`](../../../profiles.md) if affected, and
-   [`TIER-EVAL-REPORT.md`](TIER-EVAL-REPORT.md).
+   `TIER-EVAL-REPORT.md` (since deleted).
 4. **Latency regression check.** TTFT went from 81 ms → 137 ms. Verify this
    isn't a chat_template_kwargs forwarding overhead at the bridge that
    could be optimized — measure llama-server `/v1/chat/completions` direct

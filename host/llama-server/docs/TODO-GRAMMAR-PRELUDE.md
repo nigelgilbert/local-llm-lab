@@ -126,5 +126,5 @@ Hypothesis:
 - [`../grammars/claw.gbnf`](../grammars/claw.gbnf) — the file that would change.
 - [`system-prompt.md`](system-prompt.md) — the discipline rules whose
   Rule 6 this would enforce at the grammar layer.
-- [`../../test/docs/TIER-EVAL-REPORT.md`](../../test/docs/TIER-EVAL-REPORT.md) — the
+- `../../test/docs/TIER-EVAL-REPORT.md` (since deleted) — the
   2026-04-27 report that surfaced the tier-16 prelude problem.

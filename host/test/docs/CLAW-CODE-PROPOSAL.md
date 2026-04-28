@@ -69,7 +69,7 @@ The new tier-64 model has zero retry-storms today, but that won't stay true fore
 **Why:** Two problems converge in the prelude:
 
 1. **Tier-16 (legacy)**: Qwen3-14B at tier-16 used to burn its 256-token wrap budget on prelude prose. The current tier-16 (Qwen2.5-7B) doesn't, but if a future tier-16 candidate is hybrid-thinking or weakly biased toward `<tool_call>`, the symptom returns.
-2. **Tier-64 (current)**: The previous Coder-30B's `agent-single` 1-in-3 flake lived inside the prelude branch — model emits prose, hits no tool call, ends turn (see [`TODO-AGENT-SINGLE-FLAKE.md`](../../llama-server/docs/TODO-AGENT-SINGLE-FLAKE.md)). Qwen3.6 has not exhibited this in current runs, but the `multi-bug-decoy` long-tail at 64k context is structurally similar — model takes a "narrate then call" path under one sampler regime that converges short under another.
+2. **Tier-64 (current)**: The previous Coder-30B's `agent-single` 1-in-3 flake lived inside the prelude branch — model emits prose, hits no tool call, ends turn (see `TODO-AGENT-SINGLE-FLAKE.md`, since deleted after 10/10 re-verification on Qwen3.6). Qwen3.6 has not exhibited this in current runs, but the `multi-bug-decoy` long-tail at 64k context is structurally similar — model takes a "narrate then call" path under one sampler regime that converges short under another.
 
 The full drop (`root ::= tool-call | trailing-text`) is too aggressive — it could regress models that legitimately need a brief plan-statement. A length-cap of ~80 chars (one short sentence) preserves "I'll start by..." but forbids "Let me think about this. The user wants me to first..." which is the failure mode.
 
@@ -127,7 +127,7 @@ The drafter (Qwen2.5-7B) is already on disk for tier-16. Adding it as a draft mo
 
 ### P2.2 — Prose-smush in the claw renderer
 
-**What:** Fix the claw markdown renderer that strips `## ` glyphs without preserving the `\n` after them — see [`TODO-PROSE-SMUSH.md`](../../llama-server/docs/TODO-PROSE-SMUSH.md). The bug is upstream in claw-code's terminal renderer, not in this repo.
+**What:** Fix the claw markdown renderer that strips `## ` glyphs without preserving the `\n` after them — see `TODO-PROSE-SMUSH.md` (since deleted; bug is upstream in claw-code's terminal renderer, not in this repo).
 
 **Why:** The eval has been split into raw-bridge (assertive) and claw-rendered (informational), so the bug is currently invisible to test outcomes. But it's user-visible — every prose response through claw collapses headers and bullets into a wall of text. Cosmetic but real.
 
