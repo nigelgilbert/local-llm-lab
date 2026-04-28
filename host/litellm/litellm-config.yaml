@@ -65,11 +65,17 @@ model_list:
       model: openai/claw
       api_base: os.environ/LLAMA_SERVER_BASE
       api_key: llama-server-no-auth
+      extra_body:
+        chat_template_kwargs:
+          enable_thinking: false
   - model_name: anthropic/claw-llama
     litellm_params:
       model: openai/claw
       api_base: os.environ/LLAMA_SERVER_BASE
       api_key: llama-server-no-auth
+      extra_body:
+        chat_template_kwargs:
+          enable_thinking: false
   - model_name: claw-ollama
     litellm_params:
       model: openai/claw-test

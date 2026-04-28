@@ -40,11 +40,22 @@ esac
 eval "GGUF=\"\$TIER_${TIER}_GGUF\""
 eval "CTX=\"\$TIER_${TIER}_CTX\""
 eval "BATCH=\"\$TIER_${TIER}_BATCH\""
+eval "TEMP=\"\$TIER_${TIER}_TEMP\""
+eval "TOP_P=\"\$TIER_${TIER}_TOP_P\""
+eval "TOP_K=\"\$TIER_${TIER}_TOP_K\""
+eval "REPEAT_PENALTY=\"\$TIER_${TIER}_REPEAT_PENALTY\""
+eval "PRESENCE_PENALTY=\"\$TIER_${TIER}_PRESENCE_PENALTY\""
 
 if [[ -z "$GGUF" ]]; then
     echo "tier ${TIER}GB: GGUF not configured — set TIER_${TIER}_GGUF in models.conf." >&2
     exit 1
 fi
+for v in TEMP TOP_P TOP_K REPEAT_PENALTY PRESENCE_PENALTY; do
+    if [[ -z "${!v}" ]]; then
+        echo "tier ${TIER}GB: TIER_${TIER}_${v} not set in models.conf." >&2
+        exit 1
+    fi
+done
 if [[ ! -f "$GGUF" ]]; then
     echo "tier ${TIER}GB: GGUF not found: $GGUF" >&2
     echo "See models.conf for the curl command for this tier." >&2
@@ -65,6 +76,11 @@ sed \
     -e "s|__CTX_SIZE__|$CTX|g" \
     -e "s|__BATCH_SIZE__|$BATCH|g" \
     -e "s|__GRAMMAR_PATH__|$GRAMMAR|g" \
+    -e "s|__TEMP__|$TEMP|g" \
+    -e "s|__TOP_P__|$TOP_P|g" \
+    -e "s|__TOP_K__|$TOP_K|g" \
+    -e "s|__REPEAT_PENALTY__|$REPEAT_PENALTY|g" \
+    -e "s|__PRESENCE_PENALTY__|$PRESENCE_PENALTY|g" \
     "$PLIST_TEMPLATE" > "$PLIST_DEST"
 
 launchctl bootstrap "gui/$(id -u)" "$PLIST_DEST"
