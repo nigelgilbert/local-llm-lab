@@ -30,7 +30,7 @@ The other five OWUI profiles (`general`, `fast`, `reasoning`, `digest`, `analyze
 
 | | |
 |---|---|
-| `host/ollama/` set up | the Qwen3-Coder GGUF should already be at `~/.ollama/gguf/Qwen3-Coder-30B-A3B-Instruct-UD-Q6_K_XL.gguf` |
+| GGUF for your tier | Download per §2 — see [`models.conf`](models.conf) for tier → model mapping |
 | `host/litellm/` running | the bridge container is what we'll repoint |
 | Xcode CLT installed | `xcode-select -p` returns a path; needed to build llama.cpp |
 | CMake | a recent CMake. If missing, see §1 for the no-Homebrew install |
@@ -72,16 +72,36 @@ echo 'export PATH="$HOME/.local/bin:$PATH"' >> ~/.zshrc
 
 ---
 
-## 2. Stage the GGUF
+## 2. Download the GGUF for your tier
 
-Reuse the file already in `~/.ollama/gguf/` from `host/ollama/` setup. No new download:
+Model is selected by memory tier. See [`models.conf`](models.conf) for the full mapping.
 
+| Tier | Model | Size | Source |
+|------|-------|------|--------|
+| 16 GB | Qwen3-14B Q4_K_M | ~9 GB | unsloth/Qwen3-14B-GGUF |
+| 32 GB | Qwen3-30B-A3B-Instruct-2507 Q4_K_XL | ~16 GB | unsloth/Qwen3-30B-A3B-Instruct-2507-GGUF |
+| 64 GB | Qwen3-Coder-30B Q6_K_XL | ~24 GB | (already on disk from host/ollama/) |
+
+**16 GB** — use the unsloth repo (public, no HF account required):
+```sh
+curl -L -C - \
+    -o ~/.ollama/gguf/Qwen3-14B-Q4_K_M.gguf \
+    "https://huggingface.co/unsloth/Qwen3-14B-GGUF/resolve/main/Qwen3-14B-Q4_K_M.gguf"
+```
+`-C -` resumes an interrupted download.
+
+**32 GB** — Qwen3-30B-A3B-Instruct-2507, MoE with 3B active params (~16 GB):
+```sh
+curl -L -C - \
+    -o ~/.ollama/gguf/Qwen3-30B-A3B-Instruct-2507-UD-Q4_K_XL.gguf \
+    "https://huggingface.co/unsloth/Qwen3-30B-A3B-Instruct-2507-GGUF/resolve/main/Qwen3-30B-A3B-Instruct-2507-UD-Q4_K_XL.gguf"
+```
+
+**64 GB** — reuse the file already in `~/.ollama/gguf/` from `host/ollama/` setup:
 ```sh
 ls -lh ~/.ollama/gguf/Qwen3-Coder-30B-A3B-Instruct-UD-Q6_K_XL.gguf
 # expected: ~24 GB
 ```
-
-> If absent, you skipped the `host/ollama/Modelfiles/` claw step. Either run `ollama create claw -f host/ollama/Modelfiles/claw.Modelfile` once to trigger the HF pull (it lands in Ollama's blob store, not `~/.ollama/gguf/`), then symlink the blob into `~/.ollama/gguf/`; OR `huggingface-cli download` the file directly. Path used in the plist below assumes the symlink.
 
 ---
 
@@ -104,21 +124,18 @@ Validate the grammar parses:
 
 ## 4. Install the LaunchAgent
 
-Launch llama-server at login (and keep it alive on crash) via a user-scope LaunchAgent. The plist tracked at [`launchd/com.home-llm-lab.llama-server.plist`](launchd/com.home-llm-lab.llama-server.plist) is the source of truth.
+The [`scripts/install`](scripts/install) script renders the plist template for your memory tier, copies it to `~/Library/LaunchAgents/`, and bootstraps the LaunchAgent.
 
-> **Heads up** — the plist has two paths hardcoded that you may need to edit before installing:
-> - `<string>/Users/nigel/...</string>` for the binary, GGUF, grammar, and log file. macOS LaunchAgents don't expand `~` or `$HOME`. Edit to match your user.
-> - That's it for env-coupling. Everything else is portable.
-
-Install:
 ```sh
-cp host/llama-server/launchd/com.home-llm-lab.llama-server.plist ~/Library/LaunchAgents/
-launchctl load -w ~/Library/LaunchAgents/com.home-llm-lab.llama-server.plist
+./host/llama-server/scripts/install            # auto-detects from RAM
+./host/llama-server/scripts/install --size 16  # explicit override
 ```
+
+Size auto-detection: `< 24 GB` → 16, `24–48 GB` → 32, `≥ 48 GB` → 64. Override anytime with `--size` or `LLAMA_TIER=16 ./scripts/install`.
 
 Verify it's listening:
 ```sh
-sleep 5  # model load takes a few seconds
+sleep 15  # model load takes ~10–20s
 curl -fsS http://localhost:11435/health
 # expected: {"status":"ok"}
 
@@ -245,9 +262,9 @@ The plist embeds all tunables. Edit and re-load to change. Defaults match `host/
 |---|---|---|
 | `--port` | `11435` | One slot above Ollama's `11434` |
 | `--host` | `0.0.0.0` | LAN-reachable; bridge needs it via `host.docker.internal` |
-| `--model` | `~/.ollama/gguf/Qwen3-Coder-30B-A3B-Instruct-UD-Q6_K_XL.gguf` | Shared with Ollama on disk; only one of them loads it at a time |
+| `--model` | tier-dependent (see [`models.conf`](models.conf)) | 16GB: Qwen3-14B Q4_K_M; 32GB: Qwen3-30B-A3B-Instruct-2507 Q4_K_XL; 64GB: Qwen3-Coder-30B Q6_K_XL |
 | `--alias` | `claw` | What `/v1/models` advertises and what the bridge sends as `model` |
-| `--ctx-size` | `131072` | Matches the Modelfile's `num_ctx` |
+| `--ctx-size` | tier-dependent (default 32768) | Set per tier in [`models.conf`](models.conf) |
 | `-ngl` | `999` | All layers on Metal (Apple Silicon — unified memory makes this free) |
 | `-fa` | on | Flash attention; matches `OLLAMA_FLASH_ATTENTION=1` |
 | `--cache-type-k` / `--cache-type-v` | `q8_0` | Halves KV cache; matches `OLLAMA_KV_CACHE_TYPE=q8_0` |
