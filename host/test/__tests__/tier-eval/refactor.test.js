@@ -6,8 +6,9 @@
 // exit 0. The pre-condition check (node exits non-zero before the fix) ensures
 // the test is not trivially satisfied by a pre-fixed file.
 //
-// Expected differentiator: the 14B model may miss the subtle off-by-one;
-// the 30B models should spot it from the assertion message alone.
+// Expected differentiator: smaller dense models (tier-16 7B) sometimes miss
+// the off-by-one without thinking; the 14B/30B reliably spot it from the
+// assertion message alone.
 
 import { describe, it, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';

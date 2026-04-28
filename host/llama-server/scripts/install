@@ -47,9 +47,7 @@ if [[ -z "$GGUF" ]]; then
 fi
 if [[ ! -f "$GGUF" ]]; then
     echo "tier ${TIER}GB: GGUF not found: $GGUF" >&2
-    echo "Download with (no HF account required):" >&2
-    echo "  curl -L -C - -o \"$GGUF\" \\" >&2
-    echo "    \"https://huggingface.co/unsloth/Qwen3-14B-GGUF/resolve/main/Qwen3-14B-Q4_K_M.gguf\"" >&2
+    echo "See models.conf for the curl command for this tier." >&2
     exit 1
 fi
 

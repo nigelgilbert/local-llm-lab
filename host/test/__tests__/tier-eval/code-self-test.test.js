@@ -6,8 +6,8 @@
 // own exit behaviour — the model must understand the algorithm, not just emit
 // syntactically valid JS.
 //
-// Expected differentiator: the 14B tier may produce off-by-one errors or
-// iterate incorrectly; the 30B models should handle this reliably.
+// Expected differentiator: tier-16 (7B) may produce off-by-one errors or
+// iterate incorrectly; the 14B/30B should handle this reliably.
 
 import { describe, it, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';

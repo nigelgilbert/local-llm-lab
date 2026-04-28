@@ -78,23 +78,23 @@ Model is selected by memory tier. See [`models.conf`](models.conf) for the full 
 
 | Tier | Model | Size | Source |
 |------|-------|------|--------|
-| 16 GB | Qwen3-14B Q4_K_M | ~9 GB | unsloth/Qwen3-14B-GGUF |
-| 32 GB | Qwen3-30B-A3B-Instruct-2507 Q4_K_XL | ~16 GB | unsloth/Qwen3-30B-A3B-Instruct-2507-GGUF |
+| 16 GB | Qwen2.5-7B-Instruct Q5_K_M | ~5.07 GB | bartowski/Qwen2.5-7B-Instruct-GGUF |
+| 32 GB | Qwen3-14B Q4_K_M | ~8.4 GB | unsloth/Qwen3-14B-GGUF |
 | 64 GB | Qwen3-Coder-30B Q6_K_XL | ~24 GB | (already on disk from host/ollama/) |
 
-**16 GB** — use the unsloth repo (public, no HF account required):
+**16 GB** — Qwen2.5-7B-Instruct (dense, non-thinking). Qwen3-8B was tried first but its hybrid-thinking template burns the 256-token wrap-test budget on `<think>` blocks before `<tool_call>` opens — see [`host/test/docs/TIER-EVAL-MEMO-20260427-evening.md`](../test/docs/TIER-EVAL-MEMO-20260427-evening.md). The Coder-7B variant is *not* a drop-in (community-documented `<function_call>` wrapper hallucination — see [HF discussion #22](https://huggingface.co/Qwen/Qwen2.5-Coder-7B-Instruct/discussions/22)). Use the non-coder Instruct:
+```sh
+curl -L -C - \
+    -o ~/.ollama/gguf/Qwen2.5-7B-Instruct-Q5_K_M.gguf \
+    "https://huggingface.co/bartowski/Qwen2.5-7B-Instruct-GGUF/resolve/main/Qwen2.5-7B-Instruct-Q5_K_M.gguf"
+```
+`-C -` resumes an interrupted download.
+
+**32 GB** — Qwen3-14B dense instruct (~8.4 GB):
 ```sh
 curl -L -C - \
     -o ~/.ollama/gguf/Qwen3-14B-Q4_K_M.gguf \
     "https://huggingface.co/unsloth/Qwen3-14B-GGUF/resolve/main/Qwen3-14B-Q4_K_M.gguf"
-```
-`-C -` resumes an interrupted download.
-
-**32 GB** — Qwen3-30B-A3B-Instruct-2507, MoE with 3B active params (~16 GB):
-```sh
-curl -L -C - \
-    -o ~/.ollama/gguf/Qwen3-30B-A3B-Instruct-2507-UD-Q4_K_XL.gguf \
-    "https://huggingface.co/unsloth/Qwen3-30B-A3B-Instruct-2507-GGUF/resolve/main/Qwen3-30B-A3B-Instruct-2507-UD-Q4_K_XL.gguf"
 ```
 
 **64 GB** — reuse the file already in `~/.ollama/gguf/` from `host/ollama/` setup:
@@ -262,7 +262,7 @@ The plist embeds all tunables. Edit and re-load to change. Most defaults mirror 
 |---|---|---|
 | `--port` | `11435` | One slot above Ollama's `11434` |
 | `--host` | `0.0.0.0` | LAN-reachable; bridge needs it via `host.docker.internal` |
-| `--model` | tier-dependent (see [`models.conf`](models.conf)) | 16GB: Qwen3-14B Q4_K_M; 32GB: Qwen3-30B-A3B-Instruct-2507 Q4_K_XL; 64GB: Qwen3-Coder-30B Q6_K_XL |
+| `--model` | tier-dependent (see [`models.conf`](models.conf)) | 16GB: Qwen2.5-7B-Instruct Q5_K_M; 32GB: Qwen3-14B Q4_K_M; 64GB: Qwen3-Coder-30B Q6_K_XL |
 | `--alias` | `claw` | What `/v1/models` advertises and what the bridge sends as `model` |
 | `--ctx-size` | tier-dependent (default 32768) | Set per tier in [`models.conf`](models.conf) |
 | `-ngl` | `999` | All layers on Metal (Apple Silicon — unified memory makes this free) |
