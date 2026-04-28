@@ -46,6 +46,7 @@ case "${TEST_SUITE:-}" in
   backend-ab)   set -- node --test --test-concurrency=1 --test-reporter=spec __tests__/backend-ab/*.test.js ;;
   model-ab)     set -- node --test --test-concurrency=1 --test-reporter=spec __tests__/model-ab/*.test.js ;;
   settings-ab)  set -- node --test --test-concurrency=1 --test-reporter=spec __tests__/settings-ab/*.test.js ;;
+  tier-eval)    set -- node --test --test-concurrency=1 --test-reporter=spec __tests__/tier-eval/*.test.js ;;
   *)            : ;;
 esac
 

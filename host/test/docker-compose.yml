@@ -15,6 +15,7 @@ services:
       - ANTHROPIC_API_KEY=${LITELLM_MASTER_KEY}
       - BACKEND=${BACKEND:-llama-server}
       - MODEL_LABEL=${MODEL_LABEL:-}
+      - TIER=${TIER:-64}
       - TEST_SUITE=${TEST_SUITE:-}
     extra_hosts:
       - "host.docker.internal:host-gateway"
