@@ -14,7 +14,10 @@
 //
 // Neither sub-suite asserts a latency threshold — the numbers are informational
 // for the comparison table. The roundtrip suite does assert wrap rate ≥ 0.9
-// as a grammar-health sanity check.
+// as a grammar-health sanity check, computed only over requests that actually
+// produced a response: transport-level failures (undici/OrbStack socket blips)
+// are tracked separately and only fail the test if they exceed FETCH_FAIL_MAX,
+// so a network hiccup mid-sweep doesn't masquerade as a grammar regression.
 
 /** @manifest
  * {
@@ -46,6 +49,11 @@ const API_KEY    = process.env.ANTHROPIC_API_KEY;
 const TTFT_N         = Number(process.env.TTFT_N)  || 10;
 const ROUNDTRIP_N    = Number(process.env.WRAP_N)   || 20;
 const WRAP_THRESHOLD = 0.9;
+// Allow up to 20% transport-level failures before treating the suite as a
+// transport problem rather than a grammar problem. Above that, the run is
+// untrustworthy; below, surface as informational and assert grammar over
+// requests that actually came back.
+const FETCH_FAIL_MAX = 0.2;
 const TIMEOUT        = 300_000;
 
 // 25 tools — same payload as settings-ab/ttft.test.js (pushes prompt above 2048
@@ -233,17 +241,33 @@ describe(`tool-call roundtrip latency (tier=${TIER_LABEL})`, () => {
         }
       }
 
-      const wraps = results.filter((r) => r.ok).length;
-      const rate  = wraps / ROUNDTRIP_N;
-      const s     = stats(results.map((r) => r.ms));
+      const fetchFails = results.filter((r) => r.error).length;
+      const wraps      = results.filter((r) => r.ok).length;
+      const responded  = ROUNDTRIP_N - fetchFails;
+      const rate       = responded > 0 ? wraps / responded : 0;
+      const fetchFailRate = fetchFails / ROUNDTRIP_N;
+      // Latency stats over responses that actually returned; fetch-failures
+      // come back in <10ms and would skew the distribution.
+      const s = stats(results.filter((r) => !r.error).map((r) => r.ms));
 
       console.log(`\n=== tool-roundtrip (${TIER_LABEL}) ===`);
-      console.log(`  wrap rate = ${wraps}/${ROUNDTRIP_N} = ${rate.toFixed(2)}  (threshold ${WRAP_THRESHOLD})`);
-      console.log(`  latency   = min ${s.min}ms · median ${s.median}ms · p95 ${s.p95}ms · mean ${s.mean}ms`);
+      console.log(`  wrap rate     = ${wraps}/${responded} = ${rate.toFixed(2)}  (threshold ${WRAP_THRESHOLD}, over responded)`);
+      console.log(`  fetch fails   = ${fetchFails}/${ROUNDTRIP_N} = ${fetchFailRate.toFixed(2)}  (max ${FETCH_FAIL_MAX})`);
+      console.log(`  latency       = min ${s.min}ms · median ${s.median}ms · p95 ${s.p95}ms · mean ${s.mean}ms`);
 
+      // Transport instability is a separate failure mode from grammar regression
+      // — surface it with its own message so the overnight log is interpretable.
+      assert.ok(
+        fetchFailRate <= FETCH_FAIL_MAX,
+        `transport unstable: ${fetchFails}/${ROUNDTRIP_N} requests failed before reaching the bridge (rate ${fetchFailRate.toFixed(2)} > ${FETCH_FAIL_MAX}) — not a grammar issue, retry or investigate undici/OrbStack`,
+      );
+      assert.ok(
+        responded > 0,
+        'no requests responded — cannot evaluate grammar',
+      );
       assert.ok(
         rate >= WRAP_THRESHOLD,
-        `wrap rate ${rate.toFixed(2)} below threshold ${WRAP_THRESHOLD} — grammar may have regressed`,
+        `wrap rate ${rate.toFixed(2)} below threshold ${WRAP_THRESHOLD} over ${responded} responded requests — grammar may have regressed`,
       );
     },
   );
