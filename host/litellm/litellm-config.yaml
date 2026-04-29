@@ -76,6 +76,29 @@ model_list:
       extra_body:
         chat_template_kwargs:
           enable_thinking: false
+
+  # Deterministic sampler arm for the iter-distribution sweep
+  # (TODO-ITERATION-DISTRIBUTION-TEST.md W3). Pins temperature=0.3, identical
+  # presence/top_p/top_k to v1-prod. Routes to the same llama-server upstream;
+  # only the per-request sampler shape differs.
+  - model_name: claw-llama-deterministic
+    litellm_params:
+      model: openai/claw
+      api_base: os.environ/LLAMA_SERVER_BASE
+      api_key: llama-server-no-auth
+      temperature: 0.3
+      extra_body:
+        chat_template_kwargs:
+          enable_thinking: false
+  - model_name: anthropic/claw-llama-deterministic
+    litellm_params:
+      model: openai/claw
+      api_base: os.environ/LLAMA_SERVER_BASE
+      api_key: llama-server-no-auth
+      temperature: 0.3
+      extra_body:
+        chat_template_kwargs:
+          enable_thinking: false
   - model_name: claw-ollama
     litellm_params:
       model: openai/claw-test

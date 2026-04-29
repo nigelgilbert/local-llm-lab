@@ -163,12 +163,19 @@ function collectRunArtifacts({
   const sessionRecords = moveAndReadSessionFiles(runDir);
   const bridgeRecords = sliceBridgeLog(runDir, runStartedMs, runFinishedMs);
 
-  const assistantMsgs = sessionRecords.filter(
-    (r) => r.type === 'message' && r.role === 'assistant',
-  );
-  const toolMsgs = sessionRecords.filter(
-    (r) => r.type === 'message' && r.role === 'tool',
-  );
+  // Claw's persisted session JSONL nests message records under a `message`
+  // wrapper: `{ "type": "message", "message": { "role": ..., "blocks": [...], "usage": {...} } }`.
+  // Normalize to a flat shape early so the rest of the joiner can ignore the wrapper.
+  const messages = sessionRecords
+    .filter((r) => r.type === 'message' && r.message && typeof r.message === 'object')
+    .map((r) => ({
+      role: r.message.role ?? null,
+      blocks: r.message.blocks ?? [],
+      usage: r.message.usage ?? null,
+    }));
+
+  const assistantMsgs = messages.filter((m) => m.role === 'assistant');
+  const toolMsgs = messages.filter((m) => m.role === 'tool');
   const sessionMeta = sessionRecords.find((r) => r.type === 'session_meta') || null;
 
   const toolResultByUseId = new Map();
