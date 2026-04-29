@@ -1,24 +1,25 @@
 #!/usr/bin/env bash
-# W4 Pass 1 — agentic classification of long-tail runs.
+# W4 Pass 1 — agentic classification of long-tail runs, split by stratum.
 #
-# This script does not actually invoke the agent. The classifier prompt is
-# at host/test/scripts/analysis/classifier-prompt.md; the frozen taxonomy is
-# at host/llama-server/docs/W4-TAXONOMY.md; per-run packets are at
-# host/test/.claw-runtime/<run-id>/w4-packet.md.
+# After the W4 selection rule was found to mismatch the failure taxonomy
+# (65% F-rate on the original Pass 1), runs are now stratified into:
+#   - failed-tail: terminal_status != done OR exit_code != 0
+#                  → classified against W4-TAXONOMY.md (A–F)
+#                  → output: host/llama-server/docs/W4-pass1-failed-agent.csv
+#   - successful-tail: terminal_status = done AND exit_code = 0
+#                  → classified against W4-TAXONOMY-PRODUCTIVE.md (P1–P5)
+#                  → output: host/llama-server/docs/W4-pass1-productive-agent.csv
 #
-# What this script does:
-#   1. Verifies long-tail packets exist (run build-w4-packet.py first if not).
-#   2. Emits a manifest at host/test/.claw-runtime/_w4-pass1-pending.csv that
-#      lists every packet to classify, in stable order.
-#   3. Initializes the output CSV at host/llama-server/docs/W4-pass1-agent.csv
-#      with the header `run_id,class,primary_signal,justification` if it does
-#      not exist.
+# This script does not actually invoke the classifier. It:
+#   1. Verifies the stratified index and packets exist.
+#   2. Emits two manifests at host/test/.claw-runtime/_w4-pass1-{failed,productive}-pending.csv
+#   3. Initializes both output CSVs with the standard header if absent.
 #
 # The classifier itself runs in this conversation (or any harness around
-# claude-code's Agent tool) — read each packet, apply the taxonomy, append a
-# row to W4-pass1-agent.csv. Independence requirement: each packet is
-# classified without seeing other packets' labels and without seeing the
-# director's Pass 2.
+# claude-code's Agent tool) — read each packet, apply the appropriate
+# taxonomy, append a row to the matching output CSV. Independence
+# requirement: each packet is classified without seeing other packets'
+# labels and without seeing the director's Pass 2.
 
 set -eu
 
@@ -26,35 +27,59 @@ SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
 TEST_DIR=$(cd "$SCRIPT_DIR/../.." && pwd)
 HOST_DIR=$(cd "$TEST_DIR/.." && pwd)
 RUNTIME_DIR="$TEST_DIR/.claw-runtime"
-PENDING_CSV="$RUNTIME_DIR/_w4-pass1-pending.csv"
-PASS1_CSV="$HOST_DIR/llama-server/docs/W4-pass1-agent.csv"
 INDEX="$RUNTIME_DIR/_w4-index.jsonl"
+
+FAILED_PENDING="$RUNTIME_DIR/_w4-pass1-failed-pending.csv"
+SUCC_PENDING="$RUNTIME_DIR/_w4-pass1-productive-pending.csv"
+FAILED_OUT="$HOST_DIR/llama-server/docs/W4-pass1-failed-agent.csv"
+SUCC_OUT="$HOST_DIR/llama-server/docs/W4-pass1-productive-agent.csv"
 
 [ -f "$INDEX" ] || { echo "no index at $INDEX — run build-w4-packet.py first" >&2; exit 2; }
 
-if [ ! -f "$PASS1_CSV" ]; then
-  echo "run_id,class,primary_signal,justification" > "$PASS1_CSV"
-  echo "initialized $PASS1_CSV" >&2
+if [ ! -f "$FAILED_OUT" ]; then
+  echo "run_id,class,primary_signal,justification" > "$FAILED_OUT"
+  echo "initialized $FAILED_OUT" >&2
+fi
+if [ ! -f "$SUCC_OUT" ]; then
+  echo "run_id,class,primary_signal,justification" > "$SUCC_OUT"
+  echo "initialized $SUCC_OUT" >&2
 fi
 
-# Walk index, emit pending list (excludes already-classified runs).
-already=$(awk -F, 'NR>1 {print $1}' "$PASS1_CSV" | sort -u)
-echo "run_id,packet_path" > "$PENDING_CSV"
-python3 - "$INDEX" "$already" "$PENDING_CSV" <<'PY'
+# Walk index, emit pending lists per stratum (excludes already-classified).
+already_failed=$(awk -F, 'NR>1 {print $1}' "$FAILED_OUT" | sort -u)
+already_succ=$(awk -F, 'NR>1 {print $1}' "$SUCC_OUT" | sort -u)
+
+echo "run_id,packet_path,stratum" > "$FAILED_PENDING"
+echo "run_id,packet_path,stratum" > "$SUCC_PENDING"
+
+python3 - "$INDEX" "$already_failed" "$already_succ" "$FAILED_PENDING" "$SUCC_PENDING" <<'PY'
 import json, sys
-index, already_str, pending = sys.argv[1:]
-already = set(line.strip() for line in already_str.splitlines() if line.strip())
-with open(pending, "a") as out:
+index, af_str, as_str, fp, sp = sys.argv[1:]
+already_failed = set(line.strip() for line in af_str.splitlines() if line.strip())
+already_succ = set(line.strip() for line in as_str.splitlines() if line.strip())
+with open(fp, "a") as f_failed, open(sp, "a") as f_succ:
     for line in open(index):
         rec = json.loads(line)
-        if rec["run_id"] in already:
-            continue
-        out.write(f"{rec['run_id']},{rec['packet_path']}\n")
+        rid = rec["run_id"]
+        stratum = rec.get("stratum", "failed-tail")
+        if stratum == "failed-tail":
+            if rid in already_failed:
+                continue
+            f_failed.write(f"{rid},{rec['packet_path']},{stratum}\n")
+        else:
+            if rid in already_succ:
+                continue
+            f_succ.write(f"{rid},{rec['packet_path']},{stratum}\n")
 PY
 
-n_pending=$(($(wc -l < "$PENDING_CSV") - 1))
-echo "Pass 1 pending: $n_pending packet(s)"
-echo "  manifest:  $PENDING_CSV"
-echo "  output:    $PASS1_CSV"
-echo "  taxonomy:  $HOST_DIR/llama-server/docs/W4-TAXONOMY.md"
-echo "  prompt:    $SCRIPT_DIR/classifier-prompt.md"
+n_failed=$(($(wc -l < "$FAILED_PENDING") - 1))
+n_succ=$(($(wc -l < "$SUCC_PENDING") - 1))
+echo "Pass 1 pending: failed-tail=$n_failed, successful-tail=$n_succ"
+echo "  failed-tail manifest:    $FAILED_PENDING"
+echo "  failed-tail output:      $FAILED_OUT"
+echo "  failed-tail taxonomy:    $HOST_DIR/llama-server/docs/W4-TAXONOMY.md"
+echo "  failed-tail prompt:      $SCRIPT_DIR/classifier-prompt.md"
+echo "  productive manifest:     $SUCC_PENDING"
+echo "  productive output:       $SUCC_OUT"
+echo "  productive taxonomy:     $HOST_DIR/llama-server/docs/W4-TAXONOMY-PRODUCTIVE.md"
+echo "  productive prompt:       $SCRIPT_DIR/classifier-prompt-productive.md"

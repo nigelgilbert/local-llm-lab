@@ -110,7 +110,8 @@ const PROMPT =
   '      • empty input       → message contains "empty", "unexpected", or "input"\n' +
   'Then ensure `node verify.js` exits 0. Do not edit verify.js.';
 
-const TIMEOUT = 300_000;
+const CLAW_TIMEOUT = 300_000;
+const TIMEOUT = CLAW_TIMEOUT + 20_000;
 
 describe(`expression-eval: recursive-descent parser (tier=${TIER_LABEL})`, () => {
   beforeEach(() => {
@@ -119,7 +120,7 @@ describe(`expression-eval: recursive-descent parser (tier=${TIER_LABEL})`, () =>
   });
 
   it('claw implements evaluate handling precedence, assoc, errors', { timeout: TIMEOUT }, async () => {
-    const r = await runClaw({ prompt: PROMPT, model: clawModel });
+    const r = await runClaw({ prompt: PROMPT, model: clawModel, timeoutMs: CLAW_TIMEOUT });
 
     console.log(`\n=== expression-eval (${TIER_LABEL}) ===`);
     console.log(`  claw: exit=${r.code} elapsed=${r.elapsedMs}ms files=${JSON.stringify(workspace.list())}`);

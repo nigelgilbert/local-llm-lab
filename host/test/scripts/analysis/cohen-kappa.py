@@ -91,16 +91,58 @@ def load(path: Path) -> dict[str, str]:
     return out
 
 
+def load_stratum_index(path: Path) -> dict[str, str]:
+    """Returns {run_id: stratum} from _w4-index.jsonl."""
+    out = {}
+    if not path.exists():
+        return out
+    for line in path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            rec = json.loads(line)
+        except json.JSONDecodeError:
+            continue
+        rid = rec.get("run_id")
+        stratum = rec.get("stratum")
+        if rid and stratum:
+            out[rid] = stratum
+    return out
+
+
 def main() -> int:
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--pass1", type=Path, required=True)
     p.add_argument("--pass2", type=Path, required=True)
     p.add_argument("--bootstrap", type=int, default=10000)
     p.add_argument("--json", action="store_true")
+    p.add_argument(
+        "--stratum",
+        choices=("failed-tail", "successful-tail"),
+        default=None,
+        help="restrict to one stratum (joined against --index)",
+    )
+    p.add_argument(
+        "--index",
+        type=Path,
+        default=Path(__file__).resolve().parents[2] / ".claw-runtime" / "_w4-index.jsonl",
+        help="path to _w4-index.jsonl (only consulted when --stratum is set)",
+    )
     args = p.parse_args()
 
     a = load(args.pass1)
     b = load(args.pass2)
+
+    if args.stratum:
+        stratum_map = load_stratum_index(args.index)
+        if not stratum_map:
+            print(f"--stratum requires {args.index} (run build-w4-packet.py first)", file=sys.stderr)
+            return 2
+        keep = {rid for rid, s in stratum_map.items() if s == args.stratum}
+        a = {rid: c for rid, c in a.items() if rid in keep}
+        b = {rid: c for rid, c in b.items() if rid in keep}
+        print(f"--stratum {args.stratum}: kept {len(a)} pass1 + {len(b)} pass2 rows", file=sys.stderr)
 
     common = sorted(set(a.keys()) & set(b.keys()))
     if not common:

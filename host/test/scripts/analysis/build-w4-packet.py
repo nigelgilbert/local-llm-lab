@@ -95,7 +95,7 @@ def _solve_normal(X, y):
 def cell_residuals(rs: list[dict]) -> dict[str, float]:
     """Returns {run_id: residual_z}. Residuals are from per-cell OLS fit
     wallclock ~ output_tokens + iter_count; standardized by σ."""
-    rs2 = [r for r in rs if (r.get("terminal_status") or "").lower() == "done"]
+    rs2 = [r for r in rs if (r.get("terminal_status") or "").lower() == "completed"]
     rows = []
     for r in rs2:
         wallclock = _safe_float(r.get("wallclock_ms"))
@@ -121,7 +121,27 @@ def cell_residuals(rs: list[dict]) -> dict[str, float]:
     return {ri[0]: (yi - pi) / sigma for ri, yi, pi in zip(rows, y, preds)}
 
 
-def select_long_tail(runs: list[dict]) -> set[str]:
+def classify_stratum(run: dict) -> str:
+    """Routes a run into 'failed-tail' or 'successful-tail'.
+
+    The run-table's `passed` field is null for every existing run (the test
+    result is not propagated into run_summary.json — see
+    sampler-arm-compare.py's `passed_count`). We use the same proxy it uses:
+    terminal_status == "done" AND exit_code == 0 → successful-tail.
+
+    failed-tail: terminal_status ∈ {timeout, error, harness_error,
+                 context_overflow} OR exit_code not in {"0", 0}.
+    successful-tail: terminal_status = "done" AND exit_code in {"0", 0}.
+    """
+    ts = (run.get("terminal_status") or "").lower()
+    exit_code = run.get("exit_code")
+    if ts == "done" and exit_code in ("0", 0):
+        return "successful-tail"
+    return "failed-tail"
+
+
+def select_long_tail(runs: list[dict]) -> dict[str, str]:
+    """Selects long-tail runs and returns {run_id: stratum}."""
     cells: dict[tuple[str, str], list[dict]] = defaultdict(list)
     for r in runs:
         cells[(r.get("test_id"), r.get("sampler_id"))].append(r)
@@ -152,7 +172,13 @@ def select_long_tail(runs: list[dict]) -> set[str]:
         for run_id, resid in z.items():
             if abs(resid) > 1.5:
                 selected.add(run_id)
-    return selected
+    by_id = {r["run_id"]: r for r in runs}
+    # All terminal failures (regardless of iter_count tail) go in too —
+    # at small n, every failed run is informative for the failure taxonomy.
+    for r in runs:
+        if classify_stratum(r) == "failed-tail":
+            selected.add(r["run_id"])
+    return {rid: classify_stratum(by_id[rid]) for rid in selected if rid in by_id}
 
 
 def load_iterations(p: Path) -> list[dict]:
@@ -310,13 +336,18 @@ def main() -> int:
         runs = list(csv.DictReader(f))
 
     if args.run_id:
-        targets = {args.run_id}
+        targets = {args.run_id: classify_stratum(next((r for r in runs if r["run_id"] == args.run_id), {}))}
     elif args.all_runs:
-        targets = {r["run_id"] for r in runs}
+        targets = {r["run_id"]: classify_stratum(r) for r in runs}
     else:
         targets = select_long_tail(runs)
 
-    print(f"selected {len(targets)} run(s)", file=sys.stderr)
+    n_failed = sum(1 for s in targets.values() if s == "failed-tail")
+    n_succ = sum(1 for s in targets.values() if s == "successful-tail")
+    print(
+        f"selected {len(targets)} run(s) — failed-tail={n_failed} successful-tail={n_succ}",
+        file=sys.stderr,
+    )
     for r in runs:
         if r["run_id"] not in targets:
             continue
@@ -331,7 +362,7 @@ def main() -> int:
         out_path.write_text(packet, encoding="utf-8")
         print(f"  → {out_path}")
 
-    # Emit an index for the classifier prompt.
+    # Emit an index for the classifier prompt, with stratum routing.
     index_path = args.runtime / "_w4-index.jsonl"
     with index_path.open("w") as f:
         for r in runs:
@@ -344,6 +375,8 @@ def main() -> int:
                 "iter_count": r.get("iter_count"),
                 "wallclock_ms": r.get("wallclock_ms"),
                 "terminal_status": r.get("terminal_status"),
+                "passed": r.get("passed"),
+                "stratum": targets[r["run_id"]],
                 "packet_path": str((args.runtime / r["run_id"] / "w4-packet.md").resolve()),
             }) + "\n")
     print(f"wrote selection index → {index_path}", file=sys.stderr)

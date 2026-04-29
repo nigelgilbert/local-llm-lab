@@ -147,7 +147,8 @@ const PROMPT =
   '  - When ttlMs is omitted, entries never expire by time.\n' +
   'Then ensure `node verify.js` exits 0. Do not edit verify.js.';
 
-const TIMEOUT = 300_000;
+const CLAW_TIMEOUT = 165_000;
+const TIMEOUT = CLAW_TIMEOUT + 20_000;
 
 describe(`lru-cache: LRU + TTL + eviction callback (tier=${TIER_LABEL})`, () => {
   beforeEach(() => {
@@ -156,7 +157,7 @@ describe(`lru-cache: LRU + TTL + eviction callback (tier=${TIER_LABEL})`, () => 
   });
 
   it('claw implements LRUCache satisfying every spec bullet', { timeout: TIMEOUT }, async () => {
-    const r = await runClaw({ prompt: PROMPT, model: clawModel });
+    const r = await runClaw({ prompt: PROMPT, model: clawModel, timeoutMs: CLAW_TIMEOUT });
 
     console.log(`\n=== lru-cache (${TIER_LABEL}) ===`);
     console.log(`  claw: exit=${r.code} elapsed=${r.elapsedMs}ms files=${JSON.stringify(workspace.list())}`);
