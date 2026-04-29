@@ -13,6 +13,23 @@
 // Pilot first; may be too easy at tier-64 since Date manipulation is well-
 // trained.
 
+/** @manifest
+ * {
+ *   "test_id": "parseISO-with-timezone",
+ *   "test_version": "v1",
+ *   "primary_axis": "spec_precision",
+ *   "secondary_axes": [
+ *     "convergence"
+ *   ],
+ *   "suite_layer": "B",
+ *   "difficulty_band": "medium",
+ *   "oracle_type": "public_verifier",
+ *   "keep_drop_rule": "Do not drop until tier-32 and tier-16 are measured (strategy doc \u00a72.1 flags as too-easy at tier-64; lower-tier behavior unknown).",
+ *   "expected_tier_signature": "unknown",
+ *   "known_confounds": []
+ * }
+ */
+
 import { describe, it, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';

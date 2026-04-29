@@ -1,0 +1,108 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mac-llm-lab/schemas/test_manifest.schema.json",
+  "title": "Tier-Eval v2 Test Manifest Entry",
+  "description": "Per-test metadata declared in a manifest header inside each test file under host/test/__tests__/tier-eval/. See TIER-EVAL-V2-SPRINT-PLAN.md §3 (Sprint 0.3 + 0.4) and the source strategy doc §4. Capability axes drive cross-tier reporting; suite_layer determines whether the test counts toward smoke (A), the core stratification matrix (B), the diagnostic deep-dive (C), or the frontier/stress suite (D).",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "test_id",
+    "test_version",
+    "primary_axis",
+    "suite_layer",
+    "difficulty_band",
+    "oracle_type",
+    "keep_drop_rule"
+  ],
+  "properties": {
+    "test_id": {
+      "type": "string",
+      "description": "Stable test identifier. Convention: matches the basename of the test file (e.g. `expression-eval` for `expression-eval.test.js`)."
+    },
+    "test_version": {
+      "type": "string",
+      "description": "Exact prompt/verifier version. Bump when the prompt or oracle changes; older runs keep their original test_version on the registry row."
+    },
+    "primary_axis": {
+      "type": "string",
+      "enum": [
+        "spec_precision",
+        "stateful_logic",
+        "multi_file_context",
+        "convergence",
+        "tool_discipline",
+        "productivity",
+        "local_usability"
+      ],
+      "description": "Single dominant capability axis from strategy doc §4. Drives axis-scorecard reporting."
+    },
+    "secondary_axes": {
+      "type": "array",
+      "maxItems": 2,
+      "items": {
+        "type": "string",
+        "enum": [
+          "spec_precision",
+          "stateful_logic",
+          "multi_file_context",
+          "convergence",
+          "tool_discipline",
+          "productivity",
+          "local_usability"
+        ]
+      },
+      "uniqueItems": true,
+      "description": "Up to two additional axes this test exercises. Optional; do not duplicate primary_axis."
+    },
+    "suite_layer": {
+      "type": "string",
+      "enum": ["A", "B", "C", "D"],
+      "description": "Strategy doc §3: A = smoke/harness-health, B = core stratification, C = diagnostic deep-dive, D = frontier/stress. Layer-A failures must not be aggregated into model pass-rate comparisons."
+    },
+    "difficulty_band": {
+      "type": "string",
+      "enum": ["easy", "medium", "hard", "frontier"],
+      "description": "Coarse difficulty signal. `frontier` is reserved for Layer-D stress tests and tests expected to floor on smaller tiers."
+    },
+    "oracle_type": {
+      "type": "string",
+      "enum": [
+        "public_verifier",
+        "hidden_holdout",
+        "rubric",
+        "judge",
+        "human"
+      ],
+      "description": "How pass/fail is determined. Must match the `oracle_type` recorded on every run-registry row produced by this test."
+    },
+    "known_confounds": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Free-form list of known confounds (e.g. `context_pressure_high`, `tool_shape_variance`, `repo_size_dependent`). Surfaced in the discrimination matrix so a noisy result can be interpreted."
+    },
+    "keep_drop_rule": {
+      "type": "string",
+      "description": "One-sentence rule for when this test should leave the core matrix. Examples: `Drop if pass_rate >= 0.95 across all three tiers in confirmatory n>=40 runs.`, `Never drop — axis-critical for spec_precision.`, `Move to Layer D if pass_rate <= 0.10 across all three tiers in confirmatory n>=40 runs.`"
+    },
+    "expected_tier_signature": {
+      "type": ["string", "null"],
+      "enum": [
+        "monotonic_improving",
+        "ceiling",
+        "floor",
+        "tier_insensitive",
+        "unknown",
+        null
+      ],
+      "description": "Pre-registered hypothesis about how this test should behave across tiers. Used to flag surprises (e.g. a test marked `monotonic_improving` that ends up `ceiling` warrants investigation)."
+    },
+    "introduced_in": {
+      "type": ["string", "null"],
+      "description": "Harness version or date when this test was introduced. Helps interpret historical-bucketing decisions."
+    },
+    "notes": {
+      "type": ["string", "null"],
+      "description": "Free-form notes (e.g. `originally W4-A failure-mode probe; retained because expression-eval-style edge density is axis-critical for spec_precision`)."
+    }
+  }
+}

@@ -1,0 +1,94 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mac-llm-lab/schemas/model_config.schema.json",
+  "title": "Tier-Eval v2 Model-Config Manifest Entry",
+  "description": "One entry in the model-config manifest. Every run-registry row references a manifest entry by `model_config_id`; this schema enumerates what that key resolves to. See TIER-EVAL-V2-SPRINT-PLAN.md §3 (Sprint 0.2) and the source strategy doc §5.3. The manifest is the join target — denormalized fields on registry rows (model_id, quantization, context_limit, sampler_config_id) must be consistent with their manifest entry.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "model_config_id",
+    "model_id",
+    "model_family",
+    "quantization",
+    "context_limit",
+    "runtime_backend",
+    "sampler_config_id",
+    "harness_version",
+    "prompt_pack_version"
+  ],
+  "properties": {
+    "model_config_id": {
+      "type": "string",
+      "description": "Stable key for this combination of model + quantization + sampler + harness + prompt pack. Used as the foreign key from run-registry rows. Suggested format: `<family>-<size>-<quant>-ctx<N>-<sampler_id>-<prompt_pack_id>` (e.g. `qwen36-35b-a3b-q4km-ctx65k-v1prod-pp01`)."
+    },
+    "model_id": {
+      "type": "string",
+      "description": "Exact model name and revision/hash. For HuggingFace-style refs include the revision (e.g. `Qwen/Qwen3.6-35B-A3B@<git-rev>`). For LiteLLM aliases (e.g. `claw-llama`) include the upstream model + git rev or digest separately."
+    },
+    "model_family": {
+      "type": "string",
+      "description": "Family name for aggregation (e.g. `qwen3.6`, `llama3.3`, `mistral-large-2`). Coarse grouping for cross-family comparisons."
+    },
+    "parameter_count": {
+      "type": ["integer", "null"],
+      "minimum": 1,
+      "description": "Nominal parameter count, in number of parameters (not millions/billions). Null if not known or not meaningful (e.g. some MoE configs)."
+    },
+    "quantization": {
+      "type": "string",
+      "description": "Quantization format and parameters. Examples: `Q4_K_M`, `Q5_K_M`, `Q8_0`, `MLX-4bit`, `fp16`, `bf16`, `none`. Use `none` for unquantized weights."
+    },
+    "context_limit": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Effective context window available to the harness for this config, in tokens. May be smaller than the model's nominal max (e.g. memory budget on tier-16)."
+    },
+    "runtime_backend": {
+      "type": "string",
+      "description": "Backend/runtime version. Examples: `llama-server@<sha>`, `ollama@0.x.y`, `mlx@a.b.c`, `vllm@a.b.c`. Required even if the harness only supports one backend, so cross-backend comparisons remain unambiguous."
+    },
+    "sampler_config_id": {
+      "type": "string",
+      "description": "Stable key for the sampler settings used. The full sampler payload (temperature, top-p, top-k, presence/frequency penalties, repeat penalty, seed policy, min-p, etc.) is stored in `sampler_settings`."
+    },
+    "sampler_settings": {
+      "type": ["object", "null"],
+      "additionalProperties": true,
+      "description": "Full sampler settings payload for this config. Optional denormalization — the canonical source can live elsewhere — but recommended for self-contained manifest entries.",
+      "properties": {
+        "temperature": { "type": ["number", "null"] },
+        "top_p":       { "type": ["number", "null"] },
+        "top_k":       { "type": ["integer", "null"] },
+        "min_p":       { "type": ["number", "null"] },
+        "presence_penalty":  { "type": ["number", "null"] },
+        "frequency_penalty": { "type": ["number", "null"] },
+        "repeat_penalty":    { "type": ["number", "null"] },
+        "seed_policy": {
+          "type": ["string", "null"],
+          "enum": ["fixed", "per_run", "per_iteration", "task_seeded", null],
+          "description": "How the seed is chosen. `task_seeded` is required for paired sampler comparisons."
+        }
+      }
+    },
+    "harness_version": {
+      "type": "string",
+      "description": "Git SHA or release identifier of the test harness at the time this config was registered."
+    },
+    "prompt_pack_version": {
+      "type": "string",
+      "description": "System / developer / task prompt pack version. The pack identifies the exact prompt text used for runs against this config."
+    },
+    "tier_compatibility": {
+      "type": ["array", "null"],
+      "items": {
+        "type": "integer",
+        "enum": [16, 32, 64]
+      },
+      "description": "Which hardware tiers this config has been observed to run on. Optional — used by the planner to flag impossible (tier, model_config) cells before submitting them to a sweep."
+    },
+    "notes": {
+      "type": ["string", "null"],
+      "description": "Free-form notes (e.g. `replaces qwen35-30b-a3b on tier-64 as of 2026-04-15`)."
+    }
+  }
+}

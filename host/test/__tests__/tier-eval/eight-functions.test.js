@@ -17,6 +17,25 @@
 // as the model losing track of which file it's in mid-iteration; A-class
 // as repeated edit-verify cycles on the dependent files.
 
+/** @manifest
+ * {
+ *   "test_id": "eight-functions",
+ *   "test_version": "v1",
+ *   "primary_axis": "multi_file_context",
+ *   "secondary_axes": [
+ *     "convergence"
+ *   ],
+ *   "suite_layer": "B",
+ *   "difficulty_band": "medium",
+ *   "oracle_type": "public_verifier",
+ *   "keep_drop_rule": "Do not drop until tier-32 and tier-16 are measured (strategy doc \u00a72.1; redesigned in loop-2 to add cross-file deps).",
+ *   "expected_tier_signature": "monotonic_improving",
+ *   "known_confounds": [
+ *     "repo_size_dependent"
+ *   ]
+ * }
+ */
+
 import { describe, it, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';

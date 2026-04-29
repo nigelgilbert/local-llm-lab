@@ -47,3 +47,128 @@ Distilled from SWE-bench Verified, METR's task-design memos, BigCodeBench, LiveC
 4. Rebuild the test image: `(cd host/test && docker compose build)`.
 5. Add it to the `tier-eval` suite list in `run-tier-eval.sh` header comment for posterity.
 6. If pass-rate is the same on every tier, retire it.
+
+---
+
+## Tier-Eval v2 addendum: statistical decision rules (Sprint 0.6)
+
+This section supersedes the "kill / retire" framing above for tier-eval v2
+work. The eight rules and red flags still apply for authoring new tests; this
+addendum governs **classification** (keep, drop, defer) once a test has been
+running across tiers/models/configs.
+
+The motivating problem: at n=10 or n=20, a 30 percentage-point gap between
+two cells can easily be sampling noise. Treating raw point spread as the
+keep/drop rule retires useful tests during noisy weeks and promotes false
+discriminators during lucky ones. This addendum replaces that with a
+two-stage screen-then-confirm protocol with explicit uncertainty.
+
+### 1. Two-stage protocol
+
+| Stage | Sample size | Allowed conclusion |
+|---|---:|---|
+| Overnight constrained screen | n=8–10 per cell, one sampler | Identify candidate discriminators and obvious contamination. **Not valid for durable keep/drop, model admission, or sampler conclusions.** |
+| Broad census | n≈10 per cell | Screen for obvious ceiling/floor/spread; **do not drop tests solely from this**. |
+| Provisional classification | n≈20–30 per cell | Mark candidate core, noisy, ceiling, or floor with visible uncertainty. |
+| Confirmatory classification | Power-derived (often n≈40–60 for 25 pp effects, more for smaller effects or noisier baselines) | Make durable keep/drop / admission decisions. |
+
+Screening-only outputs must carry a `screening_only=true` flag on every
+registry row (run_registry.schema.json). No leadership-facing artifact may
+quote screening-only numbers.
+
+### 2. Default core-discriminator rule
+
+```
+A test is a confirmed core discriminator if ALL of:
+  1. observed max(pass_rate) − min(pass_rate) >= 25 percentage points
+     across the cells under comparison, AND
+  2. the highest and lowest cells' 80% Wilson confidence intervals do not
+     overlap, OR an agreed Bayesian/bootstrap rule gives high probability
+     (>= 0.8) that the true spread exceeds 25 pp, AND
+  3. harness-error rate < 5% and thermal_contamination_rate < 5%, AND
+  4. failures are interpretable or the test is axis-critical
+     (test_manifest.keep_drop_rule = "Never drop").
+```
+
+Rationale:
+
+- The 25 pp floor keeps the test practically meaningful; smaller spreads
+  can be real but are not worth the suite's wall-clock budget unless
+  axis-critical.
+- The 80% Wilson interval is intentionally less conservative than 95%.
+  Screening-tier decisions tolerate more false positives than admission
+  gates; a 95% rule effectively never retires anything at n=20.
+- Tests that fail the interval test but have a 25 pp point spread should
+  be labeled `provisional_discriminator`, not dropped. They earn a
+  confirmatory rerun.
+- Layer-A (smoke) and `keep_drop_rule = "Never drop"` tests are exempt —
+  the rule only governs Layer-B core-matrix membership.
+
+### 3. Power-derived N for high-stakes comparisons
+
+For model admission, major config changes, or external claims, do not rely
+on a fixed n=20 plan. Compute sample size from:
+
+- Target minimum effect size (typical: 20, 25, or 30 percentage points).
+- Expected baseline pass rate (sample-size requirements grow as p moves
+  toward 0.5).
+- Paired vs. unpaired design (paired sampler comparisons require shared
+  task seeds — see strategy doc §14.2).
+- Desired alpha (false-positive tolerance) and power.
+- Number of comparisons being made (Bonferroni or BH correction if many).
+
+Working rules of thumb:
+
+- n=20 is useful for finding large effects, not for retiring subtle
+  sampler/config questions.
+- n≈40 can be adequate for large, clean effects, especially with paired
+  designs — but **n=40 is not a universal power guarantee**; it depends on
+  baseline rates and pairedness.
+- n≈40–60 or more may be needed for 25–30 pp effects depending on the
+  baseline.
+- For sampler/prompt/harness tuning, use paired seeds where possible;
+  otherwise treat the comparison as unpaired and budget more N.
+
+### 4. Test classification labels (Sprint 2 discrimination matrix)
+
+| Label | Definition | Action |
+|---|---|---|
+| `core_discriminator` | Meets §2 confirmed-discriminator rule under confirmatory N. | Keep in Layer B. |
+| `provisional_discriminator` | Large point spread but insufficient N or overlapping intervals. | Rerun confirmatory sample; do not drop. |
+| `likely_ceiling` | Pass rate ≥ 0.95 across all tiers/configs in screening; confirmation pending. | Provisional only — do not move to Layer A or smoke until confirmed. |
+| `likely_floor` | Pass rate ≤ 0.05 across all tiers/configs in screening; confirmation pending. | Provisional only — do not move to Layer D until confirmed. |
+| `noisy_diagnostic` | Useful traces but unstable pass rate even at confirmatory N. | Keep for R&D; exclude from leaderboard/admission summaries. |
+| `harness_contaminated` | Infrastructure/tooling failures dominate. | Quarantine until the harness issue is fixed; do not aggregate. |
+| `thermal_contaminated` | Latency/throughput distorted by heat per Sprint 0.7 telemetry. | Exclude from clean latency comparisons; rerun if pass/fail itself is suspect. |
+
+The screen-stage labels are `*_candidate` versions of the same set
+(`core_discriminator_candidate`, `likely_ceiling`, etc.) and never become
+durable on their own.
+
+### 5. Reporting requirements
+
+Report effect sizes, never p-values alone:
+
+| Outcome | Report |
+|---|---|
+| Pass/fail | Pass rate plus Wilson/bootstrap/Bayesian interval. |
+| Tier spread | Point spread plus interval/probability qualification. |
+| Config deltas | Paired deltas with bootstrap CI where possible. |
+| Iterations / cost | Median, p75, p90, and outlier inspection. |
+| Trace behavior | Tag rates and representative trace links. |
+| Local usability | Pass-per-minute, p90 wallclock, throughput, context-pressure distribution, thermal status. |
+
+A single aggregate score (e.g. "tier-32 = 72%") is **forbidden** in any
+external or leadership-facing artifact for this iteration. Capability-axis
+scorecards stand on their own; the pull toward a single number is strong
+and misleading.
+
+### 6. Relationship to the eight rules above
+
+The eight rules govern **test design** (so a test can be informative at
+all). This addendum governs **interpretation of results** once tests have
+been running. Both apply: a test that violates rule #4 (measures the
+harness, not the model) cannot be rescued by §2's interval rule, and a
+test with a beautifully calibrated edge surface still needs §2 evidence
+before earning core-matrix permanence.
+

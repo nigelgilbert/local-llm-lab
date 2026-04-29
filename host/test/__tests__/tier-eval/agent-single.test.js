@@ -10,6 +10,26 @@
 // "838 ms, only `.claw/` written" note. Tracked in
 // host/llama-server/docs/TODO-AGENT-SINGLE-FLAKE.md.
 
+/** @manifest
+ * {
+ *   "test_id": "agent-single",
+ *   "test_version": "v1",
+ *   "primary_axis": "tool_discipline",
+ *   "secondary_axes": [
+ *     "local_usability"
+ *   ],
+ *   "suite_layer": "B",
+ *   "difficulty_band": "easy",
+ *   "oracle_type": "public_verifier",
+ *   "keep_drop_rule": "Never drop \u2014 minimum-viable agentic precondition. Move to Layer A only after a confirmatory n>=40 run shows ceiling on all three tiers.",
+ *   "expected_tier_signature": "ceiling",
+ *   "known_confounds": [
+ *     "tool_shape_variance"
+ *   ],
+ *   "notes": "Strategy doc \u00a72.1 flags this as ceiling-at-tier-64; lower-tier behavior unknown."
+ * }
+ */
+
 import { describe, it, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 

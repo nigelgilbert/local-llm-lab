@@ -13,6 +13,23 @@
 //
 // Target: medium-hard (7B 25-50%, 14B 60-80%, 30B 85-100%).
 
+/** @manifest
+ * {
+ *   "test_id": "multi-bug",
+ *   "test_version": "v1",
+ *   "primary_axis": "convergence",
+ *   "secondary_axes": [
+ *     "tool_discipline"
+ *   ],
+ *   "suite_layer": "B",
+ *   "difficulty_band": "medium",
+ *   "oracle_type": "public_verifier",
+ *   "keep_drop_rule": "Keep \u2014 sibling to cascading-bugs but with simultaneously-visible bugs.",
+ *   "expected_tier_signature": "monotonic_improving",
+ *   "known_confounds": []
+ * }
+ */
+
 import { describe, it, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';

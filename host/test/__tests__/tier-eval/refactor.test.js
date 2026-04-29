@@ -10,6 +10,23 @@
 // the off-by-one without thinking; the 14B/30B reliably spot it from the
 // assertion message alone.
 
+/** @manifest
+ * {
+ *   "test_id": "refactor",
+ *   "test_version": "v1",
+ *   "primary_axis": "convergence",
+ *   "secondary_axes": [
+ *     "spec_precision"
+ *   ],
+ *   "suite_layer": "B",
+ *   "difficulty_band": "easy",
+ *   "oracle_type": "public_verifier",
+ *   "keep_drop_rule": "Drop if pass_rate >= 0.95 across all three tiers in confirmatory n>=40 runs.",
+ *   "expected_tier_signature": "ceiling",
+ *   "known_confounds": []
+ * }
+ */
+
 import { describe, it, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';

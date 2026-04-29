@@ -7,6 +7,23 @@
 //
 // Target: medium-hard (7B 30-55%, 14B 65-85%, 30B 90-100%).
 
+/** @manifest
+ * {
+ *   "test_id": "state-machine",
+ *   "test_version": "v1",
+ *   "primary_axis": "stateful_logic",
+ *   "secondary_axes": [
+ *     "spec_precision"
+ *   ],
+ *   "suite_layer": "B",
+ *   "difficulty_band": "medium",
+ *   "oracle_type": "public_verifier",
+ *   "keep_drop_rule": "Keep \u2014 explicit-transition FSM is a canonical stateful_logic exercise.",
+ *   "expected_tier_signature": "monotonic_improving",
+ *   "known_confounds": []
+ * }
+ */
+
 import { describe, it, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';

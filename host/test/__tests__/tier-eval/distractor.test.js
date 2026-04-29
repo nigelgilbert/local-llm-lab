@@ -11,6 +11,23 @@
 // File names and assertion messages are deliberately neutral — no `// FIXME`
 // hints, no `buggy_*` filenames (rule #8).
 
+/** @manifest
+ * {
+ *   "test_id": "distractor",
+ *   "test_version": "v1",
+ *   "primary_axis": "tool_discipline",
+ *   "secondary_axes": [
+ *     "spec_precision"
+ *   ],
+ *   "suite_layer": "B",
+ *   "difficulty_band": "medium",
+ *   "oracle_type": "public_verifier",
+ *   "keep_drop_rule": "Keep \u2014 tests read-the-whole-file discipline, distinct from agentic recovery.",
+ *   "expected_tier_signature": "monotonic_improving",
+ *   "known_confounds": []
+ * }
+ */
+
 import { describe, it, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';

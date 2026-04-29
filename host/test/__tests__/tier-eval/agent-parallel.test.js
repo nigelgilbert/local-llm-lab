@@ -2,6 +2,25 @@
 // Verifies the model emits three non-duplicate tool calls and produces the
 // correct output. elapsedMs is a throughput signal across tiers.
 
+/** @manifest
+ * {
+ *   "test_id": "agent-parallel",
+ *   "test_version": "v1",
+ *   "primary_axis": "tool_discipline",
+ *   "secondary_axes": [
+ *     "local_usability"
+ *   ],
+ *   "suite_layer": "B",
+ *   "difficulty_band": "medium",
+ *   "oracle_type": "public_verifier",
+ *   "keep_drop_rule": "Keep \u2014 tier-sensitive for parallel-tool-emission throughput.",
+ *   "expected_tier_signature": "monotonic_improving",
+ *   "known_confounds": [
+ *     "tool_shape_variance"
+ *   ]
+ * }
+ */
+
 import { describe, it, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 

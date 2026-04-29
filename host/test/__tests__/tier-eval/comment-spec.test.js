@@ -12,6 +12,23 @@
 //
 // Target: medium (7B 50-75%, 14B 80-95%, 30B 95-100%).
 
+/** @manifest
+ * {
+ *   "test_id": "comment-spec",
+ *   "test_version": "v1",
+ *   "primary_axis": "spec_precision",
+ *   "secondary_axes": [
+ *     "multi_file_context"
+ *   ],
+ *   "suite_layer": "B",
+ *   "difficulty_band": "medium",
+ *   "oracle_type": "public_verifier",
+ *   "keep_drop_rule": "Keep \u2014 instruction-following with spec living in code is a distinct sub-mode of spec_precision.",
+ *   "expected_tier_signature": "monotonic_improving",
+ *   "known_confounds": []
+ * }
+ */
+
 import { describe, it, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';

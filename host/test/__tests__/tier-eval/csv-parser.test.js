@@ -17,6 +17,23 @@
 //
 // Target: hard.
 
+/** @manifest
+ * {
+ *   "test_id": "csv-parser",
+ *   "test_version": "v1",
+ *   "primary_axis": "spec_precision",
+ *   "secondary_axes": [
+ *     "stateful_logic"
+ *   ],
+ *   "suite_layer": "B",
+ *   "difficulty_band": "hard",
+ *   "oracle_type": "public_verifier",
+ *   "keep_drop_rule": "Do not drop until tier-32 and tier-16 are measured (strategy doc \u00a72.1).",
+ *   "expected_tier_signature": "monotonic_improving",
+ *   "known_confounds": []
+ * }
+ */
+
 import { describe, it, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';

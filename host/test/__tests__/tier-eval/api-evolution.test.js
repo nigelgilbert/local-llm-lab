@@ -13,6 +13,25 @@
 //
 // Target: medium-hard (7B 25-50%, 14B 60-80%, 30B 85-100%).
 
+/** @manifest
+ * {
+ *   "test_id": "api-evolution",
+ *   "test_version": "v1",
+ *   "primary_axis": "multi_file_context",
+ *   "secondary_axes": [
+ *     "convergence"
+ *   ],
+ *   "suite_layer": "B",
+ *   "difficulty_band": "hard",
+ *   "oracle_type": "public_verifier",
+ *   "keep_drop_rule": "Keep \u2014 multi-file signature change is core to multi_file_context axis.",
+ *   "expected_tier_signature": "monotonic_improving",
+ *   "known_confounds": [
+ *     "repo_size_dependent"
+ *   ]
+ * }
+ */
+
 import { describe, it, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';

@@ -16,6 +16,25 @@
 // rather than iteration-loop behavior, exclude from the production suite
 // and report as a methodology note.
 
+/** @manifest
+ * {
+ *   "test_id": "subtle-broken-spec",
+ *   "test_version": "v1",
+ *   "primary_axis": "spec_precision",
+ *   "secondary_axes": [
+ *     "convergence"
+ *   ],
+ *   "suite_layer": "B",
+ *   "difficulty_band": "medium",
+ *   "oracle_type": "public_verifier",
+ *   "keep_drop_rule": "Do not drop until tier-32 and tier-16 are measured (strategy doc \u00a72.1 flags as too-easy at tier-64; expected verify-loop signature is the diagnostic value).",
+ *   "expected_tier_signature": "unknown",
+ *   "known_confounds": [
+ *     "context_pressure_high"
+ *   ]
+ * }
+ */
+
 import { describe, it, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';

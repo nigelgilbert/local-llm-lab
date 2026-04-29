@@ -8,6 +8,23 @@
 // is the trip wire: it's the one place where direct `===` deliberately
 // disagrees with deep equality.
 
+/** @manifest
+ * {
+ *   "test_id": "deep-equal",
+ *   "test_version": "v1",
+ *   "primary_axis": "spec_precision",
+ *   "secondary_axes": [
+ *     "stateful_logic"
+ *   ],
+ *   "suite_layer": "B",
+ *   "difficulty_band": "medium",
+ *   "oracle_type": "public_verifier",
+ *   "keep_drop_rule": "Keep \u2014 NaN/Date/order-sensitivity edge surface is axis-critical.",
+ *   "expected_tier_signature": "monotonic_improving",
+ *   "known_confounds": []
+ * }
+ */
+
 import { describe, it, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';

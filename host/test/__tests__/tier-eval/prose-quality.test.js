@@ -21,6 +21,24 @@
 // Reference: host/llama-server/docs/TODO-PROSE-SMUSH.md,
 //            host/test/docs/MODEL-AB-RESULTS.md.
 
+/** @manifest
+ * {
+ *   "test_id": "prose-quality",
+ *   "test_version": "v1",
+ *   "primary_axis": "productivity",
+ *   "secondary_axes": [
+ *     "local_usability"
+ *   ],
+ *   "suite_layer": "B",
+ *   "difficulty_band": "easy",
+ *   "oracle_type": "rubric",
+ *   "keep_drop_rule": "Keep \u2014 sole existing productivity-axis signal until Sprint 3 lands judge-graded productivity tests. Rubric is deterministic newline/bullet counts.",
+ *   "expected_tier_signature": "tier_insensitive",
+ *   "known_confounds": [],
+ *   "notes": "Productivity axis is otherwise unmeasured; revisit classification once Sprint 3 productivity families ship."
+ * }
+ */
+
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 

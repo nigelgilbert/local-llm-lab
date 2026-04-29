@@ -16,6 +16,24 @@
 // for the comparison table. The roundtrip suite does assert wrap rate ≥ 0.9
 // as a grammar-health sanity check.
 
+/** @manifest
+ * {
+ *   "test_id": "latency",
+ *   "test_version": "v1",
+ *   "primary_axis": "local_usability",
+ *   "secondary_axes": [
+ *     "tool_discipline"
+ *   ],
+ *   "suite_layer": "A",
+ *   "difficulty_band": "easy",
+ *   "oracle_type": "public_verifier",
+ *   "keep_drop_rule": "Never drop \u2014 Layer-A health metric. Latency numbers are informational; only wrap-rate >= 0.9 is asserted.",
+ *   "expected_tier_signature": "tier_insensitive",
+ *   "known_confounds": [],
+ *   "notes": "Layer A: results must not be aggregated into model pass-rate comparisons."
+ * }
+ */
+
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 

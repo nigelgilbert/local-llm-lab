@@ -1,0 +1,173 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://mac-llm-lab/schemas/run_registry.schema.json",
+  "title": "Tier-Eval v2 Run Registry Row",
+  "description": "Canonical schema for one row in the tier-eval v2 run registry. See host/test/docs/TIER-EVAL-V2-SPRINT-PLAN.md §3 (Sprint 0.1) and the source strategy doc §6.2. Every sweep row — production, pilot, smoke, dry_run, overnight_screen, admission — lands here. Hardware fields are intentionally minimal: tier-16/32/64 each map to a single physical machine, so hardware_id and soc_generation are omitted.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "run_id",
+    "run_kind",
+    "canonical_status",
+    "hardware_tier",
+    "memory_gb",
+    "model_config_id",
+    "test_id",
+    "test_version",
+    "oracle_type",
+    "harness_version",
+    "start_time",
+    "terminal_status"
+  ],
+  "properties": {
+    "run_id": {
+      "type": "string",
+      "description": "Stable row identity. UUID v4 from the harness side."
+    },
+    "run_kind": {
+      "type": "string",
+      "enum": [
+        "production",
+        "pilot",
+        "archived",
+        "smoke",
+        "dry_run",
+        "diagnostic",
+        "admission",
+        "overnight_screen",
+        "confirmatory"
+      ],
+      "description": "What kind of run this row represents. Production lower-tier sweeps cannot start until the Sprint 0 sign-off gate (§3 of the sprint plan) is met."
+    },
+    "canonical_status": {
+      "type": "string",
+      "enum": [
+        "canonical",
+        "legacy-compatible",
+        "legacy-asterisked",
+        "excluded"
+      ],
+      "description": "Bucket label for dashboarding. `canonical` rows are the default population; `legacy-*` rows must be visibly tagged in any aggregate; `excluded` rows must not be aggregated."
+    },
+    "hardware_tier": {
+      "type": "integer",
+      "enum": [16, 32, 64],
+      "description": "Memory-target tier in GB. Single physical machine per tier."
+    },
+    "memory_gb": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Physical memory of the machine that produced this row. Should match hardware_tier for canonical rows."
+    },
+    "model_config_id": {
+      "type": "string",
+      "description": "Stable key into the model-config manifest (Sprint 0.2). Resolves to model_id, family, parameter_count, quantization, context_limit, runtime_backend, sampler_config_id, harness_version, prompt_pack_version."
+    },
+    "model_id": {
+      "type": "string",
+      "description": "Convenience denormalization of the model_id from the model-config manifest. Required for any row that aggregates without joining to the manifest."
+    },
+    "quantization": {
+      "type": ["string", "null"],
+      "description": "Quantization format and parameters (e.g. `Q4_K_M`, `MLX-4bit`). Denormalized from model_config_id."
+    },
+    "context_limit": {
+      "type": ["integer", "null"],
+      "minimum": 1,
+      "description": "Effective context window available to the harness for this run. Denormalized from model_config_id."
+    },
+    "sampler_config_id": {
+      "type": "string",
+      "description": "Stable key for the sampler settings (temperature, top-p, top-k, presence penalty, seed policy) used in this run."
+    },
+    "seed": {
+      "type": ["integer", "null"],
+      "description": "Random seed if the sampler/task generator supports one. Required for paired comparisons; null for unseeded sampling."
+    },
+    "harness_version": {
+      "type": "string",
+      "description": "Git SHA or release identifier of the test harness."
+    },
+    "prompt_pack_version": {
+      "type": ["string", "null"],
+      "description": "System / developer / task prompt pack version. Null if not yet versioned."
+    },
+    "test_id": {
+      "type": "string",
+      "description": "Stable test family identifier. For Sprint 1 this is the basename of a file under host/test/__tests__/tier-eval/ (e.g. `expression-eval`, `csv-parser`)."
+    },
+    "test_version": {
+      "type": "string",
+      "description": "Exact prompt/verifier version for this test. Bump when the prompt or oracle changes."
+    },
+    "oracle_type": {
+      "type": "string",
+      "enum": [
+        "public_verifier",
+        "hidden_holdout",
+        "rubric",
+        "judge",
+        "human"
+      ],
+      "description": "How pass/fail was determined. Hidden-holdout rows come from the gitignored host/test/__tests__/tier-eval-hidden/ directory."
+    },
+    "timeout_budget_ms": {
+      "type": ["integer", "null"],
+      "minimum": 0,
+      "description": "Time budget in milliseconds enforced for this run. Iteration budgets, if applicable, go in `iteration_budget`."
+    },
+    "iteration_budget": {
+      "type": ["integer", "null"],
+      "minimum": 0,
+      "description": "Iteration budget for this run, if the harness enforces one separately from the time budget."
+    },
+    "start_time": {
+      "type": "string",
+      "format": "date-time",
+      "description": "ISO-8601 timestamp at run start."
+    },
+    "end_time": {
+      "type": ["string", "null"],
+      "format": "date-time",
+      "description": "ISO-8601 timestamp at run end. Null if the run aborted before completion telemetry could fire."
+    },
+    "terminal_status": {
+      "type": "string",
+      "enum": [
+        "done",
+        "error",
+        "timeout",
+        "interrupted",
+        "harness_error"
+      ],
+      "description": "Why the run stopped. `harness_error` runs are excluded from model-task pass-rate comparisons (Layer A discipline)."
+    },
+    "passed": {
+      "type": ["boolean", "null"],
+      "description": "Final model-task pass/fail. Null when terminal_status is `harness_error` or `interrupted` and pass/fail cannot be assessed."
+    },
+    "harness_error": {
+      "type": ["string", "null"],
+      "description": "Typed error category if terminal_status indicates a harness-side problem (e.g. `bridge_unreachable`, `assertion_emit_failed`)."
+    },
+    "thermal_status": {
+      "type": "string",
+      "enum": [
+        "clean",
+        "warning",
+        "contaminated",
+        "unknown"
+      ],
+      "description": "Thermal flag from the Sprint 0.7 telemetry hook. `contaminated` rows must be excluded from clean latency/throughput comparisons; rerun if pass/fail itself is suspect or the row is part of an admission gate."
+    },
+    "trace_artifact_uri": {
+      "type": ["string", "null"],
+      "description": "Path or URI to the run's trace artifacts (iterations.jsonl, run_summary.json, sessions/, bridge.iterations.jsonl). Typically `host/test/.claw-runtime/<run_id>/`."
+    },
+    "screening_only": {
+      "type": "boolean",
+      "default": false,
+      "description": "True for overnight_screen rows. When true, the row must not be used for durable keep/drop, model admission, or sampler comparison decisions."
+    }
+  }
+}

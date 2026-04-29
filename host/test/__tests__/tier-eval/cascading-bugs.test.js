@@ -12,6 +12,25 @@
 //
 // Target: very hard (long-horizon agentic).
 
+/** @manifest
+ * {
+ *   "test_id": "cascading-bugs",
+ *   "test_version": "v1",
+ *   "primary_axis": "convergence",
+ *   "secondary_axes": [
+ *     "tool_discipline"
+ *   ],
+ *   "suite_layer": "B",
+ *   "difficulty_band": "hard",
+ *   "oracle_type": "public_verifier",
+ *   "keep_drop_rule": "Keep \u2014 multi-cycle iteration is core to convergence axis.",
+ *   "expected_tier_signature": "monotonic_improving",
+ *   "known_confounds": [
+ *     "context_pressure_high"
+ *   ]
+ * }
+ */
+
 import { describe, it, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';

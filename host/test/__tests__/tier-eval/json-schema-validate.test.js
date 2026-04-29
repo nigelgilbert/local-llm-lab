@@ -8,6 +8,25 @@
 //
 // Target: hard.
 
+/** @manifest
+ * {
+ *   "test_id": "json-schema-validate",
+ *   "test_version": "v1",
+ *   "primary_axis": "spec_precision",
+ *   "secondary_axes": [
+ *     "stateful_logic"
+ *   ],
+ *   "suite_layer": "B",
+ *   "difficulty_band": "hard",
+ *   "oracle_type": "public_verifier",
+ *   "keep_drop_rule": "Keep \u2014 recursive structure + path tracking is axis-critical for spec_precision.",
+ *   "expected_tier_signature": "monotonic_improving",
+ *   "known_confounds": [
+ *     "context_pressure_high"
+ *   ]
+ * }
+ */
+
 import { describe, it, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';

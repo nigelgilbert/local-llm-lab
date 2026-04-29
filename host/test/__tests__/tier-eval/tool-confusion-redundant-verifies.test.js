@@ -17,6 +17,23 @@
 // this becomes a redundant easy A-class test. Worth piloting with both
 // samplers since v1-prod is more likely to wander.
 
+/** @manifest
+ * {
+ *   "test_id": "tool-confusion-redundant-verifies",
+ *   "test_version": "v1",
+ *   "primary_axis": "tool_discipline",
+ *   "secondary_axes": [
+ *     "convergence"
+ *   ],
+ *   "suite_layer": "B",
+ *   "difficulty_band": "medium",
+ *   "oracle_type": "public_verifier",
+ *   "keep_drop_rule": "Do not drop until tier-32 and tier-16 are measured (strategy doc \u00a72.1 flags as too-easy at tier-64; predicted dominant trace tag is `bash-loop-no-progress`).",
+ *   "expected_tier_signature": "unknown",
+ *   "known_confounds": []
+ * }
+ */
+
 import { describe, it, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';

@@ -14,6 +14,25 @@
 //
 // Target: hard (saturated tier-64 ceiling probe).
 
+/** @manifest
+ * {
+ *   "test_id": "long-horizon-bugs",
+ *   "test_version": "v1",
+ *   "primary_axis": "convergence",
+ *   "secondary_axes": [
+ *     "tool_discipline"
+ *   ],
+ *   "suite_layer": "C",
+ *   "difficulty_band": "hard",
+ *   "oracle_type": "public_verifier",
+ *   "keep_drop_rule": "Keep in Layer C \u2014 trace interpretation matters more than the binary pass rate here.",
+ *   "expected_tier_signature": "monotonic_improving",
+ *   "known_confounds": [
+ *     "context_pressure_high"
+ *   ]
+ * }
+ */
+
 import { describe, it, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';

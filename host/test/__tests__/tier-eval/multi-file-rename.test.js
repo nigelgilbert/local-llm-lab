@@ -12,6 +12,23 @@
 // post-condition fails. Expected differentiator: planning + completing
 // multi-step edits without dropping a step.
 
+/** @manifest
+ * {
+ *   "test_id": "multi-file-rename",
+ *   "test_version": "v1",
+ *   "primary_axis": "multi_file_context",
+ *   "secondary_axes": [
+ *     "convergence"
+ *   ],
+ *   "suite_layer": "B",
+ *   "difficulty_band": "medium",
+ *   "oracle_type": "public_verifier",
+ *   "keep_drop_rule": "Keep \u2014 minimal multi-file refactor; pairs with api-evolution and large-refactor at increasing scale.",
+ *   "expected_tier_signature": "monotonic_improving",
+ *   "known_confounds": []
+ * }
+ */
+
 import { describe, it, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';

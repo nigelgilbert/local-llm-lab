@@ -8,6 +8,25 @@
 //
 // Target: very hard (frontier ceiling).
 
+/** @manifest
+ * {
+ *   "test_id": "mini-vm",
+ *   "test_version": "v1",
+ *   "primary_axis": "stateful_logic",
+ *   "secondary_axes": [
+ *     "spec_precision"
+ *   ],
+ *   "suite_layer": "B",
+ *   "difficulty_band": "hard",
+ *   "oracle_type": "public_verifier",
+ *   "keep_drop_rule": "Keep \u2014 multi-opcode interaction surface is axis-critical for stateful_logic.",
+ *   "expected_tier_signature": "monotonic_improving",
+ *   "known_confounds": [
+ *     "context_pressure_high"
+ *   ]
+ * }
+ */
+
 import { describe, it, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';

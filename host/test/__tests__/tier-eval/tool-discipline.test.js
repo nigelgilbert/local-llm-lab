@@ -6,6 +6,24 @@
 // model's native tool-call format is incompatible with the grammar schema —
 // the wrapper is forced but the JSON payload inside may be malformed.
 
+/** @manifest
+ * {
+ *   "test_id": "tool-discipline",
+ *   "test_version": "v1",
+ *   "primary_axis": "tool_discipline",
+ *   "secondary_axes": [
+ *     "local_usability"
+ *   ],
+ *   "suite_layer": "A",
+ *   "difficulty_band": "easy",
+ *   "oracle_type": "rubric",
+ *   "keep_drop_rule": "Never drop \u2014 Layer-A grammar-health gate. Asserts wrap_rate >= 0.9.",
+ *   "expected_tier_signature": "tier_insensitive",
+ *   "known_confounds": [],
+ *   "notes": "Layer A: model/config cannot enter the core grid until this passes."
+ * }
+ */
+
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 
