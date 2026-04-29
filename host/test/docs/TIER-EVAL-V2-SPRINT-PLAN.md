@@ -296,6 +296,10 @@ Sprint 1's first half-day landed alongside Sprint 0 sign-off — these are the b
 | 1.9 | Multi-tier confirmatory (16 → 32 → 64, EVAL_REPS=1) | **done** 2026-04-29 — 80 min wallclock, plist swaps clean (tier-32 cold-load 4s, tier-64 cold-load 6s). 32 registry rows landed: tier-16 9 rows (2 pass / 7 fail), tier-32 11 rows (3 pass / 8 fail), tier-64 12 rows (12 pass / 0 fail). Auto-emit fired correctly on every runClaw-using test that called `writeAssertionResult`. The cross-tier discrimination matrix is already showing perfect FAIL→FAIL→PASS discriminators (`csv-parser`, `deep-equal`, `eight-functions`, `large-refactor`, `lru-cache`, `tool-confusion-redundant-verifies`) and one ceiling/floor (`agent-single` PASS at all 3 tiers). Throughput-drift fired on 4/9 tier-16 rows vs 1/12 tier-64 rows — likely a real warmup-pattern signal on smaller models, worth tuning the drop_pct thresholds before treating it as load-bearing. |
 | 1.10 | Coverage gap: 23/35 tier-eval tests don't call writeAssertionResult | **done** 2026-04-29 — added `writeAssertionResult(r.runDir, { passed, claw_exit, target_file_exists, post_status, post_stderr_tail })` to 20 emit-eligible tests (every runClaw-using test except the 3 stay-exempt: latency, tool-discipline, prose-quality, which use streamMessage directly). Pattern: compute `passed` as the AND of `r.code===0`, target-file-exists (where applicable), and post-script `status===0`; insert the emit call after observations are made but BEFORE the assert chain so a failed test still produces a row. Verified by tier-64 smoke (`EVAL_REPS=1 EVAL_TIERS=64`, label `sprint1-10-smoke-20260429-1528`): **31 rows** (vs 12 in 1.9), all `passed=true` on tier-64, manifest joins clean (v1 + public_verifier on every row). The one missing emit is `mini-vm` — claw timed out at 240s on tier-64, throwing before the test reached `writeAssertionResult`; closing that gap is a separate problem (raise mini-vm's `CLAW_TIMEOUT`, or wrap runClaw failures in a try/finally that emits even on timeout). Throughput-drift `contaminated` again fired on 5/31 rows on the cleanest tier (csv-parser, deep-equal, expression-eval, multi-bug-decoy, subtle-broken-spec) — consistent with 1.9's warmup-pattern observation; threshold tuning still pending. |
 | 1.11 | run-overnight-screen.sh CSV export bug | **fixed** — script was calling `node` directly on the host where it isn't installed. Switched to `docker run --rm node:24-bookworm-slim`. The post-sweep CSV-view step warned but didn't fail the sweep (the JSONL is the authoritative artifact); fix is a polish-grade improvement for future runs. |
+| 1.12 | Demote drift-only thermal flags to advisory | **pending** — research-team direction (memo `TIER-EVAL-MEMO-20260429-pre-overnight.md`, response 2026-04-29): `thermal_status` should no longer escalate to `contaminated` from throughput-drift alone. Drift remains preserved as raw telemetry — proposed shape: `thermal_status` ∈ {`clean`, `warning`, `pmset_contaminated`, `unknown`} (drops the drift-only `contaminated` value), and a separate `thermal_drift_advisory` boolean column carries the drift signal. Sprint 2's matrix uses `thermal_status` for inclusion decisions and the advisory column for diagnostic context. Affects `lib/run_row.js` and `lib/telemetry.js`; schema needs a small change to add the advisory column and tighten the `thermal_status` enum. |
+| 1.13 | Timeout-as-row + schema loosening | **pending** — research-team direction (same memo): every attempted (test × tier × rep) cell must produce a row, so Wilson CIs in Sprint 2 are computed against planned N, not observed N. Change: wrap the `runClaw` call in a try/finally inside `writeAssertionResult`'s call sites — or, cleaner, make `runClaw` itself catch its own timeout and return a structured result (`{ code: null, terminal_status: 'timeout', runDir, ... }`) instead of throwing. Auto-emit then fires a row with `passed=false`, `terminal_status='timeout'`, `claw_exit=null`. Distinct from `terminal_status='harness_error'` (setup/spawn failure) so Sprint 2 can compute `harness_error_rate` and `timeout_rate` separately. Schema work: loosen `passed` and `claw_exit` to allow null when `terminal_status ∈ {'timeout','harness_error'}`; add the `terminal_status` enum if it isn't already structurally captured. |
+| 1.14 | Expected-attempt manifest + observed-vs-expected diff | **pending** — research-team direction (same memo, "expected row count is clarified before kickoff"): emit a static CSV before the sweep enumerating every planned (test × tier × rep) cell. Post-sweep, diff observed JSONL against expected manifest to surface any cells that were planned but produced no row (would indicate a harness drop, not a model fail). Adds `scripts/expected-attempts.mjs`; the overnight driver writes `expected_attempts.<sweep>.csv` alongside the registry JSONL. |
+| 1.15 | Short-timeout smoke test for timeout-as-row | **pending** — research-team checklist item: "short-timeout smoke test proves planned attempts == emitted rows." Run a tier-64 single-test smoke with `CLAW_TIMEOUT=5_000` (or similar deliberately-too-short cap) so claw is guaranteed to hit the timeout, and verify a row lands with `terminal_status='timeout'`, `passed=false`, populated start/end timestamps. Validates 1.13 end-to-end against a real claw invocation, not just unit tests. |
 
 **Sprint 1 entry criteria for the actual overnight (not yet met):**
 
@@ -308,5 +312,24 @@ Sprint 1's first half-day landed alongside Sprint 0 sign-off — these are the b
   ```
 - `RUN_REGISTRY_PATH` set to a sweep-specific path (e.g. `host/test/.claw-runtime/run_registry.overnight-2026-04-29.jsonl`) so the canonical jsonl stays clean if the run aborts.
 - Harness pinned to a single git SHA across all three tier runs (no rebuilds mid-sweep).
+- Deliverables 1.12 – 1.15 landed (research-team pre-flight requirements).
 
-When the user is ready to kick off the real overnight, deliverables 1.5 + 1.6 are the remaining ~half-day of work; 1.7 falls out of running them.
+**Expected output sizing (revised 2026-04-29, post research-team review):**
+
+The pre-overnight memo's "~105 rows" projection was wrong by an order of
+magnitude. Correct projection from 1.10's tier-64 smoke (31 emit-eligible
+cells per rep, post-coverage-fix):
+
+- ≈ 31 cells/rep × 3 tiers × 10 reps = **~930 rows expected**, plus
+  whatever 1.13 surfaces from previously-dropped timeouts.
+- Wallclock revised from "~10 hours" to **~13–14 hours** based on 1.9's
+  80-minute multi-tier `EVAL_REPS=1` baseline scaled linearly. Plist-swap
+  overhead is amortized (3 swaps total, not 30).
+- Expected cells per tier scale with how often the model times out: tier-16
+  will produce ~31 timeout/fail rows where it produces 7 completion rows
+  today, so the row count is biased high relative to the 1.9 + 1.10
+  pattern. 1.14's expected-attempt manifest is the authoritative count.
+
+When the user is ready to kick off the real overnight, deliverables
+1.12 – 1.15 are the remaining pre-flight work (~½ day of engineering, no
+added eval-sweep wallclock per the research-team review).
