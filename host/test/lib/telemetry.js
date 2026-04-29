@@ -1,16 +1,26 @@
-// Thermal + throughput telemetry (Sprint 0.7).
+// Thermal + throughput telemetry (Sprint 0.7, Sprint 1.12 split).
 //
-// Goal: populate `thermal_status ∈ {clean, warning, contaminated, unknown}`
-// on every run-registry row without requiring sudo on the host.
+// Sprint 1.12 (research-team direction, 2026-04-29 memo): throughput-drift
+// no longer escalates `thermal_status` — it is a separate boolean advisory
+// column. `thermal_status` is sourced exclusively from the pmset sidecar
+// hint file. Reasoning: drift fired on the cleanest tier (5/31 tier-64
+// rows) in the 1.10 smoke, suggesting it tracks warmup-phase decode rather
+// than thermal events. Keep the signal as raw telemetry; don't let it
+// degrade the per-row inclusion label.
 //
-// Strategy (no-sudo default):
-//   1. A host-side sidecar (host/test/scripts/thermal-watch.sh) polls
-//      `pmset -g therm` once per second and writes the latest result to
+// New shape:
+//   thermal_status ∈ {clean, warning, pmset_contaminated, unknown}
+//                    (drops the drift-only `contaminated` value)
+//   thermal_drift_advisory ∈ {true, false}
+//
+// Pmset hint sidecar (unchanged):
+//   1. host/test/scripts/thermal-watch.sh polls `pmset -g therm` once per
+//      second and writes the latest result to
 //      host/test/.claw-runtime/.thermal-hint.json (visible inside the
 //      container at /workspace/.claw-runtime/.thermal-hint.json via the
 //      existing volume mount).
 //   2. If the sidecar is not running, the hint file is missing/stale and we
-//      report `unknown`.
+//      report `thermal_status = unknown`.
 //
 // Hint-file schema:
 //   {
@@ -21,17 +31,13 @@
 //     "raw": "<verbatim pmset output>"
 //   }
 //
-// Throughput drift secondary signal:
-//   captureThroughputSignal(iterRecords) computes a tokens/sec trend from the
-//   per-iteration server_decode_ms + output_tokens already collected by
-//   claw.js. A monotonic decline of >25% from the run's median tokens/sec to
-//   its final-third median tokens/sec, sustained across >=3 iterations,
-//   raises the status to at least `warning` (independent of the pmset hint).
-//
-// Status combination:
-//   final_status = max(pmset_status, throughput_status)
-//     where ordering is: clean < warning < contaminated; unknown is the
-//     floor only when no other signal is available.
+// Throughput drift advisory (informational only post-1.12):
+//   captureThroughputAdvisory(iterRecords) computes a tokens/sec trend from
+//   per-iteration server_decode_ms + output_tokens. Returns
+//   `{ advisory: boolean, drop_pct, ... }`. The advisory boolean fires when
+//   median throughput drops by warningDropPct (default 25%) from the
+//   run's first-third to its final-third. Sprint 2's matrix uses this as
+//   diagnostic context, not an inclusion gate.
 
 import fs from 'node:fs';
 import path from 'node:path';
@@ -49,16 +55,16 @@ const HINT_PATH = path.join(WORKSPACE, '.claw-runtime', '.thermal-hint.json');
 const HINT_STALENESS_MS = 10_000;
 
 // pmset thermal_warning levels in escalating order. Anything from "Heavy"
-// upward forces `contaminated`; "Moderate" yields `warning`.
+// upward forces `pmset_contaminated`; "Moderate" yields `warning`.
 const PMSET_LEVELS = {
   Nominal:    'clean',
   Moderate:   'warning',
-  Heavy:      'contaminated',
-  Trapping:   'contaminated',
-  Sleeping:   'contaminated',
+  Heavy:      'pmset_contaminated',
+  Trapping:   'pmset_contaminated',
+  Sleeping:   'pmset_contaminated',
 };
 
-const STATUS_ORDER = { unknown: -1, clean: 0, warning: 1, contaminated: 2 };
+const STATUS_ORDER = { unknown: -1, clean: 0, warning: 1, pmset_contaminated: 2 };
 
 export function captureThermalStatus({ now = Date.now(), hintPath = HINT_PATH } = {}) {
   if (!fs.existsSync(hintPath)) return { status: 'unknown', source: 'no_hint_file' };
@@ -89,20 +95,21 @@ export function captureThermalStatus({ now = Date.now(), hintPath = HINT_PATH } 
   };
 }
 
-// Compute a throughput-drift signal from the per-iteration records produced
-// by claw.js. Returns { status, source, ... } with status in {clean,warning,contaminated,unknown}.
+// Compute a throughput-drift advisory from per-iteration records produced
+// by claw.js. Sprint 1.12: returns an advisory boolean rather than a
+// thermal_status escalation — drift is informational, not an inclusion
+// gate. Schema column: `thermal_drift_advisory`.
 //
 // We use server_total_ms (LiteLLM-observed upstream wallclock) divided by
 // output_tokens as a per-iteration tokens-per-ms proxy. The decode-only
 // signal (server_decode_ms) is preferred when present but is null in
 // streaming-only configs (see claw.js timing_caveats).
-export function captureThroughputSignal(iterRecords, {
+export function captureThroughputAdvisory(iterRecords, {
   warningDropPct = 25,
-  contaminationDropPct = 40,
   minIterations = 6,
 } = {}) {
   if (!Array.isArray(iterRecords) || iterRecords.length < minIterations) {
-    return { status: 'unknown', source: 'too_few_iterations', n: iterRecords?.length ?? 0 };
+    return { advisory: false, source: 'too_few_iterations', n: iterRecords?.length ?? 0 };
   }
   const tokSec = iterRecords
     .map((r) => {
@@ -117,7 +124,7 @@ export function captureThroughputSignal(iterRecords, {
     .filter((x) => x != null);
 
   if (tokSec.length < minIterations) {
-    return { status: 'unknown', source: 'insufficient_throughput_samples', n: tokSec.length };
+    return { advisory: false, source: 'insufficient_throughput_samples', n: tokSec.length };
   }
 
   const median = (arr) => {
@@ -128,29 +135,17 @@ export function captureThroughputSignal(iterRecords, {
 
   const baseline = median(tokSec.slice(0, Math.max(1, Math.floor(tokSec.length / 3))));
   const tail = median(tokSec.slice(-Math.max(1, Math.floor(tokSec.length / 3))));
-  if (baseline <= 0) return { status: 'unknown', source: 'baseline_nonpositive' };
+  if (baseline <= 0) return { advisory: false, source: 'baseline_nonpositive' };
   const dropPct = ((baseline - tail) / baseline) * 100;
 
-  let status = 'clean';
-  if (dropPct >= contaminationDropPct) status = 'contaminated';
-  else if (dropPct >= warningDropPct) status = 'warning';
-
   return {
-    status,
+    advisory: dropPct >= warningDropPct,
     source: 'throughput_drift',
     baseline_tokens_per_sec: baseline,
     tail_tokens_per_sec: tail,
     drop_pct: dropPct,
     n: tokSec.length,
   };
-}
-
-export function combineStatuses(statuses) {
-  const ranked = statuses
-    .map((s) => s?.status ?? 'unknown')
-    .filter((s) => s !== 'unknown');
-  if (ranked.length === 0) return 'unknown';
-  return worst(ranked);
 }
 
 function worst(statuses) {

@@ -16,9 +16,9 @@ without any new plumbing.
 
 It is sudo-free, available on every Mac, and produces an event-driven
 signal that maps cleanly to the registry's `thermal_status` enum
-(`clean` / `warning` / `contaminated` / `unknown`). It does not give you
-absolute SoC temperature in degrees — but the registry schema does not
-need that, only a contamination flag.
+(`clean` / `warning` / `pmset_contaminated` / `unknown`, post Sprint 1.12).
+It does not give you absolute SoC temperature in degrees — but the
+registry schema does not need that, only a contamination flag.
 
 If you later want quantitative temperature, add `macmon` (Rust, Apple
 Silicon native) plus a passwordless-sudo sudoers entry scoped to that one
@@ -56,15 +56,17 @@ Stop it with `Ctrl-C` when the sweep finishes. A missing or stale
 event since boot — the baseline "everything is fine" state, which the
 hook maps to `thermal_status=clean`. When a real event fires
 (throttling, sustained heat), the field populates with the pmset level
-name and the hook escalates to `warning` or `contaminated` per
-`PMSET_LEVELS` in `lib/telemetry.js`.
+name and the hook escalates to `warning` or `pmset_contaminated` per
+`PMSET_LEVELS` in `lib/telemetry.js`. Throughput-drift is no longer
+combined into `thermal_status` (Sprint 1.12); it lands in the separate
+`thermal_drift_advisory` boolean column via `captureThroughputAdvisory()`.
 
 ### Wiring into a sweep (Sprint 1)
 
 The hook is library-only in Sprint 0; the actual registry-row assembly
-that calls `captureThermalStatus()` + `captureThroughputSignal()` lands
-in Sprint 1's overnight-screen driver. Until then, the building blocks
-are:
+that calls `captureThermalStatus()` + `captureThroughputAdvisory()`
+lives in `lib/run_row.js`, exercised by the overnight-screen driver and
+the harvester. The building blocks are:
 
 - `lib/telemetry.js` — the read-side hook.
 - `lib/registry.js` — the registry writer; `thermal_status` is one of

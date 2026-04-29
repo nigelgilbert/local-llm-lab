@@ -145,10 +145,26 @@ export function runClaw({
         }
       }
 
+      // Sprint 1.13 (research-team direction, 2026-04-29 memo): on timeout,
+      // resolve with a structured result instead of rejecting. This lets the
+      // caller still call writeAssertionResult, so every attempted (test ×
+      // tier × rep) cell produces a registry row. Without this, a timeout
+      // throws before assertion_result.json is written and Sprint 2's Wilson
+      // CIs would be computed against observed N rather than planned N.
+      // Test files see r.code === null and r.terminal_status === 'timeout',
+      // and their existing assert.equal(r.code, 0) still fails the test —
+      // but the row has already landed.
       if (aborted) {
-        reject(new Error(
-          `claw timed out after ${timeoutMs}ms\nstderr:\n${stderr.slice(-1000)}`,
-        ));
+        resolve({
+          code: null,
+          signal: null,
+          stdout,
+          stderr,
+          elapsedMs,
+          terminal_status: 'timeout',
+          timeout: true,
+          ...extras,
+        });
         return;
       }
       resolve({ code, signal, stdout, stderr, elapsedMs, ...extras });
@@ -247,7 +263,11 @@ function maybeEmitRegistryRow(runDir) {
     runDir,
     iterationsPath: path.join(runDir, 'iterations.jsonl'),
     runSummaryPath: summaryPath,
-    code: typeof summary.exit_code === 'number' ? summary.exit_code : 0,
+    // Sprint 1.13: pass null through unchanged when claw aborted on timeout.
+    // run_summary.json's terminal_status='timeout' takes precedence in
+    // run_row.js's pickTerminalStatus, so the row reads correctly even with
+    // code=null.
+    code: typeof summary.exit_code === 'number' ? summary.exit_code : null,
     timeout: !!summary.timeout,
     signal: null,
     elapsedMs: summary.run_elapsed_ms ?? null,

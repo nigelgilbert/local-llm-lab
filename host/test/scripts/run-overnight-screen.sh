@@ -54,6 +54,7 @@ SWEEP_LABEL="${SWEEP_LABEL:-overnight-$(date +%Y%m%d-%H%M)}"
 DRY_RUN="${DRY_RUN:-0}"
 
 REGISTRY_PATH="$TEST_DIR/.claw-runtime/run_registry.${SWEEP_LABEL}.jsonl"
+EXPECTED_PATH="$TEST_DIR/.claw-runtime/expected_attempts.${SWEEP_LABEL}.csv"
 RESULTS_FILE="$TEST_DIR/logs/OVERNIGHT-SCREEN-${SWEEP_LABEL}.md"
 mkdir -p "$TEST_DIR/logs" "$TEST_DIR/.claw-runtime"
 
@@ -135,16 +136,31 @@ wait_llama() {
 
 if [ "$DRY_RUN" = "1" ]; then
   log "DRY_RUN=1 — printing plan and exiting before any plist swap or claw call."
-  log "  Tiers:  $EVAL_TIERS"
-  log "  Reps:   $EVAL_REPS"
-  log "  Sweep:  $SWEEP_LABEL"
-  log "  Reg:    $REGISTRY_PATH (would be created on real run)"
-  log "  Log:    $RESULTS_FILE  (would be created on real run)"
+  log "  Tiers:    $EVAL_TIERS"
+  log "  Reps:     $EVAL_REPS"
+  log "  Sweep:    $SWEEP_LABEL"
+  log "  Reg:      $REGISTRY_PATH (would be created on real run)"
+  log "  Expected: $EXPECTED_PATH (would be created on real run)"
+  log "  Log:      $RESULTS_FILE  (would be created on real run)"
   for t in $EVAL_TIERS; do
     log "    tier-${t} → $(tier_config_id "$t")"
   done
   exit 0
 fi
+
+# ---- write expected-attempts manifest (Sprint 1.14) ----
+log ""
+log "==> writing expected-attempts manifest..."
+docker run --rm \
+  -v "$TEST_DIR:/test" \
+  -w /test \
+  node:24-bookworm-slim \
+  node /test/scripts/expected-attempts.mjs plan \
+    --tests-dir /test/__tests__/tier-eval \
+    --tiers "$EVAL_TIERS" \
+    --reps "$EVAL_REPS" \
+    --out "/test/.claw-runtime/$(basename "$EXPECTED_PATH")" \
+  || err "failed to write expected-attempts manifest"
 
 # ---- header ----
 {
@@ -235,9 +251,26 @@ docker run --rm \
   || log "WARN: registry-to-csv.mjs failed; jsonl is still authoritative"
 
 ROW_COUNT=$(wc -l < "$REGISTRY_PATH" 2>/dev/null || echo 0)
+
+# ---- post-sweep observed-vs-expected diff (Sprint 1.14) ----
+log ""
+log "==> diffing observed JSONL vs expected manifest..."
+DIFF_OUT="$TEST_DIR/.claw-runtime/expected_attempts.${SWEEP_LABEL}.diff.txt"
+docker run --rm \
+  -v "$TEST_DIR:/test" \
+  -w /test \
+  node:24-bookworm-slim \
+  node /test/scripts/expected-attempts.mjs diff \
+    --expected "/test/.claw-runtime/$(basename "$EXPECTED_PATH")" \
+    --registry "/test/.claw-runtime/$(basename "$REGISTRY_PATH")" \
+  | tee "$DIFF_OUT" \
+  || log "WARN: observed diverged from expected; see $DIFF_OUT"
+
 log ""
 log "==> done"
 log "    sweep label:  $SWEEP_LABEL"
 log "    registry:     $REGISTRY_PATH ($ROW_COUNT rows)"
 log "    csv view:     ${REGISTRY_PATH%.jsonl}.csv"
+log "    expected:     $EXPECTED_PATH"
+log "    diff:         $DIFF_OUT"
 log "    log:          $RESULTS_FILE"

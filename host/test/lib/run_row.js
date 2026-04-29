@@ -34,7 +34,7 @@ import path from 'node:path';
 
 import { appendRow, validateRow, REGISTRY_PATH, RegistryValidationError } from './registry.js';
 import { resolveConfig } from './model_config.js';
-import { captureThermalStatus, captureThroughputSignal, combineStatuses } from './telemetry.js';
+import { captureThermalStatus, captureThroughputAdvisory } from './telemetry.js';
 
 const TERMINAL_STATUS_ALLOWED = new Set(['done', 'error', 'timeout', 'interrupted', 'harness_error']);
 
@@ -70,11 +70,13 @@ export function assembleRow(clawResult, ctx) {
   // lib/model_configs.json by default.
   const config = resolveConfig(ctx.model_config_id, { manifestPath: ctx.manifestPath });
 
-  // Thermal: combine the pmset hint with throughput-drift on the iter records.
+  // Sprint 1.12: thermal_status comes from pmset only. Drift is preserved as
+  // a separate advisory boolean column rather than an inclusion-gating signal.
   const iterRecords = readIterationsJsonl(clawResult.iterationsPath);
   const thermalHint = captureThermalStatus({ now: ctx.now });
-  const throughputHint = captureThroughputSignal(iterRecords);
-  const thermal_status = combineStatuses([thermalHint, throughputHint]);
+  const driftAdvisory = captureThroughputAdvisory(iterRecords);
+  const thermal_status = thermalHint.status;
+  const thermal_drift_advisory = !!driftAdvisory.advisory;
 
   // Pull `passed` and timestamps from sidecar artifacts. assertion_result.json
   // is written by tier-eval tests via writeAssertionResult; its `passed` field
@@ -114,6 +116,7 @@ export function assembleRow(clawResult, ctx) {
     passed,
     harness_error: ctx.harness_error ?? null,
     thermal_status,
+    thermal_drift_advisory,
     trace_artifact_uri: clawResult.runDir ?? null,
     screening_only: ctx.screening_only ?? (ctx.run_kind === 'overnight_screen'),
   };
