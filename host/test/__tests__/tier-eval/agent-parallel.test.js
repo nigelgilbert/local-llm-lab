@@ -24,7 +24,7 @@
 import { describe, it, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { runClaw } from '../../lib/claw.js';
+import { runClaw, writeAssertionResult } from '../../lib/claw.js';
 import * as workspace from '../../lib/workspace.js';
 import { clawModel, TIER_LABEL } from '../../lib/tier.js';
 
@@ -54,6 +54,18 @@ describe(`agent: parallel file writes (tier=${TIER_LABEL})`, () => {
     console.log(`\n=== agent-parallel (${TIER_LABEL}) ===`);
     console.log(`  exit=${r.code} elapsed=${r.elapsedMs}ms files=${JSON.stringify(workspace.list())}`);
     if (r.code !== 0) console.log(`  stderr (tail):\n${r.stderr.slice(-1500)}`);
+
+    const allFilesPresent = EXPECTED.every(({ file }) => workspace.exists(file));
+    const allContentsMatch = allFilesPresent &&
+      EXPECTED.every(({ file, match }) => match.test(workspace.read(file)));
+
+    writeAssertionResult(r.runDir, {
+      passed: r.code === 0 && allFilesPresent && allContentsMatch,
+      claw_exit: r.code,
+      target_file_exists: allFilesPresent,
+      post_status: allContentsMatch ? 0 : 1,
+      post_stderr_tail: null,
+    });
 
     assert.equal(r.code, 0);
     for (const { file, match } of EXPECTED) {

@@ -33,7 +33,7 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { runClaw } from '../../lib/claw.js';
+import { runClaw, writeAssertionResult } from '../../lib/claw.js';
 import * as workspace from '../../lib/workspace.js';
 import { clawModel, TIER_LABEL } from '../../lib/tier.js';
 
@@ -207,9 +207,7 @@ describe(`mini-vm: bytecode interpreter (tier=${TIER_LABEL})`, () => {
     console.log(`  claw: exit=${r.code} elapsed=${r.elapsedMs}ms files=${JSON.stringify(workspace.list())}`);
     if (r.code !== 0) console.log(`  claw stderr (tail):\n${r.stderr.slice(-1500)}`);
 
-    assert.equal(r.code, 0, 'claw must exit cleanly');
-    assert.equal(workspace.exists('vm.js'), true, 'vm.js must be created');
-
+    const targetExists = workspace.exists('vm.js');
     const post = spawnSync('node', [path.join(workspace.WORKSPACE, 'verify.js')], {
       encoding: 'utf8',
       timeout:  5_000,
@@ -217,6 +215,16 @@ describe(`mini-vm: bytecode interpreter (tier=${TIER_LABEL})`, () => {
 
     console.log(`  node post-fix: exit=${post.status} stderr=${post.stderr.slice(0, 400).trim()}`);
 
+    writeAssertionResult(r.runDir, {
+      passed: r.code === 0 && targetExists && post.status === 0,
+      claw_exit: r.code,
+      target_file_exists: targetExists,
+      post_status: post.status,
+      post_stderr_tail: post.stderr.slice(0, 800),
+    });
+
+    assert.equal(r.code, 0, 'claw must exit cleanly');
+    assert.equal(targetExists, true, 'vm.js must be created');
     assert.equal(post.status, 0, `verify.js failed:\n${post.stderr.slice(0, 800)}`);
   });
 });

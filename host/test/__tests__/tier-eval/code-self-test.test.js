@@ -30,7 +30,7 @@ import { describe, it, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 
-import { runClaw } from '../../lib/claw.js';
+import { runClaw, writeAssertionResult } from '../../lib/claw.js';
 import * as workspace from '../../lib/workspace.js';
 import { clawModel, TIER_LABEL } from '../../lib/tier.js';
 
@@ -52,9 +52,7 @@ describe(`code self-test: fibonacci implementation (tier=${TIER_LABEL})`, () => 
     console.log(`  claw: exit=${r.code} elapsed=${r.elapsedMs}ms files=${JSON.stringify(workspace.list())}`);
     if (r.code !== 0) console.log(`  claw stderr (tail):\n${r.stderr.slice(-1500)}`);
 
-    assert.equal(r.code, 0, 'claw must exit cleanly');
-    assert.equal(workspace.exists('fib.js'), true, 'fib.js must be created');
-
+    const targetExists = workspace.exists('fib.js');
     const result = spawnSync('node', ['/workspace/fib.js'], {
       encoding: 'utf8',
       timeout:  10_000,
@@ -62,6 +60,16 @@ describe(`code self-test: fibonacci implementation (tier=${TIER_LABEL})`, () => 
 
     console.log(`  node: exit=${result.status} stdout=${result.stdout.slice(0, 200).trim()} stderr=${result.stderr.slice(0, 400).trim()}`);
 
+    writeAssertionResult(r.runDir, {
+      passed: r.code === 0 && targetExists && result.status === 0,
+      claw_exit: r.code,
+      target_file_exists: targetExists,
+      post_status: result.status,
+      post_stderr_tail: result.stderr.slice(0, 800),
+    });
+
+    assert.equal(r.code, 0, 'claw must exit cleanly');
+    assert.equal(targetExists, true, 'fib.js must be created');
     assert.equal(
       result.status,
       0,
