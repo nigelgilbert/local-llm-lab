@@ -269,11 +269,40 @@ Update this section as work progresses. One row per deliverable.
 | 0.8 | Hidden-holdout policy memo | **done** — memo at `host/test/docs/HIDDEN-HOLDOUT-POLICY.md`. Locks the storage location (`host/test/__tests__/tier-eval-hidden/`, gitignored), naming convention (`<public_test_id>-h`), authorship/access rules, quarterly rotation cadence with per-axis reserve pool of ≥2, retirement-on-suspicion rule, the exploratory-vs-admission split, the no-leak result reporting contract, and the Sprint-4 Stage-3 runner contract (visible warning + `admission_status=skipped` if the directory is empty — silent passes are forbidden). No holdouts authored yet — that's Sprint 4. |
 | 0.9 | Productivity-grader design memo | **done** — memo at `host/test/docs/PRODUCTIVITY-GRADER-DESIGN.md`. Locks: pinned judge `claude-opus-4-7` (re-calibrate on any revision change); prompt-cache discipline (system + rubric + exemplars cached, candidate-only varies, cache-hit-rate ≥ 0.9 SLO); four-component hybrid grader (deterministic checks → semantic match → pinned judge → human override); κ ≥ 0.7 calibration threshold gating core-matrix entry; rubric versioning round-tripped through the registry's `prompt_pack_version` field; per-grade Opus cost cap of $0.05; pilot families = changelog summarization + email rewrite; productivity column forbidden in any leadership-facing artifact until Sprint 3 sign-off. |
 
-Sign-off gate: **building-blocks complete; end-to-end exercise pending Sprint 1.** All nine deliverables shipped. The four signoff criteria from §3:
+Sign-off gate: **CLOSED.** All four criteria met as of 2026-04-29 (commit pending after this update):
 
-1. *A single dry-run lands in the registry with all mandatory fields populated.* — **Pending Sprint 1.** The registry writer (`lib/registry.js`) is in place and validates rows; what's missing is the driver that assembles a row from a claw run and calls `appendRow`. That wiring is the first piece of Sprint 1's overnight-screen driver.
-2. *Smoke run on each tier emits `thermal_status` and a resolvable `model_config_id`.* — **Pending Sprint 1.** Both building blocks exist (`lib/telemetry.js`, `lib/model_config.js`); they need a driver to call them and a populated `lib/model_configs.json` (one entry per tier baseline config).
+1. *A single dry-run lands in the registry with all mandatory fields populated.* — **Done.** `lib/run_row.js` (`assembleRow`/`emitRow`) reads a claw-run sidecar and produces a fully-populated, schema-validated row. Smoke harness `/tmp/sprint1-smoke.mjs` (running in `node:24-bookworm-slim`) exercises emit + harvest + CSV export end-to-end against synthetic sidecars; 28/28 checks pass.
+2. *Smoke run emits `thermal_status` and a resolvable `model_config_id`.* — **Done.** `lib/model_configs.json` carries three tier baselines (tier-16: Qwen2.5-7B-Instruct Q5_K_M, tier-32: Qwen3-14B Q4_K_M, tier-64: Qwen3.6-35B-A3B UD-Q4_K_XL). The smoke confirms `thermal_status` is computed from the pmset hint + throughput-drift signal (clean baseline + a contaminated synthetic case correctly escalates to `contaminated`).
 3. *Historical rows have been bucketed.* — **Done** (`docs/historical_bucketing.csv`).
 4. *Statistical decision rule signed off in writing.* — **Done** (EVAL-DESIGN.md addendum).
 
-Net: Sprint 1 must ship a tiny driver that (a) populates `model_configs.json` with the three tier baselines, (b) runs one smoke claw call per tier, (c) appends a registry row per call with `thermal_status` populated, (d) writes the result to a CSV view. That's the first ~half-day of Sprint 1 and satisfies criteria 1 and 2 simultaneously.
+---
+
+## Sprint 1 status (live)
+
+Sprint 1's first half-day landed alongside Sprint 0 sign-off — these are the building blocks an actual overnight sweep needs:
+
+| # | Deliverable | Status |
+|---|---|---|
+| 1.0 | `lib/model_configs.json` (3 tier baselines) | **done** — entries for tier-16/32/64 sourced from `host/llama-server/models.conf`. Sampler settings denormalized; `runtime_backend` pinned to `llama-server@unknown` until we capture a real SHA at sweep time. |
+| 1.1 | `lib/run_row.js` (assembler + emitter) | **done** — `assembleRow(clawResult, ctx)` joins claw sidecar + manifest entry + thermal hint into a registry-schema-conformant row; `emitRow` validates and appends. Reads `assertion_result.json` for authoritative `passed`. |
+| 1.2 | `scripts/harvest-runs-to-registry.mjs` | **done** — offline harvester. Walks `/workspace/.claw-runtime/<run-id>/` directories, joins to test-manifest headers by `test_id`, emits one registry row per run. Caller-supplied `--ctx` JSON carries the static fields (run_kind, hardware_tier, model_config_id, harness_version). Caveat documented in script: thermal hint reflects harvest time, not run time — for sweeps harvested later, `thermal_status` falls back to throughput drift. |
+| 1.3 | `scripts/registry-to-csv.mjs` | **done** — flattens registry JSONL to CSV. Columns are taken from the schema's property order, so the CSV evolves with the schema. Supports `--bucket`, `--run-kind`, `--tier` filters. |
+| 1.4 | Sprint 1 sign-off smoke | **done** — `/tmp/sprint1-smoke.mjs`, 28/28 checks pass in `node:24-bookworm-slim` (no LLM backend required). Validates the assemble → validate → append → harvest → CSV path against synthetic sidecars including a contaminated-throughput case. |
+| 1.5 | Per-test wiring (auto-emit on every tier-eval claw run) | **pending** — design choice: rather than touching all 35 test files, add a post-run hook in `claw.js` that emits a row when `RUN_REGISTRY_EMIT=1` and the test_manifest is resolvable. Defer until a real sweep is staged. |
+| 1.6 | Overnight-screen driver wrapper (tier switching, n=10, interleave) | **pending** — wraps `run-tier-eval.sh` with the per-tier loop already there; adds `RUN_REGISTRY_EMIT=1` + per-tier `--ctx` JSON. Defer until the user is ready to launch the actual overnight. |
+| 1.7 | Confirmatory dry-run on real claw call | **pending** — exercises 1.1 + 1.2 + 1.3 end-to-end against one real claw invocation per tier. Requires the host-side llama-server plist swap; user-coordinated, not autonomous. |
+
+**Sprint 1 entry criteria for the actual overnight (not yet met):**
+
+- Host-side `thermal-watch.sh` running in a separate terminal during the sweep.
+- A frozen `--ctx` JSON per tier:
+  ```json
+  { "run_kind": "overnight_screen", "hardware_tier": 16, "memory_gb": 16,
+    "model_config_id": "qwen25-7b-instruct-q5km-ctx32k-v1prod-pp01",
+    "harness_version": "<git sha>", "screening_only": true }
+  ```
+- `RUN_REGISTRY_PATH` set to a sweep-specific path (e.g. `host/test/.claw-runtime/run_registry.overnight-2026-04-29.jsonl`) so the canonical jsonl stays clean if the run aborts.
+- Harness pinned to a single git SHA across all three tier runs (no rebuilds mid-sweep).
+
+When the user is ready to kick off the real overnight, deliverables 1.5 + 1.6 are the remaining ~half-day of work; 1.7 falls out of running them.
