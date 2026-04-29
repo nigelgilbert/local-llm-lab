@@ -146,6 +146,28 @@ export function runClaw({
   });
 }
 
+/**
+ * Persist the eval-test assertion outcome alongside run_summary.json so
+ * `passed` can be propagated into the run table. Without this, run_summary.json
+ * sees `passed: null` and the failed-tail stratum misses runs where claw exits
+ * 0 but the verify-script assertion fails.
+ *
+ * Writes <runDir>/assertion_result.json. Best-effort — never throws.
+ */
+export function writeAssertionResult(runDir, payload) {
+  if (!runDir) return;
+  try {
+    fs.writeFileSync(
+      path.join(runDir, 'assertion_result.json'),
+      JSON.stringify({ ...payload, written_at_ms: Date.now() }, null, 2) + '\n',
+    );
+  } catch (e) {
+    console.error(
+      `[iter-distribution] writeAssertionResult failed for ${runDir}: ${e.message}`,
+    );
+  }
+}
+
 // --- W1 telemetry ------------------------------------------------------------
 
 function collectRunArtifacts({

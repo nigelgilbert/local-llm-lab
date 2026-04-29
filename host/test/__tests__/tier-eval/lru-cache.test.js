@@ -16,7 +16,7 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { runClaw } from '../../lib/claw.js';
+import { runClaw, writeAssertionResult } from '../../lib/claw.js';
 import * as workspace from '../../lib/workspace.js';
 import { clawModel, TIER_LABEL } from '../../lib/tier.js';
 
@@ -163,16 +163,26 @@ describe(`lru-cache: LRU + TTL + eviction callback (tier=${TIER_LABEL})`, () => 
     console.log(`  claw: exit=${r.code} elapsed=${r.elapsedMs}ms files=${JSON.stringify(workspace.list())}`);
     if (r.code !== 0) console.log(`  claw stderr (tail):\n${r.stderr.slice(-1500)}`);
 
-    assert.equal(r.code, 0, 'claw must exit cleanly');
-    assert.equal(workspace.exists('lru.js'), true, 'lru.js must be created');
+    const lruJsExists = workspace.exists('lru.js');
+    let post = null;
+    if (r.code === 0 && lruJsExists) {
+      post = spawnSync('node', [path.join(workspace.WORKSPACE, 'verify.js')], {
+        encoding: 'utf8',
+        timeout:  5_000,
+      });
+      console.log(`  node post-fix: exit=${post.status} stderr=${post.stderr.slice(0, 400).trim()}`);
+    }
 
-    const post = spawnSync('node', [path.join(workspace.WORKSPACE, 'verify.js')], {
-      encoding: 'utf8',
-      timeout:  5_000,
+    writeAssertionResult(r.runDir, {
+      passed: r.code === 0 && lruJsExists && post != null && post.status === 0,
+      claw_exit: r.code,
+      target_file_exists: lruJsExists,
+      post_status: post ? post.status : null,
+      post_stderr_tail: post ? post.stderr.slice(0, 800) : null,
     });
 
-    console.log(`  node post-fix: exit=${post.status} stderr=${post.stderr.slice(0, 400).trim()}`);
-
+    assert.equal(r.code, 0, 'claw must exit cleanly');
+    assert.equal(lruJsExists, true, 'lru.js must be created');
     assert.equal(post.status, 0, `verify.js failed:\n${post.stderr.slice(0, 800)}`);
   });
 });

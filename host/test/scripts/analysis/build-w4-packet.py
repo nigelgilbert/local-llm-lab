@@ -124,17 +124,22 @@ def cell_residuals(rs: list[dict]) -> dict[str, float]:
 def classify_stratum(run: dict) -> str:
     """Routes a run into 'failed-tail' or 'successful-tail'.
 
-    The run-table's `passed` field is null for every existing run (the test
-    result is not propagated into run_summary.json — see
-    sampler-arm-compare.py's `passed_count`). We use the same proxy it uses:
-    terminal_status == "done" AND exit_code == 0 → successful-tail.
-
-    failed-tail: terminal_status ∈ {timeout, error, harness_error,
-                 context_overflow} OR exit_code not in {"0", 0}.
-    successful-tail: terminal_status = "done" AND exit_code in {"0", 0}.
+    Two regimes:
+    - Newer runs have `passed` populated from assertion_result.json (the
+      eval-test harness writes the real verify.js outcome there). When
+      present, it is the source of truth.
+    - Older runs (pre-2026-04-28) leave `passed` null. Fall back to the
+      proxy used by sampler-arm-compare.py's `passed_count`:
+      terminal_status == "done" AND exit_code == 0.
     """
     ts = (run.get("terminal_status") or "").lower()
     exit_code = run.get("exit_code")
+    passed_str = (run.get("passed") or "").strip().lower() if run.get("passed") is not None else ""
+    has_real_passed = passed_str in ("true", "false", "1", "0")
+    if has_real_passed:
+        if ts == "done" and exit_code in ("0", 0) and passed_str in ("true", "1"):
+            return "successful-tail"
+        return "failed-tail"
     if ts == "done" and exit_code in ("0", 0):
         return "successful-tail"
     return "failed-tail"

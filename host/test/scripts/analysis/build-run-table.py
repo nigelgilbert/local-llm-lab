@@ -136,6 +136,19 @@ def parse_filter(spec: str) -> tuple[str, str]:
     return k.strip(), v.strip()
 
 
+def load_assertion_result(child: Path) -> dict | None:
+    """Reads <run_dir>/assertion_result.json if present; the eval-test
+    harness writes this after running verify.js so `passed` reflects the
+    actual assertion outcome (run_summary.json's own `passed` is null)."""
+    path = child / "assertion_result.json"
+    if not path.exists():
+        return None
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return None
+
+
 def collect_runs(runtime: Path, filters: list[tuple[str, str]]) -> list[dict]:
     runs = []
     for child in runtime.iterdir():
@@ -160,13 +173,15 @@ def collect_runs(runtime: Path, filters: list[tuple[str, str]]) -> list[dict]:
 
         iters = load_iterations(child / "iterations.jsonl")
         iter_aggs = derive_iter_aggs(iters)
+        assertion = load_assertion_result(child)
+        passed_value = assertion.get("passed") if assertion else summary.get("passed")
 
         row = {
             "run_id": summary.get("run_id"),
             "test_id": summary.get("test_id"),
             "sampler_id": summary.get("sampler_id"),
             "model_id": summary.get("model_id"),
-            "passed": summary.get("passed"),
+            "passed": passed_value,
             "terminal_status": summary.get("terminal_status"),
             "censored": summary.get("censored"),
             "join_status": summary.get("join_status"),
