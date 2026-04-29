@@ -24,6 +24,8 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import { WORKSPACE } from './workspace.js';
+import { emitRow } from './run_row.js';
+import { readManifest } from './test_manifest.js';
 
 const SCHEMA_VERSION = 1;
 const RUNTIME_ROOT = '/workspace/.claw-runtime';
@@ -153,6 +155,22 @@ export function runClaw({
  * 0 but the verify-script assertion fails.
  *
  * Writes <runDir>/assertion_result.json. Best-effort — never throws.
+ *
+ * Sprint 1.5: when `RUN_REGISTRY_EMIT=1` is set, also assemble + append a
+ * tier-eval-v2 registry row using lib/run_row.js. Required envs:
+ *   - RUN_REGISTRY_KIND               (default: smoke)
+ *   - RUN_REGISTRY_HARDWARE_TIER      (default: TIER env, then 64)
+ *   - RUN_REGISTRY_MEMORY_GB          (default: == hardware_tier)
+ *   - RUN_REGISTRY_MODEL_CONFIG_ID    (required)
+ *   - RUN_REGISTRY_HARNESS_VERSION    (default: GIT_SHA env, then "unknown")
+ *   - RUN_REGISTRY_TESTS_DIR          (default: /test/__tests__/tier-eval)
+ *   - RUN_REGISTRY_PATH               (default: lib/registry.js DEFAULT)
+ *   - MODEL_CONFIG_MANIFEST_PATH      (default: lib/model_configs.json)
+ * Test_id is read from run_summary.json (set by ITER_DIST_TEST_ID at run time);
+ * test_version + oracle_type are joined from the test_manifest header.
+ *
+ * Emission failure is logged to stderr but does not throw — discipline is to
+ * inspect stderr at sweep tail rather than half-fail an assert.
  */
 export function writeAssertionResult(runDir, payload) {
   if (!runDir) return;
@@ -166,6 +184,67 @@ export function writeAssertionResult(runDir, payload) {
       `[iter-distribution] writeAssertionResult failed for ${runDir}: ${e.message}`,
     );
   }
+  if (process.env.RUN_REGISTRY_EMIT === '1') {
+    try {
+      maybeEmitRegistryRow(runDir);
+    } catch (e) {
+      console.error(`[run-registry] emit failed for ${runDir}: ${e.stack || e.message}`);
+    }
+  }
+}
+
+function maybeEmitRegistryRow(runDir) {
+  const summaryPath = path.join(runDir, 'run_summary.json');
+  if (!fs.existsSync(summaryPath)) {
+    console.error(`[run-registry] no run_summary.json under ${runDir}; skipping emit`);
+    return;
+  }
+  const summary = JSON.parse(fs.readFileSync(summaryPath, 'utf8'));
+  const test_id = summary.test_id;
+  if (!test_id) {
+    console.error(`[run-registry] run_summary.test_id is null (ITER_DIST_TEST_ID was unset at run time); skipping emit`);
+    return;
+  }
+
+  const testsDir = process.env.RUN_REGISTRY_TESTS_DIR || '/test/__tests__/tier-eval';
+  const testFile = path.join(testsDir, `${test_id}.test.js`);
+  if (!fs.existsSync(testFile)) {
+    console.error(`[run-registry] no test file at ${testFile} for test_id=${test_id}; skipping emit`);
+    return;
+  }
+  const manifest = readManifest(testFile);
+
+  const model_config_id = process.env.RUN_REGISTRY_MODEL_CONFIG_ID;
+  if (!model_config_id) {
+    console.error(`[run-registry] RUN_REGISTRY_MODEL_CONFIG_ID required when RUN_REGISTRY_EMIT=1; skipping emit`);
+    return;
+  }
+  const tier = parseInt(process.env.RUN_REGISTRY_HARDWARE_TIER || process.env.TIER || '64', 10);
+  const memory = parseInt(process.env.RUN_REGISTRY_MEMORY_GB || String(tier), 10);
+
+  const ctx = {
+    run_kind: process.env.RUN_REGISTRY_KIND || 'smoke',
+    hardware_tier: tier,
+    memory_gb: memory,
+    model_config_id,
+    test_id,
+    test_version: manifest.test_version,
+    oracle_type: manifest.oracle_type,
+    harness_version: process.env.RUN_REGISTRY_HARNESS_VERSION || process.env.GIT_SHA || 'unknown',
+    canonical_status: process.env.RUN_REGISTRY_CANONICAL_STATUS || 'canonical',
+  };
+
+  const written = emitRow({
+    runId: summary.run_id,
+    runDir,
+    iterationsPath: path.join(runDir, 'iterations.jsonl'),
+    runSummaryPath: summaryPath,
+    code: typeof summary.exit_code === 'number' ? summary.exit_code : 0,
+    timeout: !!summary.timeout,
+    signal: null,
+    elapsedMs: summary.run_elapsed_ms ?? null,
+  }, ctx);
+  console.error(`[run-registry] appended ${test_id} row → ${written}`);
 }
 
 // --- W1 telemetry ------------------------------------------------------------

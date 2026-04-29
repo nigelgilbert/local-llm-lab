@@ -6,8 +6,9 @@
 // Strategy (no-sudo default):
 //   1. A host-side sidecar (host/test/scripts/thermal-watch.sh) polls
 //      `pmset -g therm` once per second and writes the latest result to
-//      $WORKSPACE_ROOT/.thermal-hint.json. The container reads that file via
-//      the existing volume mount.
+//      host/test/.claw-runtime/.thermal-hint.json (visible inside the
+//      container at /workspace/.claw-runtime/.thermal-hint.json via the
+//      existing volume mount).
 //   2. If the sidecar is not running, the hint file is missing/stale and we
 //      report `unknown`.
 //
@@ -37,7 +38,11 @@ import path from 'node:path';
 
 import { WORKSPACE } from './workspace.js';
 
-const HINT_PATH = path.join(WORKSPACE, '.thermal-hint.json');
+// Match thermal-watch.sh's default write location. The .claw-runtime/
+// subdirectory is the existing host-mount point shared with run sidecars,
+// so the sidecar's writes are immediately visible here without adding a
+// second volume.
+const HINT_PATH = path.join(WORKSPACE, '.claw-runtime', '.thermal-hint.json');
 
 // Hint is considered stale if it was written more than 10 seconds ago — the
 // sidecar polls every 1s, so 10s gap = sidecar dead/paused.
