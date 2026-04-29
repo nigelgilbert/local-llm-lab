@@ -221,11 +221,17 @@ for rep in $(seq 1 "$EVAL_REPS"); do
 done
 
 # ---- post-sweep CSV view ----
+# Run via the test image — `node` is not installed on the host.
 log ""
 log "==> sweep complete; exporting CSV view"
-node "$SCRIPT_DIR/registry-to-csv.mjs" \
-  --registry "$REGISTRY_PATH" \
-  --out      "${REGISTRY_PATH%.jsonl}.csv" \
+CSV_OUT="${REGISTRY_PATH%.jsonl}.csv"
+docker run --rm \
+  -v "$TEST_DIR:/test" \
+  -w /test \
+  node:24-bookworm-slim \
+  node /test/scripts/registry-to-csv.mjs \
+    --registry "/test/.claw-runtime/$(basename "$REGISTRY_PATH")" \
+    --out      "/test/.claw-runtime/$(basename "$CSV_OUT")" \
   || log "WARN: registry-to-csv.mjs failed; jsonl is still authoritative"
 
 ROW_COUNT=$(wc -l < "$REGISTRY_PATH" 2>/dev/null || echo 0)
