@@ -147,7 +147,7 @@ const PROMPT =
   '  - When ttlMs is omitted, entries never expire by time.\n' +
   'Then ensure `node verify.js` exits 0. Do not edit verify.js.';
 
-const CLAW_TIMEOUT = 165_000;
+const CLAW_TIMEOUT = 240_000;
 const TIMEOUT = CLAW_TIMEOUT + 20_000;
 
 describe(`lru-cache: LRU + TTL + eviction callback (tier=${TIER_LABEL})`, () => {

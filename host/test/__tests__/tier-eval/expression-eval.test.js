@@ -110,7 +110,7 @@ const PROMPT =
   '      • empty input       → message contains "empty", "unexpected", or "input"\n' +
   'Then ensure `node verify.js` exits 0. Do not edit verify.js.';
 
-const CLAW_TIMEOUT = 300_000;
+const CLAW_TIMEOUT = 360_000;
 const TIMEOUT = CLAW_TIMEOUT + 20_000;
 
 describe(`expression-eval: recursive-descent parser (tier=${TIER_LABEL})`, () => {

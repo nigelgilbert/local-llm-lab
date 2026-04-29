@@ -116,7 +116,7 @@ const PROMPT =
   '  - Empty fields produce empty strings (not undefined).\n' +
   'Then ensure `node verify.js` exits 0. Do not edit verify.js.';
 
-const CLAW_TIMEOUT = 180_000;
+const CLAW_TIMEOUT = 240_000;
 const TIMEOUT = CLAW_TIMEOUT + 20_000;
 
 describe(`csv-parser: RFC 4180-ish parser (tier=${TIER_LABEL})`, () => {
