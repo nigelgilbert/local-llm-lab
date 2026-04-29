@@ -301,7 +301,7 @@ Sprint 1's first half-day landed alongside Sprint 0 sign-off — these are the b
 | 1.14 | Expected-attempt manifest + observed-vs-expected diff | **done** 2026-04-29 — `scripts/expected-attempts.mjs` (`plan` + `diff` subcommands). Eligibility rule: tier-eval test imports `writeAssertionResult` (excludes `latency`, `prose-quality`, `tool-discipline`). 32 emit-eligible tests confirmed. `run-overnight-screen.sh` writes `expected_attempts.<sweep>.csv` pre-sweep (before any plist swap) and runs `diff` post-sweep, tee'd to `expected_attempts.<sweep>.diff.txt`. Diff non-zero exit means observed diverged from plan. Self-validated against 1.10 smoke JSONL: correctly identified `mini-vm tier=64 rep=1` as the missing cell. |
 | 1.15 | Short-timeout smoke test for timeout-as-row | **done** 2026-04-29 — `/tmp/sprint1-15-smoke.mjs` invokes `runClaw` with `timeoutMs=1500` (5000 was too lenient; claw completed in ~4.5s on a refusal). 10/10 checks: runClaw resolved (no throw), `code=null`, `timeout=true`, `terminal_status='timeout'`, registry row landed with `terminal_status='timeout'`, `passed=false`, `thermal_drift_advisory: boolean`. Validates 1.12 + 1.13 end-to-end against the live bridge. |
 
-**Sprint 1 entry criteria for the actual overnight (not yet met):**
+**Sprint 1 entry criteria for the actual overnight (now met as of 2026-04-29):**
 
 - Host-side `thermal-watch.sh` running in a separate terminal during the sweep.
 - A frozen `--ctx` JSON per tier:
@@ -312,7 +312,7 @@ Sprint 1's first half-day landed alongside Sprint 0 sign-off — these are the b
   ```
 - `RUN_REGISTRY_PATH` set to a sweep-specific path (e.g. `host/test/.claw-runtime/run_registry.overnight-2026-04-29.jsonl`) so the canonical jsonl stays clean if the run aborts.
 - Harness pinned to a single git SHA across all three tier runs (no rebuilds mid-sweep).
-- Deliverables 1.12 – 1.15 landed (research-team pre-flight requirements).
+- Deliverables 1.12 – 1.15 landed (research-team pre-flight requirements). **Done 2026-04-29.** Confirmed end-to-end by `sprint1-12-15-confirm-20260429-1640` (tier-64 `EVAL_REPS=1`, ~14 min wallclock): 32 rows landed (vs 31 in 1.10), expected-attempts diff reported `missing: 0 over: 0`, mini-vm produced its first registry row with `terminal_status='timeout'` + `passed=false`, `thermal_drift_advisory=true` on 4 rows without gating them out (csv-parser, eight-functions, expression-eval, large-refactor — all `passed=true`), all 32 rows `thermal_status='clean'` from pmset. Latency wrap-rate failure (0.45) is in `latency.test.js`, which doesn't emit a registry row (one of the 3 streamMessage-exempt tests); orthogonal to 1.12-1.15.
 
 **Expected output sizing (revised 2026-04-29, post research-team review):**
 
