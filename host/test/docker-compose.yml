@@ -19,3 +19,10 @@ services:
       - TEST_SUITE=${TEST_SUITE:-}
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    volumes:
+      # Iteration-distribution per-run artifacts. Static mount (the v2 plan
+      # rejected dynamic per-run remounts under a long-lived service); per-run
+      # subdirectories are created by runClaw() under <run-id>/. Mirror mount in
+      # ../litellm/docker-compose.yml so the LiteLLM custom callback writes to
+      # the same host directory.
+      - ./.claw-runtime:/workspace/.claw-runtime

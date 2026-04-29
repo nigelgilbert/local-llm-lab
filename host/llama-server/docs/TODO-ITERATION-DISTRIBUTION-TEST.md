@@ -100,6 +100,35 @@ Reviewer P0.4 / P0.5 flagged unverified assumptions in the v1 plan. Before W1 im
 
 This step is ~30–60 min of source reading and is the gate on Step 1.0.
 
+#### Step 0.5 — Findings (recorded 2026-04-28, post-implementation-start)
+
+Audit run against `/private/tmp/cyberia-ab/claw-code/` (commit `6db68a2`, the upstream `main` ref the Dockerfile clones) and a live llama-server probe at port 11435.
+
+| Question | Answer | Citation |
+|---|---|---|
+| Header injection | **No.** claw's reqwest client (`crates/api/src/http_client.rs`) only supports proxy config; per-request headers in `crates/api/src/providers/anthropic.rs` are limited to auth + content-type + the static `request_profile.header_pairs()` list. No CLI flag, no env var that prepends arbitrary headers. Forking claw to add this is out of scope for this work item. | `http_client.rs:63-113`, `providers/anthropic.rs:481-485` |
+| `CLAW_HOME` / data-dir override | **No.** `SessionStore::from_cwd()` is the only constructor used by the CLI binary; layout is hardcoded to `<cwd>/.claw/sessions/<workspace_hash>/`. The `from_data_dir(data_dir, workspace_root)` constructor exists but is unwired (`grep` for `data_dir` and `CLAW_DATA_DIR` in `crates/rusty-claude-cli/src` returned zero matches). `CLAW_CONFIG_HOME` exists for *config* only. | `crates/runtime/src/session_control.rs:32-72`, `crates/runtime/src/config.rs:561` |
+| Tool-timestamp availability | **Outcome (b).** `ContentBlock::ToolUse { id, name, input }` and `ContentBlock::ToolResult { tool_use_id, tool_name, output, is_error }` carry no timestamps; `ConversationMessage { role, blocks, usage }` has no per-message timestamp either; only the session header records `created_at_ms` / `updated_at_ms`. Per-call and per-iteration wallclock must come from the bridge layer. | `crates/runtime/src/session.rs:27-52, 671-728` |
+| Server-side timing exposure | **Partial.** A direct probe of `http://127.0.0.1:11435/v1/chat/completions` returned a `timings` object: `prompt_ms`, `predicted_ms`, `predicted_per_token_ms`, `predicted_per_second`, `prompt_n`, `predicted_n`, `cache_n`. No `queue_ms` (llama-server processes one request at a time, so queue depth is the harness's responsibility). **However**, LiteLLM's Anthropic-shape translation (`/v1/messages`) strips the `timings` field — verified by probing the bridge and observing only `usage` in the Anthropic response. Capture must happen inside LiteLLM (custom callback) before translation, or via a sidecar proxy. |  llama.cpp probe + LiteLLM probe |
+| Bridge lifetime | **Long-lived containerized service.** `host/litellm/docker-compose.yml` runs `ghcr.io/berriai/litellm:main-stable` with `restart: unless-stopped`, `--num_workers 1`, `--max_requests_before_restart 1000`. State is per-process, persisting across `runClaw()` invocations. | `host/litellm/docker-compose.yml:1-44` |
+| Concurrency policy | LiteLLM is single-worker (`--num_workers 1`). Sequential `runClaw()` is enforced by the sweep driver. Recorded in `_sweep-manifest.json`. | — |
+
+#### Step 0.5 — Architectural correction for W1 (resolves audit constraints)
+
+The v2 plan referenced `host/test/lib/bridge.js` as the bridge to instrument. **That file is the wrap-rate test-suite SDK shim, not the production bridge** — the production bridge is the LiteLLM container. The doc's Step 1.1 ("bridge appends one JSONL record per `/v1/messages` request") is therefore relocated to a LiteLLM custom-callback module rather than a Node.js edit.
+
+Revised W1 architecture:
+
+1. **`host/litellm/callbacks/iter_distribution_logger.py`** — LiteLLM custom-callback module. On every successful `/v1/messages` request, appends a JSONL record to `/runtime/_bridge.jsonl` (a host-mounted volume). Captures `request_started_ms`, `request_finished_ms`, `model_elapsed_ms` (bridge-observed), token counts, and — when extractable from `kwargs["response_obj"]._hidden_params` or the raw upstream response — `server_prompt_ms` and `server_predicted_ms`. Wired in `litellm-config.yaml` via `litellm_settings.callbacks`.
+2. **`host/test/.claw-runtime/`** — host directory, gitignored. Mounted into the LiteLLM container as `/runtime` and into the test container as `/workspace/.claw-runtime`. Single source of truth across both.
+3. **`runClaw()` in `host/test/lib/claw.js`** — mints `run_id` (UUID v4), records `run_started_ms` immediately before `spawn()` and `run_finished_ms` immediately after process close. After spawn completes:
+   - Moves `/workspace/.claw/sessions/<workspace_hash>/session-*.jsonl` into `/workspace/.claw-runtime/<run-id>/sessions/<workspace_hash>/` (no `CLAW_HOME` override available — post-run mv is the fallback).
+   - Slices `/workspace/.claw-runtime/_bridge.jsonl` by `[run_started_ms, run_finished_ms]` into `/workspace/.claw-runtime/<run-id>/bridge.iterations.jsonl`. Time-window correlation is sound under the sequential-execution invariant.
+   - Joins session and bridge records by ordinal (assistant-message N ↔ bridge-request N) and emits `iterations.jsonl` and `run_summary.json` per the original v2 schema, with `tool_*_ms` fields null (outcome b) and `non_model_gap_ms` populated where computable.
+4. **No header injection.** `run_id` is a harness-side identifier; the bridge has no awareness of it. The bridge_iterations.jsonl is purely time-correlated to the run.
+
+Rationale: this preserves every analysis-relevant field in the v2 schema except per-call tool timing (which Step 0.5 outcome (b) had already declared null) and per-iteration `server_queue_ms` (no llama.cpp field to sample). All H1 / H2 / W3 / W4 acceptance criteria remain executable as written.
+
 ### Step 1.0 — Bind-mount design (revised P0.5)
 
 The v1 plan used per-run `host/test/.claw-runtime/<run-id>/` mounted to `/workspace/.claw/`. Compose can't dynamically remount paths per invocation under a long-lived service, so v1 wouldn't have worked.

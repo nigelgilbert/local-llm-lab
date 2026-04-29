@@ -6,9 +6,16 @@ import path from 'node:path';
 
 export const WORKSPACE = '/workspace';
 
+// `.claw-runtime` is the host-mounted iter-distribution telemetry directory
+// (TODO-ITERATION-DISTRIBUTION-TEST.md W1). It must survive between test
+// invocations or each new run wipes the bridge log + prior run sidecars
+// before the analysis scripts get to read them.
+const PRESERVE_BETWEEN_RUNS = new Set(['.claw-runtime']);
+
 export function reset() {
   if (fs.existsSync(WORKSPACE)) {
     for (const entry of fs.readdirSync(WORKSPACE)) {
+      if (PRESERVE_BETWEEN_RUNS.has(entry)) continue;
       fs.rmSync(path.join(WORKSPACE, entry), { recursive: true, force: true });
     }
   } else {

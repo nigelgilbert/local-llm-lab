@@ -48,7 +48,9 @@ These point at one phenomenon: at temp=0.7 with presence_penalty=1.5, the model 
 
 ### P0.3 — Add per-turn telemetry to `runClaw` so failures are attributable
 
-**What:** Modify [`host/test/lib/claw.js`](../lib/claw.js) to capture, per claw invocation: tool-call count, total tokens generated, total tokens received, per-turn elapsed, and the final stop_reason. Persist as a sidecar JSON next to the result file.
+**Status: satisfied 2026-04-28** by [TODO-ITERATION-DISTRIBUTION-TEST.md](../../llama-server/docs/TODO-ITERATION-DISTRIBUTION-TEST.md) §W1. `runClaw()` now emits `iterations.jsonl` (per-iteration record with model_elapsed_ms, server_*_ms, tool_calls[], state-change diagnostics) and `run_summary.json` (per-run aggregate, censoring flag, join_status) into `host/test/.claw-runtime/<run-id>/`. The bridge layer (LiteLLM custom callback) captures upstream timings the Anthropic-shape translation strips. See the linked TODO §"Step 0.5 — Findings" for the architectural pivot vs. the original P0.3 sketch.
+
+**What (original):** Modify [`host/test/lib/claw.js`](../lib/claw.js) to capture, per claw invocation: tool-call count, total tokens generated, total tokens received, per-turn elapsed, and the final stop_reason. Persist as a sidecar JSON next to the result file.
 
 **Why:** [`EVAL-CALIBRATION-REPORT.md`](EVAL-CALIBRATION-REPORT.md) §5 lists this as a known limitation: *"a retry storm and an honest 240s decode look identical from this layer."* The classifier in [`scripts/classify-failures.sh`](../scripts/classify-failures.sh) currently splits by elapsed and workspace state, which is a clever workaround for missing telemetry, but it can't see *why* a 240s timeout happened — was claw stuck in a `read → propose → diff-mismatch → re-read` loop (harness pathology), or did the model genuinely think for 240s (capability bound), or did context fill up (`multi-bug-decoy` 64k-overflow class)?
 

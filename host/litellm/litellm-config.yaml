@@ -123,6 +123,11 @@ litellm_settings:
   # (verified with claw-code's 54-tool requests — see comment on the `claw`
   # route above).
   use_chat_completions_url_for_anthropic_messages: true
+  # Per-request bridge logger for iteration-distribution work (W1). Module
+  # lives in ../callbacks/, mounted to /app/callbacks/ via
+  # ../litellm/docker-compose.yml. Writes /runtime/_bridge.jsonl, which the
+  # test harness slices per-run by time-window.
+  callbacks: ["callbacks.iter_distribution_logger.iter_distribution_callback"]
 
 general_settings:
   master_key: os.environ/LITELLM_MASTER_KEY

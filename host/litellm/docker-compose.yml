@@ -3,8 +3,12 @@ services:
     image: ghcr.io/berriai/litellm:main-stable
     container_name: mac-llm-lab-litellm
     restart: unless-stopped
-    mem_limit: 512m
-    memswap_limit: 512m
+    # Bumped 2026-04-28 from 512m → 1g to accommodate the iter-distribution
+    # custom callback module and its append-only JSONL writer. Original 512m
+    # OOM-killed at startup (container exit-looped with code 137 and empty
+    # stdout); 1g gives headroom without measurable production cost on M5.
+    mem_limit: 1g
+    memswap_limit: 1g
     ports:
       - "4000:4000"
     volumes:
@@ -17,6 +21,14 @@ services:
       # which is what Anthropic clients (claw-code, etc.) expect. See
       # ./patches/streaming_iterator.py for the diff.
       - ./patches/streaming_iterator.py:/usr/lib/python3.13/site-packages/litellm/llms/anthropic/experimental_pass_through/adapters/streaming_iterator.py:ro
+      # Iteration-distribution custom callback (TODO-ITERATION-DISTRIBUTION-TEST.md
+      # Step 1.1). Wired in via litellm-config.yaml's litellm_settings.callbacks.
+      # Mounted at /app/callbacks/ so it sits on the importable path.
+      - ./callbacks:/app/callbacks:ro
+      # Shared per-run artifact store. The same host directory is mounted into
+      # the test container at /workspace/.claw-runtime; the callback writes
+      # /runtime/_bridge.jsonl there for runClaw() to slice by time-window.
+      - ../test/.claw-runtime:/runtime
     command:
       - "--config"
       - "/app/config.yaml"
@@ -31,6 +43,9 @@ services:
       - OLLAMA_OPENAI_BASE=http://${OLLAMA_HOST}:${OLLAMA_PORT}/v1
       - LLAMA_SERVER_BASE=http://${LLAMA_SERVER_HOST}:${LLAMA_SERVER_PORT}/v1
       - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY}
+      # Iter-distribution callback diagnostic dump. Set to 1 to capture one
+      # response_obj dump per LiteLLM process to /tmp inside the container.
+      - ITER_DIST_DEBUG=${ITER_DIST_DEBUG:-0}
     extra_hosts:
       - "host.docker.internal:host-gateway"
     healthcheck:
