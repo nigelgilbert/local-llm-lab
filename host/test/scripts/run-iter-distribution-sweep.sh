@@ -48,7 +48,8 @@ set -eu
 N="${1:-20}"
 SCRIPT_DIR=$(cd "$(dirname "$0")" && pwd)
 TEST_DIR=$(cd "$SCRIPT_DIR/.." && pwd)
-REPO_DIR=$(cd "$TEST_DIR/.." && pwd)
+HOST_DIR=$(cd "$TEST_DIR/.." && pwd)
+REPO_DIR=$(cd "$HOST_DIR/.." && pwd)
 
 RUNTIME_DIR="$TEST_DIR/.claw-runtime"
 MANIFEST="$RUNTIME_DIR/_sweep-manifest.json"
@@ -154,31 +155,24 @@ printf '%s\n' "$SCHEDULE" | while IFS=$'\t' read -r TEST SAMPLER REP; do
   TEMP=$(sampler_temperature "$SAMPLER")
   log "[$JOB_INDEX/$JOB_COUNT] test=$TEST sampler=$SAMPLER rep=$REP route=$ROUTE temp=$TEMP"
 
-  # The test file references clawModel from lib/tier.js. Override via env so
-  # we can flip route without editing test files.
-  ITER_DIST_TEST_ID="$TEST" \
-  ITER_DIST_SAMPLER_ID="$SAMPLER" \
-  CLAW_MODEL_OVERRIDE="$ROUTE" \
-  SAMPLER_TEMPERATURE="$TEMP" \
-  SAMPLER_TOP_P="$(sampler_top_p)" \
-  SAMPLER_TOP_K="$(sampler_top_k)" \
-  SAMPLER_PRESENCE_PENALTY="$(sampler_presence)" \
-  CTX=65536 \
-  GIT_SHA="$GIT_SHA" \
-  HARDWARE_INSTANCE="$HARDWARE_INSTANCE" \
+  # Detach stdin: without `< /dev/null`, `docker compose run` attaches to the
+  # loop's stdin (the schedule pipe) and the read loop terminates after the
+  # first iteration. Inline -e VAR=VALUE form (rather than -e VAR
+  # passthrough) so vars are visible inside the container regardless of how
+  # the parent shell exported them.
   docker compose -f "$TEST_DIR/docker-compose.yml" run --rm \
-    -e ITER_DIST_TEST_ID \
-    -e ITER_DIST_SAMPLER_ID \
-    -e CLAW_MODEL_OVERRIDE \
-    -e SAMPLER_TEMPERATURE \
-    -e SAMPLER_TOP_P \
-    -e SAMPLER_TOP_K \
-    -e SAMPLER_PRESENCE_PENALTY \
-    -e CTX \
-    -e GIT_SHA \
-    -e HARDWARE_INSTANCE \
+    -e "ITER_DIST_TEST_ID=$TEST" \
+    -e "ITER_DIST_SAMPLER_ID=$SAMPLER" \
+    -e "CLAW_MODEL_OVERRIDE=$ROUTE" \
+    -e "SAMPLER_TEMPERATURE=$TEMP" \
+    -e "SAMPLER_TOP_P=$(sampler_top_p)" \
+    -e "SAMPLER_TOP_K=$(sampler_top_k)" \
+    -e "SAMPLER_PRESENCE_PENALTY=$(sampler_presence)" \
+    -e "CTX=65536" \
+    -e "GIT_SHA=$GIT_SHA" \
+    -e "HARDWARE_INSTANCE=$HARDWARE_INSTANCE" \
     test node --test --test-concurrency=1 "__tests__/tier-eval/${TEST}.test.js" \
-    >>"$LOG" 2>&1 || log "  (test failed or timed out — telemetry sidecar should still be present)"
+    </dev/null >>"$LOG" 2>&1 || log "  (test failed or timed out — telemetry sidecar should still be present)"
 done
 
 END_MS=$(date +%s)
