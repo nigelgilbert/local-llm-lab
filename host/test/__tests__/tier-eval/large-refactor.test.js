@@ -15,7 +15,7 @@ import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { runClaw } from '../../lib/claw.js';
+import { runClaw, writeAssertionResult } from '../../lib/claw.js';
 import * as workspace from '../../lib/workspace.js';
 import { clawModel, TIER_LABEL } from '../../lib/tier.js';
 
@@ -87,7 +87,8 @@ const PROMPT =
   'use the existing DEFAULT_CURRENCY constant. After your edits, running ' +
   '`node test.js` must exit 0. Do not edit test.js.';
 
-const TIMEOUT = 300_000;
+const CLAW_TIMEOUT = 240_000;
+const TIMEOUT = CLAW_TIMEOUT + 60_000;
 
 describe(`large-refactor: thread currency through 5 call sites (tier=${TIER_LABEL})`, () => {
   beforeEach(() => {
@@ -106,21 +107,30 @@ describe(`large-refactor: thread currency through 5 call sites (tier=${TIER_LABE
     });
     assert.notEqual(pre.status, 0, 'pre-condition: test.js must fail before the refactor');
 
-    const r = await runClaw({ prompt: PROMPT, model: clawModel });
+    const r = await runClaw({ prompt: PROMPT, model: clawModel, timeoutMs: CLAW_TIMEOUT });
 
     console.log(`\n=== large-refactor (${TIER_LABEL}) ===`);
     console.log(`  claw: exit=${r.code} elapsed=${r.elapsedMs}ms files=${JSON.stringify(workspace.list())}`);
     if (r.code !== 0) console.log(`  claw stderr (tail):\n${r.stderr.slice(-1500)}`);
 
-    assert.equal(r.code, 0, 'claw must exit cleanly');
+    let post = null;
+    if (r.code === 0) {
+      post = spawnSync('node', [path.join(workspace.WORKSPACE, 'test.js')], {
+        encoding: 'utf8',
+        timeout:  5_000,
+      });
+      console.log(`  node post-fix: exit=${post.status} stderr=${post.stderr.slice(0, 400).trim()}`);
+    }
 
-    const post = spawnSync('node', [path.join(workspace.WORKSPACE, 'test.js')], {
-      encoding: 'utf8',
-      timeout:  5_000,
+    writeAssertionResult(r.runDir, {
+      passed: r.code === 0 && post != null && post.status === 0,
+      claw_exit: r.code,
+      target_file_exists: workspace.exists('format.js'),
+      post_status: post ? post.status : null,
+      post_stderr_tail: post ? post.stderr.slice(0, 800) : null,
     });
 
-    console.log(`  node post-fix: exit=${post.status} stderr=${post.stderr.slice(0, 400).trim()}`);
-
+    assert.equal(r.code, 0, 'claw must exit cleanly');
     assert.equal(post.status, 0, `test.js still fails:\n${post.stderr.slice(0, 800)}`);
   });
 });

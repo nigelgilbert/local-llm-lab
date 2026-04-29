@@ -13,25 +13,38 @@
 import { describe, it, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { runClaw } from '../../lib/claw.js';
+import { runClaw, writeAssertionResult } from '../../lib/claw.js';
 import * as workspace from '../../lib/workspace.js';
 import { clawModel, TIER_LABEL } from '../../lib/tier.js';
 
 const PROMPT  = "create hello.py with one line: print('hello')";
-const TIMEOUT = 300_000;
+const CLAW_TIMEOUT = 240_000;
+const TIMEOUT = CLAW_TIMEOUT + 60_000;
+const HELLO_RE = /print\(\s*['"]hello['"]\s*\)/;
 
 describe(`agent: single-file write (tier=${TIER_LABEL})`, () => {
   beforeEach(() => workspace.reset());
 
   it('claw creates hello.py with the requested content', { timeout: TIMEOUT }, async () => {
-    const r = await runClaw({ prompt: PROMPT, model: clawModel });
+    const r = await runClaw({ prompt: PROMPT, model: clawModel, timeoutMs: CLAW_TIMEOUT });
 
     console.log(`\n=== agent-single (${TIER_LABEL}) ===`);
     console.log(`  exit=${r.code} elapsed=${r.elapsedMs}ms files=${JSON.stringify(workspace.list())}`);
     if (r.code !== 0) console.log(`  stderr (tail):\n${r.stderr.slice(-1500)}`);
 
+    const helloPyExists = workspace.exists('hello.py');
+    const contentMatches = helloPyExists && HELLO_RE.test(workspace.read('hello.py'));
+
+    writeAssertionResult(r.runDir, {
+      passed: r.code === 0 && helloPyExists && contentMatches,
+      claw_exit: r.code,
+      target_file_exists: helloPyExists,
+      post_status: helloPyExists ? (contentMatches ? 0 : 1) : null,
+      post_stderr_tail: null,
+    });
+
     assert.equal(r.code, 0);
-    assert.equal(workspace.exists('hello.py'), true);
-    assert.match(workspace.read('hello.py'), /print\(\s*['"]hello['"]\s*\)/);
+    assert.equal(helloPyExists, true);
+    assert.match(workspace.read('hello.py'), HELLO_RE);
   });
 });

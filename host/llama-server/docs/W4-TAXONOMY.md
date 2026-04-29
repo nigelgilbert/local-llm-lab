@@ -7,6 +7,24 @@ director Pass 2) are bound to this file. If acceptance gates (κ ≥ 0.6 with
 CI lower bound ≥ 0.4, raw agreement ≥ 70%, unclassified < 30%) fail, the
 taxonomy is rebuilt from data and rerun — not patched in place.*
 
+## Amendment 2026-04-29 — Class E deprecated
+
+Class E ("infrastructure / non-model-gap latency") is **deprecated for the
+post-`6dd992d` regime** and must not be used as a label in new
+classification passes. Active classes for any sweep against the widened
+timeouts (240/240/360s) are **A, B, C, D, F**.
+
+**Rationale.** [W2-W3-RESULTS-20260428.md](W2-W3-RESULTS-20260428.md) shows
+median `model_share ≥ 0.994` for csv-parser, lru-cache, and expression-eval
+under the widened timeouts — `total_non_model_gap_ms` is empirically <0.5%
+of wallclock. Class E's defining signature ("normal turn count, abnormal
+non-model time") is therefore mechanically unobservable in this regime; E
+was a censoring artifact of the prior tight-timeout configuration.
+Class B is also a candidate for deprecation (empty in both sweeps to date),
+but is retained provisionally pending one more sweep on the post-`c145343`
+test suite. The Class E definition is preserved below for traceability of
+prior classifications (n=20 archive, sampler-grid runs).
+
 ## Coding rules
 
 1. **Earliest identifiable root cause wins.** If `wrong-module-shape (B)`
@@ -100,7 +118,11 @@ progress" or "the call is structurally unproductive."
 **Plausible levers:** grammar restriction, better tool feedback, no-op
 detection.
 
-### Class E — infrastructure / non-model-gap latency
+### Class E — infrastructure / non-model-gap latency *(deprecated 2026-04-29)*
+
+> **Deprecated.** Do not use as a label in new classification passes against
+> the post-`6dd992d` regime. See *Amendment 2026-04-29* at the top of this
+> file. Definition preserved for traceability of prior passes only.
 
 **Trace signature (all three required):**
 
