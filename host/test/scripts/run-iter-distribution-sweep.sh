@@ -3,7 +3,10 @@
 # (TODO-ITERATION-DISTRIBUTION-TEST.md).
 #
 # Design (per round-2 v2 plan):
-#   - 3 noisy tier-64 tests: csv-parser, lru-cache, expression-eval
+#   - 3 failure-prone tier-64 tests: adversarial-input, deep-equal,
+#     expression-eval (csv-parser & lru-cache dropped after the n=20 sweep
+#     produced 0/40 failures each — non-error-prone tests carry no
+#     failed-tail signal at this difficulty / sampler regime)
 #   - 2 sampler arms: v1-prod (temp=0.7, presence_penalty=1.5) and
 #     v3-deterministic (temp=0.3, presence_penalty=1.5)
 #   - n=20 per (test, sampler) cell → 120 runs total
@@ -40,8 +43,9 @@
 #   host/test/scripts/run-iter-distribution-sweep.sh [N]
 #     N — repetitions per (test, sampler) cell. Default 20.
 #
-# Estimated wallclock at n=20: ~6h on M5 per the v2 plan. Each csv-parser /
-# lru-cache / expression-eval run is 10–60s typically; n=20×3×2 = 120 runs.
+# Estimated wallclock at n=20: ~2-2.5h on M5. adversarial-input and deep-equal
+# typical wallclock 30-90s; expression-eval typical wallclock 100-150s; n=20×3×2
+# = 120 runs.
 
 set -eu
 
@@ -61,7 +65,7 @@ GIT_SHA=$(git -C "$REPO_DIR" rev-parse HEAD)
 DATE=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 HARDWARE_INSTANCE="${HARDWARE_INSTANCE:-M5}"
 
-TESTS=(csv-parser lru-cache expression-eval)
+TESTS=(adversarial-input deep-equal expression-eval)
 SAMPLERS=(v1-prod v3-deterministic)
 
 # Sampler defs (frozen — must match the v2 plan).
@@ -135,7 +139,7 @@ data = {
     "git_sha": git_sha,
     "seed": seed,
     "n_per_cell": int(n),
-    "tests": ["csv-parser", "lru-cache", "expression-eval"],
+    "tests": ["adversarial-input", "deep-equal", "expression-eval"],
     "samplers": ["v1-prod", "v3-deterministic"],
     "hardware_instance": hw,
     "concurrency": 1,
