@@ -56,11 +56,6 @@ source "$RW/wizard/lib/keys.sh"
 # 1. STATIC / LINT
 # ============================================================================
 hdr "1. static / lint"
-mapfile_compat() {
-  # bash 3.2 has no mapfile; collect via while-read.
-  local f
-  while IFS= read -r f; do printf '%s\n' "$f"; done
-}
 ALL_SH=$(find "$REPO/wizard" -type f -name '*.sh' | sort)
 ENTRYPOINT="$REPO/wizard/wizard"
 
@@ -84,7 +79,7 @@ done
 bad_shebang=""
 for f in $ALL_SH "$ENTRYPOINT"; do
   head -n1 "$f" | grep -qE '^#!/usr/bin/env bash' \
-    || bad_shebang="$bad_shebang $(basename $f)"
+    || bad_shebang="$bad_shebang $(basename "$f")"
 done
 [ -z "$bad_shebang" ] && t_ok "every script uses #!/usr/bin/env bash shebang" \
   || t_not_ok "shebang audit" "$bad_shebang"
@@ -495,6 +490,9 @@ TRACE="$LOGS/install-trace.log"
 # query, not a mutation.
 make_logger() {
   local name="$1" body="$2"
+  # Expand any $TRACE refs in body before writing — the shim runs under
+  # /bin/sh with no TRACE in env, so substitutions must happen here.
+  body="${body//\$TRACE/$TRACE}"
   cat >"$SHIMS/$name" <<EOF
 #!/bin/sh
 echo "[$name] \$*" >> "$TRACE"
@@ -585,7 +583,8 @@ else
 fi
 
 # Should see lots of skip lines
-skip_count=$(grep -c 'already done' "$INSTALL_LOG" 2>/dev/null || echo 0)
+skip_count=$(grep -c 'already done' "$INSTALL_LOG" 2>/dev/null)
+skip_count="${skip_count:-0}"
 if [ "$skip_count" -ge 3 ]; then
   t_ok "idempotency-while-hot: $skip_count 'already done' skip lines printed"
 else
