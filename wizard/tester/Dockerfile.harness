@@ -1,0 +1,10 @@
+FROM alpine:3.20
+
+RUN apk add --no-cache \
+      bash zsh \
+      shellcheck \
+      curl jq openssl ca-certificates \
+      coreutils grep sed gawk findutils
+
+WORKDIR /repo
+ENTRYPOINT ["/bin/bash", "/repo/wizard/tester/run-tests.sh"]

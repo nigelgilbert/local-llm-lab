@@ -1,0 +1,169 @@
+#!/usr/bin/env bash
+# wizard — install | test | doctor | --help
+# Pure-bash entrypoint for the mac-llm-lab code-stack installer.
+set -u
+
+WIZARD_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "${WIZARD_ROOT}/.." && pwd)"
+export WIZARD_ROOT REPO_ROOT
+
+# shellcheck source=lib/ui.sh
+source "${WIZARD_ROOT}/lib/ui.sh"
+# shellcheck source=lib/state.sh
+source "${WIZARD_ROOT}/lib/state.sh"
+# shellcheck source=lib/log.sh
+source "${WIZARD_ROOT}/lib/log.sh"
+# shellcheck source=lib/detect.sh
+source "${WIZARD_ROOT}/lib/detect.sh"
+# shellcheck source=lib/deps.sh
+source "${WIZARD_ROOT}/lib/deps.sh"
+# shellcheck source=lib/keys.sh
+source "${WIZARD_ROOT}/lib/keys.sh"
+# shellcheck source=lib/probe.sh
+source "${WIZARD_ROOT}/lib/probe.sh"
+
+# Source every step file so its functions are available.
+for f in "${WIZARD_ROOT}"/steps/*.sh; do
+  # shellcheck disable=SC1090
+  source "$f"
+done
+
+cmd_help() {
+  cat <<'EOF'
+wizard — install the mac-llm-lab code stack.
+
+Usage:
+  wizard install            run the multi-step installer (default)
+  wizard test [MODE]        spin the tester orb. MODE = docker|ollama|bridge|models|deep (default: models)
+  wizard selftest           run the wizard test harness inside an isolated orb
+  wizard doctor             read-only state inspection
+  wizard --help             this message
+
+Notes:
+  - Pure Bash, curl-only. No Homebrew is required or installed.
+  - Strict idempotency: anything already in place is skipped, never redone.
+    This makes 'install' safe to re-run on a live system, including the M5
+    host while evals are running.
+  - State lives in wizard/.state. Logs in wizard/.logs/. Both gitignored.
+EOF
+}
+
+cmd_install() {
+  log_init
+  step_00_main
+  step_20_main
+  step_30_main
+  step_32_main
+  if [ "$(state_get TOPOLOGY)" = "full-local" ]; then
+    step_31_main
+  else
+    skip "tier slider hidden in client-only mode (host serves whatever it serves)"
+  fi
+  # Dependencies, in build-order.
+  step_40_main
+  step_41_main
+  step_42_main || warn "llama.cpp build issue — continuing; you can re-run later"
+  step_43_main || { fail "Docker is required — re-run when ready"; return 1; }
+  step_44_main
+  if [ "$(state_get TOPOLOGY)" = "full-local" ]; then
+    step_45_main
+    step_46_main
+    step_47_main
+    step_48_main
+  fi
+  step_49_main
+  # Bring-up + smoke.
+  step_50_main
+  step_60_main || true
+  hdr "Done"
+  printf "  log: %s\n\n" "$(log_path)"
+}
+
+cmd_test() {
+  local mode="${1:-models}"
+  hdr "wizard test (--${mode})"
+  if ! command -v docker >/dev/null 2>&1; then
+    fail "docker not on PATH — run './wizard/wizard install' first"
+    return 1
+  fi
+  if ! docker image inspect wizard-tester:local >/dev/null 2>&1; then
+    info "tester orb not built yet — building now"
+    ( cd "${WIZARD_ROOT}/tester" && docker compose build ) \
+      || { fail "tester orb build failed"; return 1; }
+  fi
+  tester_run "$mode"
+}
+
+cmd_selftest() {
+  hdr "wizard selftest (harness orb)"
+  if ! command -v docker >/dev/null 2>&1; then
+    fail "docker not on PATH — install OrbStack first"; return 1
+  fi
+  if ! docker image inspect wizard-harness:local >/dev/null 2>&1; then
+    info "harness orb not built yet — building now"
+    ( cd "${WIZARD_ROOT}/tester" && docker compose build harness ) \
+      || { fail "harness build failed"; return 1; }
+  fi
+  ( cd "${WIZARD_ROOT}/tester" && docker compose run --rm harness "$@" )
+}
+
+cmd_doctor() {
+  hdr "wizard doctor"
+  printf "  WIZARD_ROOT = %s\n" "$WIZARD_ROOT"
+  printf "  REPO_ROOT   = %s\n\n" "$REPO_ROOT"
+
+  hdr "state (wizard/.state)"
+  if [ -f "$WIZARD_STATE_FILE" ]; then
+    sed 's/^/  /' "$WIZARD_STATE_FILE"
+  else
+    info "no .state yet"
+  fi
+
+  hdr ".env files"
+  for f in "${REPO_ROOT}/host/litellm/.env" "${REPO_ROOT}/client/claw-code/.env"; do
+    if [ -f "$f" ]; then ok "$f"
+    else warn "missing: $f"
+    fi
+  done
+
+  hdr "Container state"
+  if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then
+    for c in mac-llm-lab-litellm claw-code mac-llm-lab-openwebui; do
+      local s
+      s=$(docker inspect --format '{{.State.Status}}' "$c" 2>/dev/null | tr -d '\n')
+      [ -z "$s" ] && s="absent"
+      case "$s" in
+        running) ok  "$c — running" ;;
+        absent)  info "$c — not present" ;;
+        *)       warn "$c — $s" ;;
+      esac
+    done
+  else
+    warn "docker daemon not reachable"
+  fi
+
+  hdr "Bridge probe"
+  local bh bp
+  bh=$(state_get BRIDGE_HOST 2>/dev/null || printf 'host.docker.internal')
+  bp=$(state_get BRIDGE_PORT 2>/dev/null || printf '4000')
+  if curl -fsS --max-time 3 "http://${bh}:${bp}/health/liveliness" >/dev/null 2>&1 \
+    || curl -fsS --max-time 3 "http://localhost:${bp}/health/liveliness" >/dev/null 2>&1; then
+    ok "bridge reachable"
+  else
+    warn "bridge not reachable at ${bh}:${bp}"
+  fi
+  printf '\n'
+}
+
+main() {
+  case "${1:-install}" in
+    install)         shift || true; cmd_install "$@" ;;
+    test)            shift || true; cmd_test "$@" ;;
+    selftest)        shift || true; cmd_selftest "$@" ;;
+    doctor)          cmd_doctor ;;
+    -h|--help|help)  cmd_help ;;
+    *) printf "unknown subcommand: %s\n\n" "$1" >&2; cmd_help; exit 1 ;;
+  esac
+}
+
+main "$@"
