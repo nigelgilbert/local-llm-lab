@@ -10,3 +10,14 @@ services:
       - MODE=${MODE:-models}
     extra_hosts:
       - "host.docker.internal:host-gateway"
+
+  harness:
+    build:
+      context: .
+      dockerfile: Dockerfile.harness
+    image: wizard-harness:local
+    volumes:
+      - ../..:/repo:ro
+    environment:
+      - HARNESS_FILTER=${HARNESS_FILTER:-}
+      - NO_COLOR=${NO_COLOR:-}

@@ -35,6 +35,7 @@ wizard — install the mac-llm-lab code stack.
 Usage:
   wizard install            run the multi-step installer (default)
   wizard test [MODE]        spin the tester orb. MODE = docker|ollama|bridge|models|deep (default: models)
+  wizard selftest           run the wizard test harness inside an isolated orb
   wizard doctor             read-only state inspection
   wizard --help             this message
 
@@ -94,6 +95,19 @@ cmd_test() {
   tester_run "$mode"
 }
 
+cmd_selftest() {
+  hdr "wizard selftest (harness orb)"
+  if ! command -v docker >/dev/null 2>&1; then
+    fail "docker not on PATH — install OrbStack first"; return 1
+  fi
+  if ! docker image inspect wizard-harness:local >/dev/null 2>&1; then
+    info "harness orb not built yet — building now"
+    ( cd "${WIZARD_ROOT}/tester" && docker compose build harness ) \
+      || { fail "harness build failed"; return 1; }
+  fi
+  ( cd "${WIZARD_ROOT}/tester" && docker compose run --rm harness "$@" )
+}
+
 cmd_doctor() {
   hdr "wizard doctor"
   printf "  WIZARD_ROOT = %s\n" "$WIZARD_ROOT"
@@ -146,6 +160,7 @@ main() {
   case "${1:-install}" in
     install)         shift || true; cmd_install "$@" ;;
     test)            shift; cmd_test "$@" ;;
+    selftest)        shift; cmd_selftest "$@" ;;
     doctor)          cmd_doctor ;;
     -h|--help|help)  cmd_help ;;
     *) printf "unknown subcommand: %s\n\n" "$1" >&2; cmd_help; exit 1 ;;
