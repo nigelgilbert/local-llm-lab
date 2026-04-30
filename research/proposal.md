@@ -1,190 +1,528 @@
-# Research Proposal — Tool-Call Quality & Mac-Tier Scorecard
+# Research Proposal v2 - Protocol-Faithful Tool Use and Mac-Tier Agent Scorecard
 
-**Status:** Draft for research-team review
-**Date:** 2026-04-30
-**Scope:** Two coupled research threads with one shared instrumentation layer
-**Target tiers:** 16 GB / 32 GB / 64 GB Apple Silicon unified memory
-**Mandate alignment:** [MANIFESTO.md](../MANIFESTO.md) §"Three reasons it matters" #1 (democratization across all three tiers), #3 (architecture, not just inference)
+**Status:** Revised draft for research-team review  
+**Date:** 2026-04-30  
+**Scope:** Two coupled research threads with one shared instrumentation layer  
+**Target tiers:** 16 GB / 32 GB / 64 GB Apple Silicon unified memory  
+**Mandate alignment:** Democratization across Mac tiers; architecture and orchestration, not only larger inference.
+
+---
+
+## Executive review
+
+The original proposal is directionally strong: it picks an important systems bottleneck, connects tool-use reliability to end-to-end coding utility, and insists on a reusable scorecard before claiming progress. I would green-light the direction, but not the draft as written. The main revision is to make the proposal more testable and less dependent on one risky integration path.
+
+Material changes in this revision:
+
+1. **Replace "GBNF -> XGrammar" as the first milestone with a structured-output backend bake-off.** XGrammar and XGrammar-2 are compelling research targets, but llama.cpp already has LLGuidance support while XGrammar is not yet a drop-in llama.cpp backend. Treat LLGuidance as the in-tree control, GBNF as the current baseline, and XGrammar/XGrammar-2 as research adapters.
+2. **Add a real tool-calling benchmark.** Wrap-rate alone is too narrow, and coding benchmarks do not isolate protocol failures. The scorecard now includes BFCL-style function-calling evaluation plus an internal Anthropic protocol matrix.
+3. **Decouple "decide to call a tool" from "format a valid tool call."** A two-phase decoder only helps if the transition into the constrained phase is reliable. The proposal now measures call-decision precision/recall separately from argument-schema conformance.
+4. **Repair the evaluation tiers.** A 30-instance coding dev set is unlikely to run in 30 minutes on local Mac hardware once Docker setup, repository tests, and local model latency are included. This version separates a fast smoke set, a nightly dev set, and milestone/full runs.
+5. **Treat SWE-bench on Apple Silicon as a systems risk.** SWE-bench is Docker-heavy, requires substantial disk/RAM, and ARM64 image coverage is incomplete. The harness must separate model-generation latency on Mac from patch-grading latency, and it must explicitly record whether tests ran natively on ARM64 or under x86_64 emulation.
+6. **Use statistical non-inferiority instead of a fixed 1 percentage point rule everywhere.** On small dev sets, 1 pp is meaningless. This draft uses paired bootstrap/McNemar-style comparisons, Wilson intervals for proportions, and full-set confirmation before external claims.
 
 ---
 
 ## 1. Mission
 
-Build a *truly useful* agentive coding harness on 16 / 32 / 64 GB Apple Silicon. The thesis from the manifesto: "most of the leverage was always in the orchestration, not the parameter count." This proposal commits to two research threads that test that thesis empirically, on this rig, with results that survive external citation-checking.
+Build a useful local coding agent harness for 16 GB, 32 GB, and 64 GB Apple Silicon machines. The core thesis is that local models become materially more useful when the orchestration layer is protocol-faithful, latency-aware, and measured against realistic agent workloads. The project therefore has two coupled threads:
 
-- **Thread A — Tool-call quality.** Improve the agent's ability to use tools correctly, fluently, and across the full Anthropic protocol surface — without sacrificing reasoning quality. The current win (10/10 wrap-rate via hand-coded GBNF) is real but narrow; the deeper question is how to make any local model behave as a *protocol-faithful* Anthropic-API agent.
-- **Thread B — Mac-tier scorecard.** Build the measurement infrastructure the project currently lacks. Wrap-rate, eval-a, and eval-b are insufficient to claim "useful agent." We need a tier-stratified scorecard with credible benchmarks and latency metrics, so every future research direction can be evaluated against it.
+- **Thread A - Protocol-faithful tool use.** Improve the local model server's ability to produce correct Anthropic-style tool-use turns, including multi-tool selection, parallel calls, multi-turn `tool_result` continuation, and schema-conformant arguments, without degrading free-form reasoning.
+- **Thread B - Mac-tier scorecard.** Build the measurement layer that makes Thread A and future work falsifiable across 16 GB, 32 GB, and 64 GB Apple Silicon tiers.
 
-These threads are coupled: every Thread A change is validated on Thread B's scorecard. The scorecard itself becomes the proof artifact for the manifesto's bet.
-
----
-
-## 2. Thread A — Tool-Call Quality
-
-### 2.1 Hypothesis
-
-A two-phase decoder (free reasoning → grammar-masked tool call) using XGrammar-derived grammars from the Anthropic tool spec will:
-
-1. preserve reasoning quality that current single-phase grammar masking erodes,
-2. cover the entire Anthropic tool-use surface (multi-tool, parallel calls, multi-turn `tool_result`) without per-tool hand-coding, and
-3. impose lower per-token decoding overhead than the current hand-rolled GBNF path.
-
-### 2.2 Background
-
-Current state: `host/llama-server/grammars/claw.gbnf` enforces `<tool_call>...</tool_call>` wrapping. Wrap-rate = 10/10 vs. 6/10 on the Ollama baseline. Hand-coded for one model family + one tool format.
-
-Two findings from the literature drive this thread:
-
-- **XGrammar** (Dong et al., MLSys '25, [arxiv:2411.15100](https://arxiv.org/abs/2411.15100)) reports up to 100× speedup over Outlines / lm-format-enforcer / llama.cpp GBNF and "near-zero overhead structure generation in end-to-end LLM serving" via vocabulary partitioning into context-independent (precheckable) and context-dependent tokens. Supports full CFG, including recursive schemas — a strict superset of GBNF's coverage.
-- **"Let Me Speak Freely?"** (Tam et al. 2024, [arxiv:2408.02442](https://arxiv.org/abs/2408.02442)) reports "a significant decline in LLMs reasoning abilities under format restrictions," with "stricter format constraints generally lead to greater performance degradation in reasoning tasks." This is direct evidence that single-phase grammar masking is a quality cost we are currently paying without measuring.
-
-CodeAct (Wang et al. 2024, [arxiv:2402.01030](https://arxiv.org/abs/2402.01030)) — code-as-action vs JSON tool calls, +20% success across 17 LLMs — is adjacent prior art for "format choice matters more than people think."
-
-### 2.3 Work plan
-
-1. **Swap GBNF → XGrammar** in `host/llama-server/`. Validate baseline wrap-rate is preserved (≥10/10), measure per-token overhead delta. Expect strict improvement.
-2. **Two-phase decoder.** Decode the assistant turn unconstrained until a deterministic stop sequence (e.g. an explicit `<tool_call>` open tag), then engage XGrammar masking only for the structured payload. Implement at the llama-server boundary so claw-code is unaware of the change.
-3. **Auto-grammar from Anthropic tool schemas.** At request time, derive an XGrammar CFG from the `tools` array in the incoming Anthropic `/v1/messages` payload. Eliminates the per-tool hand-coding step. This is the generalizable contribution.
-4. **Cover the full surface.** Multi-tool selection, parallel `tool_use` blocks, multi-turn `tool_result` continuation, stop-sequence handling. The hand-rolled grammar today covers only the simplest case.
-
-### 2.4 Success criteria
-
-Measured via the Thread B scorecard:
-
-- Wrap-rate ≥ current 10/10 across all profiles.
-- Reasoning quality (Aider polyglot subset, LiveCodeBench) within 1 percentage point of free-form decoding — i.e. we recover what Tam et al. say single-phase grammar masking costs.
-- Per-token structured-output decoding overhead reduced ≥ 30% vs. the current GBNF path (XGrammar's published delta is much larger; we'll claim what we measure). End-to-end TTFT reported separately as a secondary metric.
-- Tool-call coverage across the Anthropic schema fully exercised on synthetic multi-tool tests.
+The proposal's output is not only a feature. It is a reusable experimental apparatus: a trace schema, benchmark runner, hardware profile matrix, result format, and reporting template that future research directions must use before claiming wins.
 
 ---
 
-## 3. Thread B — Mac-Tier Scorecard
+## 2. Research questions and hypotheses
 
-### 3.1 Hypothesis
+### RQ1 - Which structured-output backend should a Mac-local Anthropic-compatible server use?
 
-The current eval suite (wrap-rate, eval-a, eval-b) is insufficient to detect quality regressions or gains from any of the changes Thread A or future work will introduce. A tier-stratified scorecard built around an external benchmark anchor + latency + multi-turn discipline metrics is the missing instrumentation layer for every research direction the project will pursue.
+**Hypothesis.** For current llama.cpp-based serving, LLGuidance is the most practical near-term structured-output backend because it is already integrated upstream. XGrammar/XGrammar-2 may become the best research backend if we can amortize dynamic per-request schema compilation and integrate token masking cleanly at the llama-server boundary.
 
-### 3.2 Metric stack
+**Rationale.** XGrammar reports up to 100x speedups and near-zero serving overhead for structured generation by prechecking context-independent tokens and optimizing context-dependent checks. XGrammar-2 is even more directly relevant because it targets dynamic structured-generation workloads such as tool calling and conditional protocols. However, llama.cpp already supports GBNF and LLGuidance, while XGrammar integration would be new engineering. LLGuidance also supports JSON Schema, regular expressions, and context-free grammars through Lark-like formats and is already integrated in llama.cpp.
 
-Five metrics, two evaluation tiers (fast dev set + full-set), three hardware tiers (16 / 32 / 64 GB).
+### RQ2 - Can constrained decoding be applied only where it helps?
 
-| Metric | Source | Tier-stratified? | Why |
+**Hypothesis.** A gated two-phase policy - free reasoning until the system decides a tool call is needed, then constrained decoding only for the tool-use payload - will preserve more reasoning quality than single-phase grammar masking while retaining protocol fidelity.
+
+**Important correction to the original draft.** The hard part is not just switching the grammar on after `<tool_call>`. The hard part is making the transition decision reliable. The evaluation must therefore measure:
+
+- tool-use recall: did the model call a tool when the task required one?
+- tool-use precision: did it avoid tools when no tool was needed?
+- tool-name accuracy;
+- argument schema conformance;
+- argument semantic accuracy;
+- multi-call ordering and dependency handling;
+- continuation behavior after `tool_result`.
+
+This directly addresses evidence that stricter format restrictions can degrade reasoning performance, and keeps the experiment honest about whether two-phase decoding helps or merely hides failures in the trigger mechanism.
+
+### RQ3 - What scorecard proves local Mac usefulness rather than narrow protocol compliance?
+
+**Hypothesis.** A useful local agent must be evaluated across three axes simultaneously: protocol fidelity, coding utility, and Mac viability. Any decoder or KV-cache change that improves wrap-rate but worsens real editing success, time-to-first-edit, memory pressure, or multi-turn stability is not a win.
+
+---
+
+## 3. Launch scope
+
+### In scope for this proposal
+
+1. Anthropic-compatible `/v1/messages` client-tool behavior for local serving:
+   - `tools` definitions with JSON-schema-like `input_schema` objects;
+   - `tool_choice` modes used by the harness;
+   - one or more assistant `tool_use` content blocks;
+   - user `tool_result` content blocks that reference tool-use IDs;
+   - multi-turn continuation after tool results;
+   - stop-reason handling compatible with `tool_use` and `end_turn`.
+2. Structured-output backend comparison:
+   - current GBNF path;
+   - llama.cpp LLGuidance path;
+   - XGrammar/XGrammar-2 prototype path if integration cost is acceptable.
+3. Scorecard and trace infrastructure across 16 GB / 32 GB / 64 GB Mac tiers.
+4. KV-cache quantization sweep using only options available in the pinned llama.cpp commit.
+
+### Explicitly deferred
+
+- Anthropic server-side tools such as hosted web search or code execution. A local compatibility server should emulate client-tool semantics first.
+- Fine-grained tool streaming as a correctness target. It can stream partial/invalid JSON by design, so it needs a separate streaming repair/eager-consumption experiment.
+- MCP, tool search, programmatic tool calling, and skill discovery.
+- Fine-tuning or distillation of protocol traces.
+- Speculative decoding, KV eviction, sub-Q4 KV research, RAG, and sidecar memory.
+
+---
+
+## 4. Thread A - Protocol-faithful tool use
+
+### 4.1 Baseline and instrumentation first
+
+Before changing decoding, add a trace layer around every assistant turn:
+
+- request metadata: model, quantization, context length, prompt template hash, tool schema hash, llama.cpp commit, OS version, hardware tier;
+- decoding metadata: grammar backend, grammar compile time, per-token mask time where available, sampling settings, stop sequences, tool trigger policy;
+- protocol events: emitted text blocks, emitted tool-use blocks, tool-use IDs, tool names, raw argument strings, parsed arguments, parse errors, schema validation errors, repair attempts;
+- outcome metadata: benchmark result, number of turns, retries, time-to-first-token, time-to-first-meaningful-edit, total wall-clock, peak memory, memory-pressure events.
+
+This instrumentation is shared by both research threads. No decoder change should merge without emitting this trace format.
+
+### 4.2 Backend bake-off: GBNF vs LLGuidance vs XGrammar prototype
+
+**Goal.** Determine which backend should carry production work and which backend is worth research investment.
+
+**Conditions.**
+
+1. **GBNF baseline:** current hand-coded grammar path.
+2. **LLGuidance:** upstream llama.cpp structured-output engine, used as the practical near-term alternative.
+3. **XGrammar prototype:** minimal adapter if feasible; otherwise measured outside llama.cpp to estimate upside and integration risk.
+4. **XGrammar-2 investigation:** no production dependency unless dynamic schema switching clearly reduces per-request compilation overhead for tool workloads.
+
+**Metrics.**
+
+- schema compile time;
+- per-token mask generation/apply time;
+- total tokens/sec during structured payload generation;
+- TTFT and end-to-end tool-call latency;
+- schema coverage over the internal protocol matrix;
+- failure mode: unsupported schema keyword, grammar compile failure, invalid continuation, malformed output.
+
+**Acceptance gate.** LLGuidance becomes the default replacement candidate if it preserves protocol conformance and improves or does not materially worsen end-to-end latency. XGrammar advances only if a prototype demonstrates clear value beyond LLGuidance on dynamic schemas or recursive/nested tool arguments.
+
+### 4.3 Schema-to-grammar compiler
+
+Build a per-request compiler from Anthropic tool definitions to the selected backend format.
+
+The compiler must maintain a capability matrix:
+
+| Schema feature | Required for launch? | Notes |
+|---|---:|---|
+| root object input schema | Yes | Anthropic user-defined tools use object-shaped inputs in normal practice. |
+| required / optional fields | Yes | Must preserve requiredness exactly. |
+| string / number / integer / boolean / null | Yes | Include boundary cases and tokenizer edge cases. |
+| arrays and nested objects | Yes | Common in coding tools and file-edit tools. |
+| enum / const | Yes | Needed for command modes and patch operations. |
+| additionalProperties=false | Yes | Critical for strict tool mode. |
+| oneOf / anyOf / allOf | Phase 2 | Must be detected and either compiled or rejected with a clear error. |
+| patternProperties / complex regex | Phase 2 | Backend support varies. |
+| recursive schemas | Research | Useful to test XGrammar's claimed strengths, not required for v1. |
+
+Unsupported schema constructs must fail closed in strict mode and fall back to validated free-form mode only when explicitly configured for research.
+
+### 4.4 Gated two-phase decoder
+
+The original proposal's "free reasoning -> grammar-masked tool call" idea is retained, but with a more precise policy.
+
+**Phase 1: unconstrained deliberation or answer drafting.** The model can reason and decide whether a tool is needed.
+
+**Gate: deterministic transition.** The server detects one of three states:
+
+1. no tool needed -> finish normally;
+2. tool required by harness or `tool_choice` -> force the structured phase;
+3. tool optional -> enter structured phase only when a high-confidence trigger is present.
+
+**Phase 2: constrained tool-use payload.** The backend constrains only the machine-readable content block or internal proxy format. The server then serializes to canonical Anthropic-compatible content blocks.
+
+**Why not rely only on `<tool_call>`?** A model that forgets the tag would be counted as a tool-use recall failure, not a grammar failure. The gate must be instrumented so we can distinguish trigger failures from formatting failures.
+
+### 4.5 Protocol coverage matrix
+
+The internal synthetic suite should cover the Anthropic client-tool surface, not just tag wrapping.
+
+| Case | Expected behavior | Failure modes to record |
+|---|---|---|
+| no tools supplied | no `tool_use` blocks | hallucinated tool |
+| tools supplied, no tool needed | natural-language answer | false positive tool call |
+| forced single tool | exactly one matching `tool_use` | wrong name, bad args, no call |
+| optional single tool | call only when needed | precision/recall split |
+| multiple candidate tools | select correct tool | wrong tool, ambiguous tool |
+| independent parallel calls | multiple `tool_use` blocks in one turn | missing call, serial-only behavior |
+| dependent multi-step call | second call after first `tool_result` | ignores result, repeats same call |
+| tool error result | recover or ask clarifying question | infinite retry, argument thrash |
+| nested arguments | schema-conformant nested JSON | truncation, stringified JSON |
+| large string argument | valid payload under token pressure | broken escaping, early stop |
+| enum/const fields | exact enum value | near-miss strings |
+| strict object | no extra keys | extra keys, missing required keys |
+| stop-sequence collision | no premature stop | truncated arguments |
+
+---
+
+## 5. Thread B - Mac-tier scorecard
+
+### 5.1 Metric stack
+
+The scorecard has four metric families. Wrap-rate remains as a sanity check but is no longer a headline.
+
+| Metric family | Primary metrics | Benchmarks / sources | Why it matters |
 |---|---|---|---|
-| 1. **SWE-bench Lite** (300-instance subsample of original [SWE-bench](https://www.swebench.com/); independent of [SWE-bench Verified](https://www.swebench.com/verified.html), not a subset of it) | Jimenez et al. 2024; reference: [OpenHands CodeAct 2.1 = 53% on Verified, 41.7% on Lite w/ Sonnet 3.5](https://openhands.dev/blog/openhands-codeact-21-an-open-state-of-the-art-software-development-agent), [SWE-agent original = 12.5%](https://arxiv.org/abs/2405.15793) | Yes | External, comparable, paper-grade. Lite is the 16/32 GB tier's realistic ceiling; Verified runs land on 64 GB only. |
-| 2. **LiveCodeBench** (contamination-resistant) | livecodebench.github.io | Yes | SWE-bench Verified is suspected-contaminated for Qwen2.5-Coder-era weights. LiveCodeBench uses post-cutoff problems; pair with SWE-bench so headline claims survive review. |
-| 3. **Aider polyglot** subset (225 exercises) | [aider.chat leaderboard](https://aider.chat/docs/leaderboards/); reference points: Claude Opus 4.5 = 89.4% (current SOTA), GPT-5 = 88%, DeepSeek-V3.2-Exp Reasoner = 74.2%, Qwen3-32B = 40% | Yes | Calibrates against open-weight models and gives a multi-language signal. |
-| 4. **End-to-end task latency** | Internal: time-to-first-meaningful-edit + total wall-clock | Yes | The metric the literature barely reports; uniquely visible from a local rig. |
-| 5. **Multi-turn discipline** | Internal: turns-to-success, retry-rate, loop-detection rate | Yes | SWE-EVO ([arxiv:2512.18470](https://arxiv.org/abs/2512.18470), Dec 2025) shows GPT-5 + OpenHands drops from 65% to 21% under sustained multi-file pressure. Frontier weakness; ripe for measurement. |
+| Protocol fidelity | parse rate, schema conformance, tool precision/recall, semantic argument accuracy, parallel-call correctness, `tool_result` continuation accuracy | Internal Anthropic protocol matrix; BFCL V4/V3 subsets | Isolates tool-use quality from coding skill. |
+| Coding utility | resolved rate, pass@1, edit correctness, malformed edit rate | SWE-bench Lite, SWE-bench Verified where feasible, LiveCodeBench, Aider polyglot | Measures whether protocol improvements translate into useful coding. |
+| Multi-turn discipline | turns-to-success, retries, repeated action loops, context exhaustion, failed recovery after tool errors | Internal coding traces; SWE-EVO as stretch/audit | Captures long-horizon fragility that single-turn tests hide. |
+| Mac viability | TTFT, tokens/sec, time-to-first-meaningful-edit, total wall-clock, peak unified memory, memory pressure, thermal/power mode, cache type | Internal instrumentation | The lab's differentiator: local usefulness under real Mac constraints. |
 
-Wrap-rate stays in the suite as a sanity floor, but is no longer the headline metric.
+### 5.2 Benchmark choices
 
-### 3.3 Two evaluation tiers
+**SWE-bench Lite.** Keep as the main repository-level coding anchor because it is 300 instances and designed for lower-cost evaluation. The proposal should avoid saying Lite is independent from Verified unless the harness computes and reports actual overlap. Both are subsets of the original SWE-bench family.
 
-- **Dev set (~30 instances).** Stratified subsample across SWE-bench Lite difficulty buckets + LiveCodeBench recency buckets + Aider polyglot per-language. Designed to run in ≤ 30 min on a 64 GB Mac so the inner loop is minutes, not hours. This is what every Thread A experiment uses for fast iteration.
-- **Full set.** SWE-bench Lite (300), LiveCodeBench (full), Aider polyglot (225). Wall-clock measured in hours per (model, config). Run only at thread milestones — not every commit.
+**SWE-bench Verified.** Use as a milestone/audit benchmark on the 64 GB tier or an external grading machine. It is valuable but should not gate every Thread A experiment.
 
-### 3.4 Work plan
+**LiveCodeBench.** Retain as a contamination hedge and algorithmic coding signal. Use date-windowed slices based on each candidate model's release/training cutoff when known.
 
-1. **Harness.** Build a dispatcher that takes `(model, config, dev|full)` and emits a structured JSON result. Reuse `host/test/` and `wizard/tester/` scaffolding where possible.
-2. **Anchor runs.** Establish baselines on each tier with current settings: claw profile + GBNF + `q8_0` KV. Publish numbers as the t=0 reference.
-3. **Contamination handling.** Document which benchmarks each candidate model may have seen in training; note in every reported number. Do not retract; flag.
-4. **Calibration.** Re-run ≥ 1 published agent (e.g. mini-SWE-agent) on our scorecard to verify our numbers reproduce theirs within tolerance.
+**Aider polyglot.** Retain for multi-language editing. The official Aider page includes detailed per-run metadata such as edit format, malformed responses, cost, and seconds per case; these fields are useful templates for our own reporting.
 
-### 3.5 Success criteria
+**BFCL.** Add as the primary external tool-calling anchor. BFCL V4 explicitly evaluates function/tool calling accuracy and includes real-world data, periodic updates, latency, and format-sensitivity categories. BFCL V3 is also useful for multi-turn and multi-step tool use.
 
-- Dev-set run completes in ≤ 30 min on 64 GB tier; ≤ 60 min on 32 GB.
-- t=0 baselines published per tier with 95% CI from ≥ 3 seeds.
-- Mini-SWE-agent calibration run reproduces published numbers within ± 2 percentage points on SWE-bench Lite.
-- Every Thread A experiment is reportable as a delta against the t=0 baseline on the dev set within one working day of the change landing.
+**tau-bench and AppWorld.** Hold as optional stretch benchmarks. tau-bench is more user-interaction/policy oriented; AppWorld is more API/coding-agent oriented. Either may be useful after the core scorecard is stable, but adding both at launch would dilute focus.
 
----
+**SWE-EVO / SWE-bench Pro.** Treat as aspiration/audit only. They are valuable because they expose long-horizon, multi-file weakness, but they should not be part of the inner loop.
 
-## 4. First experiments on Thread B
+### 5.3 Evaluation tiers
 
-The scorecard's value is realized only by running experiments on it. These three are committed up front:
+| Tier | Purpose | Contents | Cadence | Target runtime |
+|---|---|---|---|---|
+| Smoke | Catch protocol and latency regressions before merge | 20-40 internal protocol cases, 5-10 coding tasks, tiny BFCL subset | Every decoder/harness PR | <= 30 min on 64 GB; <= 60 min on 32 GB |
+| Dev | Compare research variants with useful signal | Stratified protocol matrix, BFCL subset, Aider mini-slice, LiveCodeBench slice, 10-30 SWE-bench Lite tasks | Every Thread A experiment | Same working day, not necessarily minutes |
+| Milestone | Publishable internal comparison | Full protocol suite, BFCL selected/full, Aider 225, LiveCodeBench selected/full, SWE-bench Lite 300 | Thread milestones | Hours per model/config |
+| Audit | Stress long-horizon claims | SWE-bench Verified, SWE-EVO or SWE-bench Pro subset, larger contexts | Monthly or release-gated | 64 GB tier or external grader |
 
-### 4.1 exp-a — GBNF vs XGrammar
+This structure preserves the original intent - fast iteration and credible full results - without making unrealistic runtime promises.
 
-Validates Thread A step 1. Hypothesis: latency improves, quality unchanged, wrap-rate preserved. Risk: XGrammar integration into llama.cpp may be non-trivial; budget 1 week of engineering before measurement.
+### 5.4 Apple Silicon evaluation caveat
 
-### 4.2 exp-b — Single-phase vs two-phase decoding
+SWE-bench evaluation is Docker-heavy. Official documentation recommends at least 120 GB free disk and 16 GB+ RAM, with Docker resource allocation increased on macOS. Existing image registries provide strong x86_64 coverage, but ARM64 coverage is incomplete and in some cases untested. Therefore:
 
-Validates Thread A core claim. Hypothesis: two-phase recovers ≥ 1 percentage point on Aider polyglot reasoning subset and ≥ 1 percentage point on LiveCodeBench, no regression on SWE-bench Lite or wrap-rate. Direct test of Tam et al. on our models.
+1. The scorecard must record **generation host** and **grading host** separately.
+2. For Mac-tier claims, model inference must run on the target Mac tier.
+3. Patch grading may run on native ARM64 Docker, x86_64 emulation, or an external x86_64 grader, but the mode must be reported.
+4. Latency claims must separate model-generation latency from repository test execution latency.
+5. A preflight step must verify Docker image availability and native/emulated architecture for every SWE-bench instance selected into smoke/dev sets.
 
-### 4.3 exp-c — KV-cache quantization sweep (mainline-only)
+This is not a blocker. It is a measurement hygiene requirement.
 
-Folds in the original "Topic 3" question, scoped to KV-quant options *that already ship in llama.cpp*: `f16` baseline, `q8_0` (current), `q5_1`, `q5_0`, `q4_1`, `q4_0`, `iq4_nl`. Sweep at 32K / 64K / 128K context per tier.
+### 5.5 Statistical plan
 
-Hypothesis: the Pareto frontier picks differ per tier, and the 16 GB tier becomes viable only with `q4_0` or `iq4_nl` KV at ≤ 32K context. Measure regressions on every scorecard metric; pick the per-tier default that maximizes (quality preserved at fixed context budget).
+For each comparison, report:
 
-Explicit non-goals for exp-c: KIVI 2-bit ([arxiv:2402.02750](https://arxiv.org/abs/2402.02750)), H2O eviction ([arxiv:2306.14048](https://arxiv.org/abs/2306.14048)), Apple LLM-in-a-flash style tiered loading ([arxiv:2312.11514](https://arxiv.org/abs/2312.11514)). Those would require a llama.cpp fork or move to MLX. If the scorecard motivates them, that's a follow-on engineering project, not part of this research.
+- exact task list and task hashes;
+- deterministic seed and sampling settings;
+- paired outcome table versus baseline;
+- Wilson interval for single-condition proportions;
+- paired bootstrap interval over task instances for deltas;
+- McNemar-style significance check for binary pass/fail deltas when appropriate;
+- n=3 stochastic repeats only where decoding remains stochastic enough to matter.
 
----
-
-## 5. Out of scope for this proposal
-
-To prevent scope creep, the following are explicitly deferred:
-
-- **Speculative decoding.** EAGLE-2/3, Medusa, vanilla draft-model spec sampling. Real latency lever, but training EAGLE heads for our target models is an engineering project of its own. Tracked separately; not in this proposal's success criteria.
-- **Sub-Q4 KV cache or eviction.** See exp-c non-goals.
-- **Fine-tuning.** Distilling Anthropic-protocol traces onto Qwen2.5-Coder-7B/14B is the natural next research bet (high-leverage for the 16 GB tier). Out of scope here so the scorecard exists *first* — without it we can't measure the win.
-- **RAG / sidecar memory.** Already on the project's Phase 3+ roadmap.
-- **Web search, Caddy, Tailscale, WoL.** Phase 2+ infrastructure, not research.
+Do not claim a 1 pp win or loss on the smoke/dev set. Use dev results to decide whether to advance to milestone runs. For milestone/full runs, define non-inferiority margins before running: e.g. no more than 2 pp absolute degradation on coding success and no statistically clear increase in malformed protocol events.
 
 ---
 
-## 6. Risks & open questions
+## 6. First experiments
 
-1. **XGrammar ↔ llama.cpp integration cost.** XGrammar's reference implementation targets MLC-LLM, SGLang, vLLM, TensorRT-LLM, and (since late 2025) Mirai/OpenVINO; llama.cpp mainline is *not* on that list as of April 2026. A llama.cpp adapter may require non-trivial work. Two fallbacks: (a) measure two-phase with hand-rolled GBNF first; XGrammar swap second; (b) evaluate llama.cpp's already-mainlined **LLGuidance** (`common/llguidance.cpp`) — Microsoft's fast structured-output engine — as a drop-in for the GBNF path. LLGuidance lacks XGrammar's published 100× headline but is in-tree today, which lets us decouple "two-phase decoding wins" from "XGrammar port lands." Also track XGrammar 2 ([arxiv:2601.04426](https://arxiv.org/abs/2601.04426), Jan 2026), which adds dynamic schema switching aimed at agentic workloads — exactly our use case.
-2. **Benchmark contamination.** SWE-bench Verified contamination on Qwen2.5-Coder is suspected, not proven. LiveCodeBench is the hedge; flag contamination risk in every reported number.
-3. **Dev-set representativeness.** A 30-instance subsample may have high variance vs. full-set. Bootstrap CI on every dev-set number; require full-set confirmation before any externally-published claim.
-4. **Tool-call coverage during two-phase decode.** When does the model decide to stop free reasoning and emit `<tool_call>`? If we rely on the model emitting a stop sequence we may miss cases where it forgets. Investigate forced-format prompts vs trained discipline.
-5. **Apple Silicon idiosyncrasies.** `--cache-type-v` quantization needs `-fa` (flash attention) on Metal; older ggml versions had quirks. Document the exact llama.cpp commit each scorecard run uses.
-6. **SWE-EVO regime.** Even GPT-5 + OpenHands drops to 21% on multi-file long-horizon tasks. We should measure on it as an aspirational ceiling — even our best result will be far below frontier — but include it specifically because the gap is interesting.
+### E0 - Scorecard t=0 baseline
+
+**Question.** What does the current system actually do on each Mac tier?
+
+**Run.** Current claw profile + current GBNF grammar + current KV settings + pinned model roster per tier.
+
+**Outputs.**
+
+- scorecard JSON for each tier;
+- trace bundle for every task;
+- report with hardware, OS, llama.cpp commit, model hash, quantization, context length, KV cache type, and prompt-template hash;
+- known failures grouped into protocol, decoding, model, harness, grading, and Mac resource categories.
+
+**Gate.** No Thread A decoder change starts until E0 has produced at least smoke and dev baselines.
+
+### E1 - Structured-output backend bake-off
+
+**Question.** Is the current GBNF path the right baseline, or should LLGuidance replace it before XGrammar work?
+
+**Arms.** GBNF, LLGuidance, XGrammar prototype if feasible.
+
+**Primary metrics.** Protocol conformance, schema coverage, structured-output latency, TTFT, tokens/sec during tool payload generation.
+
+**Decision.** Pick the near-term backend for E2. Keep XGrammar/XGrammar-2 as a research track only if it beats LLGuidance on dynamic schema workload or supports schema constructs LLGuidance/GBNF cannot handle cleanly.
+
+### E2 - Single-phase vs gated two-phase decoding
+
+**Question.** Does gating constrained decoding recover reasoning quality without losing protocol fidelity?
+
+**Arms.**
+
+1. free-form decoding + post-hoc parser/repair;
+2. single-phase constrained decoding;
+3. gated two-phase constrained decoding.
+
+**Primary metrics.**
+
+- tool-use recall and precision;
+- argument conformance and semantic accuracy;
+- Aider/LiveCodeBench/SWE-bench Lite deltas on dev set;
+- malformed response rate;
+- time-to-first-meaningful-edit and total wall-clock.
+
+**Success criterion.** Two-phase must be non-inferior to free-form coding quality on milestone runs while materially reducing malformed or unparseable tool calls. A small latency cost is acceptable only if Mac-tier end-to-end task time does not regress meaningfully.
+
+### E3 - KV-cache quantization sweep
+
+**Question.** Which KV cache setting maximizes useful local context per Mac tier?
+
+**Scope.** Mainline llama.cpp options only, pinned to the exact commit used in the scorecard. Planned sweep from the original proposal: `f16`, `q8_0`, `q5_1`, `q5_0`, `q4_1`, `q4_0`, `iq4_nl`, subject to what the pinned build exposes.
+
+**Contexts.** 32K / 64K / 128K where the model and tier can support them without pathological swapping.
+
+**Metrics.**
+
+- coding utility deltas;
+- protocol failure deltas;
+- prompt processing and decode tokens/sec;
+- peak unified memory and memory pressure;
+- crash/OOM rate;
+- Metal/flash-attention requirements and failures.
+
+**Decision.** Select per-tier defaults. The 16 GB tier may prioritize survival and 32K context; the 64 GB tier may prioritize quality and longer context. Do not pick one global default unless the data supports it.
+
+### E4 - Protocol stress and negative controls
+
+**Question.** Are improvements real, or are we overfitting prompt and schema formats?
+
+**Run.** Add adversarial schema/name variations, no-tool tasks, similar-tool ambiguity, and stop-sequence collision cases. Include a prompt-only condition to test format sensitivity.
+
+**Decision.** Any backend that passes the happy path but fails negative controls is not protocol-faithful.
 
 ---
 
-## 7. Reading list (verified citations from the research pass)
+## 7. Success criteria
 
-Papers and resources that directly inform this proposal. Every numeric claim above is traceable to one of these.
+### Thread A success
 
-**Tool-call quality / structured generation:**
-- XGrammar — [arxiv:2411.15100](https://arxiv.org/abs/2411.15100) (Dong et al., MLSys '25). 100× over GBNF, near-zero overhead, full CFG.
-- XGrammar 2 — [arxiv:2601.04426](https://arxiv.org/abs/2601.04426) (Jan 2026). Dynamic schema switching for agentic LLMs; directly relevant to per-request grammar derivation in §2.3 step 3.
-- LLGuidance — [github.com/guidance-ai/llguidance](https://github.com/guidance-ai/llguidance). Microsoft's structured-output engine; already integrated into llama.cpp mainline (`common/llguidance.cpp`). Pragmatic fallback to XGrammar.
-- "Let Me Speak Freely?" — [arxiv:2408.02442](https://arxiv.org/abs/2408.02442) (Tam et al. 2024). Constrained decoding hurts reasoning.
-- "Generating Structured Outputs from Language Models" — [arxiv:2501.10868](https://arxiv.org/abs/2501.10868) (Jan 2025). Benchmark of XGrammar / Outlines / GBNF / LLGuidance across efficiency and quality. Useful methodological template for exp-a.
-- CodeAct — [arxiv:2402.01030](https://arxiv.org/abs/2402.01030) (Wang et al. 2024). Code-as-action +20% over JSON.
+Thread A is successful if, on milestone runs:
 
-**Agent harness & evaluation:**
-- SWE-agent — [arxiv:2405.15793](https://arxiv.org/abs/2405.15793) (Yang et al., NeurIPS '24). ACI design as a research surface; 12.5% on original SWE-bench.
-- OpenHands CodeAct 2.1 — [Nov 2025 announcement](https://openhands.dev/blog/openhands-codeact-21-an-open-state-of-the-art-software-development-agent). 53% on SWE-bench Verified, 41.7% on SWE-bench Lite, w/ Claude Sonnet 3.5.
-- OpenHands Software Agent SDK — [arxiv:2511.03690](https://arxiv.org/abs/2511.03690) (Nov 2025). Composable foundation for production agents; relevant priors for the dispatcher in §3.4 step 1.
-- SWE-bench (original) — [arxiv:2310.06770](https://arxiv.org/abs/2310.06770) (Jimenez et al., ICLR '24). 2,294 instances; both Lite (300, easier subsample) and Verified (500, human-validated solvable) are independent subsets of this set.
-- SWE-bench Verified — [swebench.com/verified.html](https://www.swebench.com/verified.html).
-- SWE-bench Lite — [swebench.com/lite.html](https://www.swebench.com/lite.html).
-- Aider polyglot — [aider.chat/docs/leaderboards](https://aider.chat/docs/leaderboards/).
-- SWE-EVO — [arxiv:2512.18470](https://arxiv.org/abs/2512.18470) (Dec 2025). Multi-file long-horizon weakness; GPT-5+OpenHands = 21% (vs 65% on SWE-bench Verified). 48 tasks, avg 21 files modified, 874 tests/instance.
-- SWE-bench Pro — [arxiv:2509.16941](https://arxiv.org/abs/2509.16941) (Sep 2025). Long-horizon SWE companion to SWE-EVO; hold in reserve as a stretch metric.
+1. protocol conformance improves materially versus the current GBNF baseline;
+2. tool-use precision and recall improve or remain non-inferior;
+3. coding quality is non-inferior to free-form decoding within the predeclared margin;
+4. structured-output latency is improved versus the current path, or any overhead is small enough that end-to-end task time is not meaningfully worse;
+5. schema coverage expands beyond the current hand-coded one-format grammar;
+6. trace-level failure analysis shows fewer malformed, repaired, or silently dropped tool calls.
 
-**KV-cache compression (out-of-scope context for exp-c non-goals):**
-- KIVI — [arxiv:2402.02750](https://arxiv.org/abs/2402.02750) (Liu et al., ICML '24). Tuning-free 2-bit KV; 2.6× memory.
-- H2O — [arxiv:2306.14048](https://arxiv.org/abs/2306.14048) (Zhang et al. 2023). Heavy-hitter eviction at 20%.
-- LLM in a flash — [arxiv:2312.11514](https://arxiv.org/abs/2312.11514) (Alizadeh et al., ACL '24). Apple's flash-tiered loading.
+### Thread B success
 
-**Speculative decoding (deferred — referenced for completeness):**
-- EAGLE-2 — [arxiv:2406.16858](https://arxiv.org/abs/2406.16858), 3.05–4.26× lossless.
-- EAGLE-3 — [arxiv:2503.01840](https://arxiv.org/abs/2503.01840), up to 6.5×; not yet in mainline llama.cpp ([discussion #15902](https://github.com/ggml-org/llama.cpp/discussions/15902)).
+Thread B is successful if:
 
-**Models referenced:**
-- Qwen2.5-Coder — [arxiv:2409.12186](https://arxiv.org/abs/2409.12186). Six sizes 0.5B–32B; at-size SOTA on 10+ benchmarks. Primary contamination-risk anchor for SWE-bench Verified.
-- Qwen3 — [arxiv:2505.09388](https://arxiv.org/abs/2505.09388) (May 2025). 0.6B–235B; dense + MoE; unified thinking/non-thinking modes. Tier-64 currently runs Qwen3.6-35B-A3B per recent repo state — scorecard t=0 baselines should explicitly name commit + variant per tier.
+1. every benchmark run emits a stable JSON result and trace bundle;
+2. smoke runs are fast enough to gate decoder PRs;
+3. dev runs are fast enough to compare Thread A experiments within one working day;
+4. t=0 baselines exist for 16 GB, 32 GB, and 64 GB tiers;
+5. at least one external harness calibration is performed using SWE-bench/mini-SWE-agent or published predictions, with version-matched expectations;
+6. reports include confidence intervals, task lists, hardware metadata, and contamination notes;
+7. every future decoder, KV, prompt, model, or harness change can be reported as a delta against t=0.
 
 ---
 
-## 8. Recommended next steps
+## 8. Risks and mitigations
 
-1. Research-team review of this proposal; commit or revise.
-2. If accepted: stand up the scorecard harness skeleton (Thread B step 1) before any Thread A code lands. The discipline rule is: no Thread A change merges without a dev-set scorecard delta in the PR description.
-3. Set milestone dates per thread; carve out an explicit "scorecard t=0 baselines published" gate before exp-a runs.
-4. Decide who runs full-set evaluations and on what cadence (monthly? per-release?).
+| Risk | Severity | Mitigation |
+|---|---:|---|
+| XGrammar integration into llama.cpp takes longer than expected | High | Use LLGuidance as the practical first alternative; keep XGrammar as prototype until justified. |
+| Two-phase trigger misses tool calls | High | Measure trigger precision/recall separately; include forced-tool and optional-tool conditions. |
+| Schema compiler silently weakens schemas | High | Maintain a feature matrix; fail closed for unsupported strict schemas. |
+| SWE-bench on Apple Silicon is slow or inconsistent | High | Preflight image architecture; separate generation from grading; report native vs emulated tests. |
+| Dev set variance hides real regressions | Medium | Use paired comparisons and full-set confirmation before external claims. |
+| Benchmark contamination affects model conclusions | Medium | Report model release/training dates when known; use LiveCodeBench/SWE-bench Live-style date slices as hedges. |
+| KV quantization changes quality subtly | Medium | Sweep against coding and protocol metrics, not perplexity or speed alone. |
+| Apple Silicon thermal/memory pressure confounds latency | Medium | Fix power mode where possible; record peak memory, memory pressure, and run order. |
+| Tool benchmark does not resemble coding harness tools | Medium | Pair BFCL with internal tool matrix modeled after actual file/edit/bash tools. |
+
+---
+
+## 9. Milestone plan
+
+### Gate 0 - Measurement skeleton
+
+- Define result JSON schema and trace schema.
+- Add hardware/profile metadata capture.
+- Add protocol matrix runner.
+- Add smoke/dev/full tier selection files.
+
+### Gate 1 - t=0 baselines
+
+- Run current system across target Mac tiers where hardware is available.
+- Publish baseline report with failure taxonomy.
+- Validate SWE-bench Docker mode on Apple Silicon for selected tasks.
+
+### Gate 2 - Backend bake-off
+
+- Run E1 on smoke and dev.
+- Pick near-term backend for E2.
+- Decide whether XGrammar/XGrammar-2 remains active in this proposal or moves to a follow-on integration project.
+
+### Gate 3 - Gated two-phase decoder
+
+- Implement gate and constrained payload phase.
+- Run E2 on dev.
+- Advance to milestone only if protocol metrics improve and coding quality is non-inferior on dev.
+
+### Gate 4 - KV-tier defaults
+
+- Run E3 by tier.
+- Publish default model/context/KV profile per Mac tier.
+
+### Gate 5 - Milestone report
+
+- Run milestone scorecard for selected model/config pairs.
+- Publish results, traces, and analysis.
+- Decide whether next research bet is fine-tuning protocol traces, MLX migration, speculative decoding, or long-horizon memory.
+
+---
+
+## 10. Recommended near-term decisions
+
+1. **Approve the project, but revise the first engineering milestone.** Start with instrumentation and LLGuidance-vs-GBNF, not an immediate XGrammar port.
+2. **Add BFCL and the internal Anthropic protocol matrix to the headline metrics.** SWE-bench/Aider/LiveCodeBench are necessary but do not isolate tool-call failures.
+3. **Rename the Thread A target from "tool-call wrapping" to "protocol-faithful tool use."** This makes the work harder but more publishable and more useful.
+4. **Split the evaluation tiers into smoke/dev/milestone/audit.** Keep the inner loop fast without pretending full coding-agent evaluation is cheap on local Macs.
+5. **Make Apple Silicon Docker feasibility a Gate 1 deliverable.** If repository tests must run externally or under x86_64 emulation, say so in every report.
+6. **Predeclare statistical margins.** Avoid cherry-picking small task-set deltas.
+
+---
+
+## 11. Reference notes verified during this review
+
+- **XGrammar.** Reports acceleration for context-free-grammar constrained generation through vocabulary partitioning into context-independent and context-dependent tokens, with up to 100x speedups over existing approaches and near-zero overhead in serving settings.[^xgrammar]
+- **XGrammar-2.** Targets dynamic agentic structured generation such as tool calling, adds TagDispatch/JIT/cross-grammar caching, and reports more than 6x speedup over existing structured generation engines for dynamic workloads.[^xgrammar2]
+- **LLGuidance.** Supports JSON Schema, regex, and CFG-style grammars, and is integrated with llama.cpp via a CMake option.[^llguidance]
+- **Format restriction risk.** Tam et al. report significant reasoning declines under structured format restrictions, with stricter constraints generally causing larger degradation on reasoning tasks.[^speakfreely]
+- **Structured-output evaluation.** JSONSchemaBench evaluates constrained decoding across efficiency, schema coverage, and output quality for engines including llama.cpp, XGrammar, Guidance, OpenAI, and Gemini.[^jsonschemabench]
+- **Anthropic tool semantics.** Claude client tools return one or more `tool_use` blocks with stop reason `tool_use`; the application executes them and returns `tool_result` blocks. Strict tool use and parallel tool use are part of the documented surface.[^anthropic-tools]
+- **CodeAct.** Code-as-action outperformed text/JSON alternatives by up to 20% success rate across tested settings, supporting the broader point that action format is a first-class research variable.[^codeact]
+- **SWE-bench family.** SWE-bench Lite is a 300-instance subset for cheaper evaluation; Verified is a 500-instance human-validated subset. Treat both as subsets of the same benchmark family and check overlap before making independence claims.[^swe-lite][^swe-verified]
+- **SWE-bench on Mac.** SWE-bench uses Docker-based grading and recommends substantial disk/RAM. Optimized x86_64 image registries are much more complete than ARM64 registries, making Apple Silicon grading a systems risk.[^swe-docker][^epoch-swe]
+- **LiveCodeBench.** Continuously collects new coding problems over time and is positioned as contamination-free/contamination-resistant for code evaluation.[^livecodebench]
+- **Aider polyglot.** Tests 225 Exercism exercises across C++, Go, Java, JavaScript, Python, and Rust; official leaderboard metadata includes edit format, malformed responses, time per case, and other useful reporting fields.[^aider]
+- **BFCL.** BFCL V4 evaluates function/tool calling accuracy and includes real-world data, latency, and format-sensitivity categories; V3 introduced multi-turn/multi-step function calling.[^bfcl]
+- **tau-bench and AppWorld.** tau-bench evaluates tool-agent-user interaction with domain policies; AppWorld provides a high-fidelity app/API environment with programmatic state and execution checks.[^taubench][^appworld]
+- **SWE-EVO and SWE-bench Pro.** Both highlight long-horizon software-engineering gaps and are best treated as audit/stretch metrics rather than inner-loop tests.[^sweevo][^swepro]
+- **Qwen model context.** Qwen2.5-Coder covers 0.5B through 32B model sizes; Qwen3 introduces dense and MoE models from 0.6B to 235B with thinking/non-thinking modes; Qwen3.6-35B-A3B is a recent open-weight MoE option relevant to the 32/64 GB tiers if it fits the local runtime.[^qwen25][^qwen3][^qwen36]
+
+---
+
+## Appendix A - Minimal scorecard JSON shape
+
+```json
+{
+  "run_id": "2026-04-30_qwen36_35b_a3b_llguidance_dev",
+  "timestamp_utc": "2026-04-30T00:00:00Z",
+  "hardware": {
+    "tier": "64gb",
+    "machine": "MacBook Pro / Mac Studio",
+    "chip": "Apple Silicon model string",
+    "os": "macOS version",
+    "power_mode": "recorded if available"
+  },
+  "model": {
+    "name": "model name",
+    "weights_hash": "sha256-or-gguf-hash",
+    "quantization": "Q4_K_M / etc",
+    "context_tokens": 32768,
+    "kv_cache_k": "q8_0",
+    "kv_cache_v": "q8_0"
+  },
+  "server": {
+    "runtime": "llama.cpp",
+    "commit": "git-sha",
+    "metal": true,
+    "flash_attention": true,
+    "structured_backend": "gbnf|llguidance|xgrammar-prototype",
+    "decoder_policy": "free|single_phase|gated_two_phase"
+  },
+  "benchmark": {
+    "suite": "protocol_matrix|bfcl|aider|livecodebench|swe_bench_lite",
+    "split": "smoke|dev|milestone|audit",
+    "task_id": "stable-task-id",
+    "task_hash": "hash"
+  },
+  "metrics": {
+    "success": true,
+    "parse_ok": true,
+    "schema_ok": true,
+    "tool_precision_event": null,
+    "tool_recall_event": null,
+    "turns": 3,
+    "retries": 0,
+    "ttft_ms": 0,
+    "time_to_first_edit_ms": 0,
+    "wall_ms": 0,
+    "peak_memory_mb": 0,
+    "tokens_per_second_decode": 0.0
+  },
+  "grading": {
+    "host_arch": "arm64|x86_64",
+    "docker_mode": "native|emulated|external",
+    "image": "image-ref",
+    "result": "passed|failed|error"
+  }
+}
+```
+
+---
+
+## References
+
+[^xgrammar]: Yixin Dong et al., "XGrammar: Flexible and Efficient Structured Generation Engine for Large Language Models," arXiv:2411.15100, https://arxiv.org/abs/2411.15100.
+[^xgrammar2]: Linzhang Li et al., "XGrammar-2: Dynamic and Efficient Structured Generation Engine for Agentic LLMs," arXiv:2601.04426, https://arxiv.org/abs/2601.04426.
+[^llguidance]: LLGuidance project and llama.cpp integration notes, https://github.com/guidance-ai/llguidance and https://github.com/ggml-org/llama.cpp/blob/master/docs/llguidance.md.
+[^speakfreely]: Zhi Rui Tam et al., "Let Me Speak Freely? A Study on the Impact of Format Restrictions on Performance of Large Language Models," arXiv:2408.02442, https://arxiv.org/abs/2408.02442.
+[^jsonschemabench]: Saibo Geng et al., "Generating Structured Outputs from Language Models: Benchmark and Studies," arXiv:2501.10868, https://arxiv.org/abs/2501.10868.
+[^anthropic-tools]: Anthropic Claude API docs, "Tool use with Claude," https://platform.claude.com/docs/en/agents-and-tools/tool-use/overview.
+[^codeact]: Xingyao Wang et al., "Executable Code Actions Elicit Better LLM Agents," arXiv:2402.01030, https://arxiv.org/abs/2402.01030.
+[^swe-lite]: SWE-bench Lite, https://www.swebench.com/lite.html.
+[^swe-verified]: SWE-bench Verified, https://www.swebench.com/verified.html.
+[^swe-docker]: SWE-bench Docker setup guide, https://github.com/SWE-bench/SWE-bench/blob/main/docs/guides/docker_setup.md.
+[^epoch-swe]: Epoch AI SWE-bench Docker image registry, https://github.com/epoch-research/SWE-bench.
+[^livecodebench]: LiveCodeBench, https://livecodebench.github.io/.
+[^aider]: Aider LLM leaderboards, https://aider.chat/docs/leaderboards/.
+[^bfcl]: Berkeley Function-Calling Leaderboard, https://gorilla.cs.berkeley.edu/leaderboard.html.
+[^taubench]: Shunyu Yao et al., "tau-bench: A Benchmark for Tool-Agent-User Interaction in Real-World Domains," arXiv:2406.12045, https://arxiv.org/abs/2406.12045.
+[^appworld]: Harsh Trivedi et al., "AppWorld: A Controllable World of Apps and People for Benchmarking Interactive Coding Agents," arXiv:2407.18901, https://arxiv.org/abs/2407.18901.
+[^sweevo]: Minh V. T. Thai et al., "SWE-EVO: Benchmarking Coding Agents in Long-Horizon Software Evolution Scenarios," arXiv:2512.18470, https://arxiv.org/abs/2512.18470.
+[^swepro]: Xiang Deng et al., "SWE-Bench Pro: Can AI Agents Solve Long-Horizon Software Engineering Tasks?" arXiv:2509.16941, https://arxiv.org/abs/2509.16941.
+[^qwen25]: Binyuan Hui et al., "Qwen2.5-Coder Technical Report," arXiv:2409.12186, https://arxiv.org/abs/2409.12186.
+[^qwen3]: An Yang et al., "Qwen3 Technical Report," arXiv:2505.09388, https://arxiv.org/abs/2505.09388.
+[^qwen36]: Qwen, "Qwen3.6-35B-A3B: Agentic Coding Power, Now Open to All," https://qwen.ai/blog?id=qwen3.6-35b-a3b.
