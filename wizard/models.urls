@@ -1,0 +1,15 @@
+# tier → GGUF source (mirrors host/llama-server/models.conf curl recipes).
+# Format: TIER_<N>_GGUF=<absolute path>; TIER_<N>_URL=<download URL>.
+# Used by steps/46-model-fetch.sh.
+
+TIER_16_GGUF="$HOME/.ollama/gguf/Qwen2.5-7B-Instruct-Q5_K_M.gguf"
+TIER_16_URL="https://huggingface.co/bartowski/Qwen2.5-7B-Instruct-GGUF/resolve/main/Qwen2.5-7B-Instruct-Q5_K_M.gguf"
+TIER_16_MIN_BYTES=4500000000
+
+TIER_32_GGUF="$HOME/.ollama/gguf/Qwen3-14B-Q4_K_M.gguf"
+TIER_32_URL="https://huggingface.co/unsloth/Qwen3-14B-GGUF/resolve/main/Qwen3-14B-Q4_K_M.gguf"
+TIER_32_MIN_BYTES=8000000000
+
+TIER_64_GGUF="$HOME/.ollama/gguf/Qwen3.6-35B-A3B-UD-Q4_K_XL.gguf"
+TIER_64_URL="https://huggingface.co/unsloth/Qwen3.6-35B-A3B-GGUF/resolve/main/Qwen3.6-35B-A3B-UD-Q4_K_XL.gguf"
+TIER_64_MIN_BYTES=20000000000
