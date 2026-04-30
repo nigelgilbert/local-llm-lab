@@ -33,15 +33,20 @@ On-edge compute is the only kind of compute you actually own. This rig is built 
 
 ### 3. Architecture, not just inference
 
-The mission isn't "run a model." It's to demonstrate that on a single laptop you can compose:
+The mission isn't "run a model." It's to ship two real **products** built from a team of small specialists, on hardware you already own:
 
-- **Profile-based model swapping** — `general`, `fast`, `reasoning`, `digest`, `analyze`, plus `claw` for agentic coding. Each profile is the *right model for the job*, not a finetune of one base. Picking models is the cheapest, highest-leverage tuning step.
-- **Agentic coding loops** via `claw-code` through a LiteLLM Anthropic-API bridge. The same shape Claude Code has — tools, file edits, multi-turn — running entirely against a local model.
-- **Long-context summarization and reasoning** with MoE models that prefill quickly enough to make 256K context windows usable on consumer hardware.
-- **Retrieval-augmented memory** (Phase 3) — sidecar-loader feeds curated knowledge bases per profile, idempotently synced.
-- **A LAN-shared, multi-user UI** so the rig is a shared family / lab resource, not a single-user tool.
+- **`chat`** — 100% local ChatGPT. Ask a question, get a grounded answer, optionally over your own corpus.
+- **`code`** — 100% local Claude Code. An agentic coding loop with tools, file edits, and multi-turn work, via [`claw-code`](https://github.com/ultraworkers/claw-code) through a LiteLLM Anthropic-API bridge talking to a local model.
 
-That stack — swap + agent + retrieval + UI — is the same general shape the hosted products use. Doing it locally with small open models is the proof.
+The pattern under both is a **multi-net architecture** — a team of small specialists, not one giant model. A typical `chat` request flows router → optional query rewrite → embedder → vector search → reranker → reasoning LLM → answer; cheap stages do most of the work, and the one expensive stage (the reasoning LLM) is where extra memory pays off. Profiles swap into that reasoning stage by task — `general`, `fast`, `reasoning`, `digest`, `analyze`, `claw` — each the right model for the job, not a finetune of one base.
+
+The same shape compresses across tiers. At 64 GB the reasoning stage is a 27–49B model behind Open WebUI; at 16 GB it's a ~7 GB sidecar — Qwen2.5-7B Q4 reasoning, nomic embed, bge reranker, sqlite-vec store, ~200 lines of glue. Same architecture, different budget. That stack — multi-net + agent + retrieval — is the same general shape the hosted products use. Doing it locally with small open models is the proof.
+
+## A frontier lab in a box
+
+This project is built by an autonomous agent swarm — research, evals, specs, code — with the human as director rather than coder. The swarm runs on Claude Opus 4.7 today, not on the local rig itself. The artifacts (calibrated tier-stratified evals, sampler sweeps, internal proposals signed under autonomous-research mandate) live in [`host/test/docs/`](host/test/docs/).
+
+That's why `code` matters as a product. A 100% local Claude Code harness is the substrate for an eventually-100%-local research loop. The agents drafting this manifesto are Opus; the goal is the day they're a team of small specialists running on the laptop they're optimizing.
 
 ## What this project actually is
 
