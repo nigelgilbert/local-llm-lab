@@ -42,14 +42,19 @@ render_template() {
     fail "template not found: $src"
     return 1
   fi
+  # Bash 5.2 enables `patsub_replacement` by default, which makes `&` in the
+  # replacement string mean "the matched text" — that would corrupt any value
+  # containing &. Disable it for this scope; on bash 3.2 the shopt doesn't
+  # exist, so the call no-ops and `&` is already literal.
+  shopt -u patsub_replacement 2>/dev/null || true
   local body
   body=$(cat "$src")
-  local kv k v
+  local kv k v needle
   for kv in "$@"; do
     k="${kv%%=*}"
     v="${kv#*=}"
-    # Escape for sed: we use a sentinel | because keys are hex.
-    body=$(printf '%s' "$body" | sed "s|\${${k}}|${v}|g")
+    needle="\${${k}}"
+    body="${body//$needle/$v}"
   done
   mkdir -p "$(dirname "$dst")"
   printf '%s\n' "$body" > "$dst"

@@ -51,7 +51,6 @@ EOF
 cmd_install() {
   log_init
   step_00_main
-  step_10_main
   step_20_main
   step_30_main
   step_32_main
@@ -159,8 +158,8 @@ cmd_doctor() {
 main() {
   case "${1:-install}" in
     install)         shift || true; cmd_install "$@" ;;
-    test)            shift; cmd_test "$@" ;;
-    selftest)        shift; cmd_selftest "$@" ;;
+    test)            shift || true; cmd_test "$@" ;;
+    selftest)        shift || true; cmd_selftest "$@" ;;
     doctor)          cmd_doctor ;;
     -h|--help|help)  cmd_help ;;
     *) printf "unknown subcommand: %s\n\n" "$1" >&2; cmd_help; exit 1 ;;

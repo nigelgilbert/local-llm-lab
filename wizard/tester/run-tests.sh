@@ -241,6 +241,24 @@ render_template "$LOGS/does-not-exist" "$LOGS/x" "K=v" >/dev/null 2>&1
 [ $? -ne 0 ] && t_ok "render_template missing src -> nonzero" \
   || t_not_ok "render_template missing src"
 
+# 3k. render_template handles sed metacharacters in values (|, &, /, \)
+src2="$LOGS/tmpl2.in"; dst2="$LOGS/tmpl2.out"; rm -f "$dst2"
+printf 'P=${PATHY}\nA=${AMP}\nB=${BSL}\n' > "$src2"
+render_template "$src2" "$dst2" \
+  'PATHY=/a/b|c/d' 'AMP=x&y' 'BSL=back\slash'
+grep -q '^P=/a/b|c/d$' "$dst2" \
+  && grep -q '^A=x&y$' "$dst2" \
+  && grep -q '^B=back\\slash$' "$dst2" \
+  && t_ok "render_template handles |, &, \\ in values without escaping" \
+  || t_not_ok "render_template metacharacter handling" "$(cat "$dst2" | tr '\n' '|')"
+
+# 3l. state file is chmod 600 after state_set (key material protection)
+WIZARD_STATE_FILE="$LOGS/state-perms.txt"; rm -f "$WIZARD_STATE_FILE"
+state_set SECRETKEY "sk-abcdef"
+perms=$(stat -c '%a' "$WIZARD_STATE_FILE" 2>/dev/null || stat -f '%Lp' "$WIZARD_STATE_FILE" 2>/dev/null)
+[ "$perms" = "600" ] && t_ok "state_set chmods state file to 600" \
+  || t_not_ok "state file perms" "got [$perms]"
+
 # ============================================================================
 # 4. DETECTION
 # ============================================================================
@@ -432,6 +450,27 @@ if ! step_48_is_done; then
 else
   t_not_ok "step_48_is_done missing .env"
 fi
+
+# 46 is_done — file exists but smaller than MIN_BYTES -> false (catches a
+# half-finished resumable download that was abandoned mid-stream).
+WIZARD_STATE_FILE="$LOGS/state-step46.txt"; rm -f "$WIZARD_STATE_FILE"
+state_set TIER 16
+state_set TOPOLOGY full-local
+# Resolve the tier-16 target path the same way the step does, then plant a
+# 1-byte file there. is_done must reject it (real GGUF is ~5 GB).
+HOME_SAVE="$HOME"
+export HOME="$LOGS/fakehome46"
+mkdir -p "$HOME/.ollama/gguf"
+step_46_resolve 16
+mkdir -p "$(dirname "$TARGET_GGUF")"
+printf 'x' > "$TARGET_GGUF"
+if ! step_46_is_done 16; then
+  t_ok "step_46_is_done: undersized GGUF (1 byte) -> false"
+else
+  t_not_ok "step_46_is_done undersized" "expected false for 1-byte file"
+fi
+rm -f "$TARGET_GGUF"
+export HOME="$HOME_SAVE"
 
 # ============================================================================
 # 6. ENTRYPOINT DISPATCHER (bash + zsh)

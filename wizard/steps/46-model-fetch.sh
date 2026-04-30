@@ -12,8 +12,9 @@ step_46_resolve() {
   eval "TARGET_GGUF=\"\${TIER_${tier}_GGUF}\""
   eval "TARGET_URL=\"\${TIER_${tier}_URL}\""
   eval "TARGET_MIN=\"\${TIER_${tier}_MIN_BYTES}\""
-  # Expand $HOME inside the loaded value.
-  TARGET_GGUF=$(eval "printf '%s' \"$TARGET_GGUF\"")
+  # Expand a leading $HOME via parameter substitution rather than eval — the
+  # value comes from an in-repo data file but eval-on-data is a footgun.
+  TARGET_GGUF="${TARGET_GGUF/#\$HOME/$HOME}"
 }
 
 step_46_is_done() {

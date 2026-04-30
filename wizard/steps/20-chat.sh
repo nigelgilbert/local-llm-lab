@@ -3,7 +3,7 @@
 # y/n: if yes, print "under construction" and skip. If no, skip silently.
 
 step_20_main() {
-  hdr "Chat sub-wizard"
+  hdr "Chat stack (optional)"
   if prompt_yn "Install the chat stack (Open WebUI + Ollama profiles)?" n; then
     warn "🚧 chat sub-wizard is under construction — skipping for now."
     info "today: \`docker compose up -d\` in host/ + manual OWUI signup."

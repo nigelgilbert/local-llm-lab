@@ -9,7 +9,8 @@ state_get() {
   local line
   line=$(grep "^${key}=" "$WIZARD_STATE_FILE" 2>/dev/null | tail -n1)
   [ -z "$line" ] && return 1
-  printf '%s\n' "${line#${key}=}"
+  local prefix="${key}="
+  printf '%s\n' "${line#"$prefix"}"
 }
 
 state_set() {
@@ -22,6 +23,7 @@ state_set() {
   grep -v "^${key}=" "$WIZARD_STATE_FILE" > "$tmp" 2>/dev/null || true
   printf '%s=%s\n' "$key" "$val" >> "$tmp"
   mv "$tmp" "$WIZARD_STATE_FILE"
+  chmod 600 "$WIZARD_STATE_FILE" 2>/dev/null || true
 }
 
 state_has() {

@@ -1,7 +1,8 @@
 # wizard
 
 A pure-Bash, curl-only install wizard for the `mac-llm-lab` **code stack**
-(claw-code + LiteLLM bridge + llama-server). No Homebrew. Strictly idempotent.
+(claw-code + LiteLLM bridge + llama-server). The wizard itself never invokes
+Homebrew. Strictly idempotent.
 
 ## Quickstart
 
@@ -45,5 +46,16 @@ The wizard owns `wizard/` and writes generated env files into:
 - `client/claw-code/.env` (full-local + client-only)
 - `host/litellm/.env`     (full-local only)
 
-Plus runtime state in `wizard/.state` and logs in `wizard/.logs/`. Both
-gitignored.
+Plus runtime state in `wizard/.state` (chmod 600; stores the LiteLLM master
+key) and logs in `wizard/.logs/`. Both gitignored.
+
+## Trust boundaries
+
+The wizard is curl-only and pure Bash, but the install path executes one
+remote script: OrbStack's `curl -fsSL https://orbstack.dev/install.sh | sh`
+(see `steps/43-dep-orbstack.sh`). This is the upstream-recommended install
+method. If you'd rather not pipe-to-shell, install OrbStack manually from
+<https://orbstack.dev> first; the wizard will detect it and skip the step.
+
+OrbStack's own install script may use Homebrew if it is already present on
+the system — that's an upstream behavior, not the wizard's.
