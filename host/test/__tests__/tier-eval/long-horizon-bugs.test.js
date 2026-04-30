@@ -160,6 +160,8 @@ describe(`long-horizon: 4 bugs across 6 files (tier=${TIER_LABEL})`, () => {
       post_stderr_tail: post.stderr.slice(0, 800),
     });
 
+    if (r.terminal_status === 'timeout') assert.fail(`claw timed out after ${r.elapsedMs}ms (terminal_status=timeout)`);
+
     assert.equal(r.code, 0, 'claw must exit cleanly');
     assert.equal(post.status, 0, `test.js still fails:\n${post.stderr.slice(0, 800)}`);
     assert.equal(readmeUntouched, true, 'README.md must not be edited');

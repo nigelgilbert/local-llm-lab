@@ -169,6 +169,8 @@ describe(`eight-functions: 12 helpers with cross-file deps (tier=${TIER_LABEL})`
       post_stderr_tail: post ? post.stderr.slice(0, 800) : null,
     });
 
+    if (r.terminal_status === 'timeout') assert.fail(`claw timed out after ${r.elapsedMs}ms (terminal_status=timeout)`);
+
     assert.equal(r.code, 0, 'claw must exit cleanly');
     assert.equal(allTargetsExist, true,
       `missing target files: ${TARGETS.filter((f, i) => !targetsPresent[i]).join(', ')}`);

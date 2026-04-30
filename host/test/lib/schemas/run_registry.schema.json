@@ -165,6 +165,11 @@
       "default": false,
       "description": "Sprint 1.12 advisory column. True when the throughput-drift signal (median tokens/sec drop, first-third → final-third) crossed the warning threshold (default 25%). Informational diagnostic — does NOT gate row inclusion. Sprint 2's matrix may use this as warmup-pattern context but should not exclude rows on it alone."
     },
+    "iters_count": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Sprint 1.16 enrichment. Count of records in iterations.jsonl for the run — i.e., number of LLM iterations claw made before terminating. Combined with end_time-start_time gives Sprint 2's p90 iters/wallclock §8 column. Zero when the iterations.jsonl is empty or absent (e.g., very early aborts)."
+    },
     "trace_artifact_uri": {
       "type": ["string", "null"],
       "description": "Path or URI to the run's trace artifacts (iterations.jsonl, run_summary.json, sessions/, bridge.iterations.jsonl). Typically `host/test/.claw-runtime/<run_id>/`."

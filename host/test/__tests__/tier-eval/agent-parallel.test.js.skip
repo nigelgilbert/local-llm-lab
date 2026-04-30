@@ -67,6 +67,8 @@ describe(`agent: parallel file writes (tier=${TIER_LABEL})`, () => {
       post_stderr_tail: null,
     });
 
+    if (r.terminal_status === 'timeout') assert.fail(`claw timed out after ${r.elapsedMs}ms (terminal_status=timeout)`);
+
     assert.equal(r.code, 0);
     for (const { file, match } of EXPECTED) {
       assert.equal(workspace.exists(file), true, `expected ${file} to exist`);

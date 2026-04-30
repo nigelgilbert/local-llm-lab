@@ -63,6 +63,8 @@ describe(`agent: single-file write (tier=${TIER_LABEL})`, () => {
       post_stderr_tail: null,
     });
 
+    if (r.terminal_status === 'timeout') assert.fail(`claw timed out after ${r.elapsedMs}ms (terminal_status=timeout)`);
+
     assert.equal(r.code, 0);
     assert.equal(helloPyExists, true);
     assert.match(workspace.read('hello.py'), HELLO_RE);

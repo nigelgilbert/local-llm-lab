@@ -117,6 +117,7 @@ export function assembleRow(clawResult, ctx) {
     harness_error: ctx.harness_error ?? null,
     thermal_status,
     thermal_drift_advisory,
+    iters_count: iterRecords.length,
     trace_artifact_uri: clawResult.runDir ?? null,
     screening_only: ctx.screening_only ?? (ctx.run_kind === 'overnight_screen'),
   };
