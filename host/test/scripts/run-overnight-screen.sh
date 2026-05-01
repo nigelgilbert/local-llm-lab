@@ -61,10 +61,11 @@ mkdir -p "$TEST_DIR/logs" "$TEST_DIR/.claw-runtime"
 GIT_SHA="$(cd "$REPO_DIR" && git rev-parse --short HEAD)"
 
 # Tier → model_config_id mapping. Must match an entry in lib/model_configs.json.
+# Sprint 1.19 in flight: tier-32 mapping points to candidate config.
 tier_config_id() {
   case "$1" in
-    16) echo "qwen25-7b-instruct-q5km-ctx32k-v1prod-pp01" ;;
-    32) echo "qwen3-14b-q4km-ctx32k-v1prod-pp01" ;;
+    16) echo "${T16_CANDIDATE_CONFIG_ID:-qwen25-7b-instruct-q5km-ctx32k-v1prod-pp01}" ;;
+    32) echo "${T32_CANDIDATE_CONFIG_ID:-qwen3-14b-q4km-ctx32k-v1prod-pp01}" ;;
     64) echo "qwen36-35b-a3b-q4kxl-ctx65k-v1prod-pp01" ;;
     *) echo ""; return 1 ;;
   esac
@@ -193,7 +194,12 @@ run_one_pass() {
   fi
 
   log "[tier-${tier}] installing plist..."
-  LLAMA_TIER="$tier" "$INSTALL"
+  if [ -n "${INSTALL_OVERRIDE:-}" ]; then
+    log "[tier-${tier}] using INSTALL_OVERRIDE=$INSTALL_OVERRIDE"
+    eval "$INSTALL_OVERRIDE"
+  else
+    LLAMA_TIER="$tier" "$INSTALL"
+  fi
   wait_llama "tier-${tier}"
 
   {

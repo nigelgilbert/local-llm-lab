@@ -70,6 +70,42 @@
              llama.cpp removed `--system-prompt-file`, so per-deploy injection
              via the server is no longer available.) -->
 
+        <!-- ====================================================================
+             FUTURE-MODEL HINT — chat-template-kwargs (Sprint 1.19, 2026-05-01)
+
+             Forces `enable_thinking: true` for hybrid-thinking models whose
+             default is ambiguous (e.g. Qwen3.5-9B at tier-16, where the model
+             card and llama.cpp Jinja template disagree on the default). Without
+             this flag, cell E (Sweep 2/3 tier-16 winner) silently degrades.
+
+             Currently safe across all tiers because:
+               - tier-16 (Qwen3.5-9B IQ4_XS): designed for this flag (cells E/γ/δ/ζ).
+               - tier-32 (Qwen3.5-9B UD-Q5_K_XL @ 64k, B2): same family as
+                 tier-16 — designed for this flag.
+               - tier-64 (Qwen3.6-35B): default-thinking, **suppressed via litellm
+                 per-request override** (see host/litellm/litellm-config.yaml
+                 `claw-llama` extra_body.chat_template_kwargs.enable_thinking=false).
+                 The per-request override wins against the server-side default.
+
+             FUTURE: if a model lands whose Jinja template ignores
+             `enable_thinking`, OR whose template uses a different kwarg name
+             (e.g. `thinking`, `reasoning_mode`), this flag may become a no-op
+             or, worse, cause a template-render error. Re-evaluate when:
+               1. Adopting a new model family at any tier (re-test the install).
+               2. Upgrading llama.cpp past a release-note that mentions
+                  chat-template-kwargs handling changes.
+               3. Adding a tier whose chat template doesn't support
+                  enable_thinking.
+
+             Sweep 2 cells used a separate variant plist (com.mac-llm-lab.llama-server-qwen35.plist)
+             before this flag was promoted to production. That variant is now
+             redundant for tier-16 in steady-state — kept on disk as a reference
+             implementation and a fallback if this universal flag has to be
+             reverted.
+        ==================================================================== -->
+        <string>--chat-template-kwargs</string>
+        <string>{"enable_thinking":true}</string>
+
         <!-- misc -->
         <string>--metrics</string>
     </array>
