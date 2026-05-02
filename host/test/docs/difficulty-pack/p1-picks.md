@@ -73,9 +73,11 @@ In priority order (swap-in if a primary pick fails pilot):
 
 ---
 
-## Mutation specs (drafted in step 2 — placeholder)
+## Mutation specs
 
-Per-pick mutation specs (rename map, edge-case shifts, return-shape changes) will be detailed in step 2 of execution after fetching the Exercism canonical solutions. The mutation depth target: enough to defeat surface recall (rename, edge shift, shape change) without redesigning the underlying capability test. Open question for staff-scientist review (per `PLAN.md` §Open questions): if mutation drifts into "newly-authored-inspired-by," should we relabel the source as `inspired_by` rather than `adapted_from`?
+Per-pick mutation specs (rename map, edge-case shifts, return-shape changes) live in [`mutations.md`](mutations.md). HEAVY mutations: `book-store`, `alphametics`, `two-bucket` (contamination-flagged). STANDARD: `wordy`, `word-search`, `forth`, `grade-school`. Each spec includes a verifier-sanity table to hand-verify before commit and a mutation-depth gate that flags when to revert if pilot trips R4 (`passed=null` > 20%).
+
+Open question for staff-scientist review (per [`PLAN.md`](PLAN.md) §Open questions Q3): if mutation drifts into "newly-authored-inspired-by," should we relabel the source as `inspired_by` rather than `adapted_from`?
 
 ## R8 calibration check (pilot dependency)
 

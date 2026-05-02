@@ -91,7 +91,11 @@ This is a **hard gate** for Sprint 2. The discrimination matrix cannot ship with
 - [`PLAN.md`](PLAN.md) — engineering implementation plan (test composition, calibration protocol, statistical sizing, harness affordances, execution order)
 - [`p1-picks.md`](p1-picks.md) — locked Aider/Exercism picks with research rationale and runner-up bench
 - [`p2-decision.md`](p2-decision.md) — full P2 sourcing trail (LCB rejection, candidate evaluations, why one port not two)
+- [`mutations.md`](mutations.md) — per-pick mutation specs (rename maps, edge shifts, return-shape changes) for the 7 P1 ports
+- [`authoring-template.md`](authoring-template.md) — canonical `.test.js` pattern, manifest field reference, per-stream variations
+- [`canonicals/`](canonicals/) — read-only Exercism upstream snapshot for the 7 P1 picks (R8 audit reference)
 - [`memos/n8-confirm-vs-baseline.md`](memos/n8-confirm-vs-baseline.md) — the saturation finding that motivated this pack
+- [`memos/aider-calibration-note.md`](memos/aider-calibration-note.md) — Aider per-exercise data unavailable; aggregate Qwen3 numbers calibrate the discriminative-middle assumption
 - [`memos/standardtest-helper.md`](memos/standardtest-helper.md) — deferred-architecture rationale (test-helper refactor, sequenced for Sprint 1.22 or 1.23)
 
 ## External references
