@@ -88,8 +88,16 @@ export function assembleRow(clawResult, ctx) {
   const start_time = isoFromMs(summary?.run_started_ms);
   const end_time = isoFromMs(summary?.run_finished_ms);
 
-  const terminal_status = pickTerminalStatus(clawResult, summary);
+  // Sprint 1.20: if claw exited non-zero AND the per-run bridge slice carries a
+  // typed context-overflow failure from LiteLLM, relabel as harness_error so
+  // the row drops out of pass-rate denominators per the schema's Layer-A
+  // discipline (run_registry.schema.json's `terminal_status` description).
+  const upstreamFailure = detectUpstreamFailure(clawResult.runDir);
+
+  const terminal_status = pickTerminalStatus(clawResult, summary, upstreamFailure);
   const passed = pickPassed(assertion, summary, terminal_status);
+  const harness_error = ctx.harness_error
+    ?? (terminal_status === 'harness_error' ? upstreamFailure?.harness_error ?? null : null);
 
   const row = {
     run_id: runId,
@@ -114,7 +122,7 @@ export function assembleRow(clawResult, ctx) {
     end_time,
     terminal_status,
     passed,
-    harness_error: ctx.harness_error ?? null,
+    harness_error,
     thermal_status,
     thermal_drift_advisory,
     iters_count: iterRecords.length,
@@ -161,7 +169,23 @@ function isoFromMs(ms) {
   return new Date(ms).toISOString();
 }
 
-function pickTerminalStatus(clawResult, summary) {
+function pickTerminalStatus(clawResult, summary, upstreamFailure) {
+  // Sprint 1.20: a claw exit-non-zero attributable to a typed upstream failure
+  // (e.g. llama-server context-overflow rejection surfaced as LiteLLM
+  // BadRequestError) is harness-side, not test-content. Relabel before the
+  // generic 'error' bucketing so Layer-A pass-rate denominators stay clean.
+  //
+  // Gate on claw exit != 0: a transient upstream failure that claw recovered
+  // from (e.g. mid-run BadRequestError followed by a successful retry → claw
+  // exits 0) is not a harness failure of the run; only kill-the-run failures
+  // get the harness_error label.
+  if (upstreamFailure
+      && !clawResult.timeout
+      && !clawResult.signal
+      && typeof clawResult.code === 'number'
+      && clawResult.code !== 0) {
+    return 'harness_error';
+  }
   if (summary?.terminal_status && TERMINAL_STATUS_ALLOWED.has(summary.terminal_status)) {
     return summary.terminal_status;
   }
@@ -175,5 +199,44 @@ function pickPassed(assertion, summary, terminal_status) {
   if (terminal_status === 'harness_error' || terminal_status === 'interrupted') return null;
   if (assertion && typeof assertion.passed === 'boolean') return assertion.passed;
   if (summary && typeof summary.passed === 'boolean') return summary.passed;
+  return null;
+}
+
+// Sprint 1.20: per-run upstream-failure detector. Reads the bridge slice
+// (claw.js:collectRunArtifacts copies the time-windowed _bridge.jsonl segment
+// into <runDir>/bridge.iterations.jsonl) and types the failure from LiteLLM's
+// callback metadata captured by host/litellm/callbacks/iter_distribution_logger.py.
+//
+// Patterns:
+//   - context_overflow: BadRequestError + message including
+//     "exceeds the available context size" — n_ctx ceiling at llama-server.
+// Future: other failure_class patterns get their own harness_error label here.
+//
+// Returns null when no record is typed; otherwise { harness_error: 'context_overflow' }.
+function detectUpstreamFailure(runDir) {
+  if (!runDir) return null;
+  const slicePath = path.join(runDir, 'bridge.iterations.jsonl');
+  if (!fs.existsSync(slicePath)) return null;
+  for (const line of fs.readFileSync(slicePath, 'utf8').split('\n')) {
+    const t = line.trim();
+    if (!t) continue;
+    let rec;
+    try { rec = JSON.parse(t); } catch { continue; }
+    if (!rec.stream_aborted) continue;
+    // BadRequestError → llama-server's typed pre-decode rejection.
+    // InternalServerError / APIError → same root cause surfaced as a
+    // streaming "Context size has been exceeded" mid-decode (observed in
+    // Sprint 1.20 N=8 confirm, expression-eval at 64k). Both are upstream-
+    // bound context-overflow; relabel both as harness_error.
+    if (typeof rec.failure_message_tail !== 'string') continue;
+    if (rec.failure_class === 'BadRequestError'
+        && rec.failure_message_tail.includes('exceeds the available context size')) {
+      return { harness_error: 'context_overflow' };
+    }
+    if ((rec.failure_class === 'InternalServerError' || rec.failure_class === 'APIError')
+        && rec.failure_message_tail.includes('Context size has been exceeded')) {
+      return { harness_error: 'context_overflow' };
+    }
+  }
   return null;
 }

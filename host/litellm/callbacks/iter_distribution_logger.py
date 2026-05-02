@@ -294,6 +294,33 @@ def _debug_dump(kwargs: dict, response_obj: Any) -> None:
         pass
 
 
+def _extract_failure(kwargs: dict, response_obj: Any) -> dict:
+    """Pull a typed `failure_class` + truncated `failure_message_tail` from the
+    LiteLLM failure-callback payload. Both fields are null on success rows.
+
+    Sprint 1.20: Sprint 2's matrix has a `harness-error rate` column and we
+    need to be able to distinguish context-overflow rejections (n_ctx exceeded
+    at llama-server) from upstream timeouts, model-side bugs, and bridge
+    unreachable. LiteLLM surfaces the exception under `kwargs['exception']`
+    when invoking failure callbacks; otherwise we fall back to the response
+    object's stringified form.
+    """
+    exc = kwargs.get("exception") if isinstance(kwargs, dict) else None
+    if exc is None and isinstance(response_obj, BaseException):
+        exc = response_obj
+    if exc is None:
+        return {"failure_class": None, "failure_message_tail": None}
+    cls = type(exc).__name__
+    try:
+        msg = str(exc)
+    except Exception:
+        msg = repr(exc)
+    return {
+        "failure_class": cls,
+        "failure_message_tail": msg[-500:] if msg else None,
+    }
+
+
 def _build_record(
     kwargs: dict, response_obj: Any, start_time: Any, end_time: Any
 ) -> dict:
@@ -355,6 +382,7 @@ class IterDistributionLogger(CustomLogger):
         try:
             record = _build_record(kwargs, response_obj, start_time, end_time)
             record["stream_aborted"] = True
+            record.update(_extract_failure(kwargs, response_obj))
             _write_record(record)
         except Exception:
             pass
@@ -365,6 +393,7 @@ class IterDistributionLogger(CustomLogger):
         try:
             record = _build_record(kwargs, response_obj, start_time, end_time)
             record["stream_aborted"] = True
+            record.update(_extract_failure(kwargs, response_obj))
             _write_record(record)
         except Exception:
             pass

@@ -80,6 +80,7 @@ across two N=4 chunks ([t16 chunk1](../.claw-runtime/run_registry.t16-confirm-n4
 2. Triage t16 harness errors (28 across 208) — if they cluster on a
    small set of test_ids they are protocol-level fixes, not capability
    gaps; that recovers most of the 84.6 → 98.3 pp gap on all-attempts.
+   **Closed 2026-05-02 by Sprint 1.20** — see "Sprint 1.20 closure" below.
 3. Open a Sprint 1.20 ticket for a difficulty-extension test pack
    before publishing the discrimination matrix in Sprint 2 — current
    pack saturates.
@@ -91,3 +92,101 @@ across two N=4 chunks ([t16 chunk1](../.claw-runtime/run_registry.t16-confirm-n4
   (Sprint 1.18, see [`TIER-EVAL-V2-SPRINT-PLAN.md`](TIER-EVAL-V2-SPRINT-PLAN.md) row 1.18)
 - Test pack: 26 tier-eval tests, unchanged between baseline and
   confirm.
+
+## Sprint 1.20 closure (2026-05-02)
+
+**Root cause:** the 28/208 = 13.5% t16 harness errors were 100% llama-server
+context-overflow rejections at the 32k ceiling. Diagnostic confirmation:
+
+- N=1 t16 32k diagnostic ([t16-1.20-diag-n1-iq4xs-32k-...](../.claw-runtime/run_registry.t16-1.20-diag-n1-iq4xs-32k-20260502-0346.csv))
+  produced 4 errors / 26 tests; 4/4 carried `failure_class='BadRequestError'`
+  with message `litellm.BadRequestError: OpenAIException - request (NNNNN
+  tokens) exceeds the available context size (32768 tokens), try increasing it`.
+  Token overshoot 33k–42k against the 32k ceiling.
+- Cross-validated by 5/6 t32 errors clustering at the 64k ceiling in
+  `t32-confirm-n4-chunk{1,2}` (last_ok in+out 59k–65k tokens).
+- Test clustering matched the read→write→reread mechanism: errors landed on
+  expression-eval, csv-parser, lru-cache, parseISO-with-timezone,
+  multi-bug-decoy, json-schema-validate — tests that re-emit large source
+  files into the conversation each turn.
+
+**Fix shipped:**
+
+1. **Diagnostic capture** — [`host/litellm/callbacks/iter_distribution_logger.py`](../../litellm/callbacks/iter_distribution_logger.py)
+   `log_failure_event` / `async_log_failure_event` now write
+   `failure_class` + `failure_message_tail` (last 500 chars) to `_bridge.jsonl`.
+   Sprint 2's `harness-error rate` column is no longer opaque.
+2. **Config swap** — t16 lock-in moved from
+   `qwen35-9b-iq4xs-ctx32k-v6antiloop-pp01` (archived) to
+   `qwen35-9b-iq4xs-ctx64k-v6antiloop-pp01`. Same model + sampler;
+   `n_ctx` 32768 → 65536 in [`host/llama-server/models.conf`](../../llama-server/models.conf)
+   and the wrapper's t16 default in [`host/test/scripts/run-overnight-screen.sh`](../scripts/run-overnight-screen.sh).
+3. **Honest bucketing** — [`host/test/lib/run_row.js`](../lib/run_row.js)
+   `pickTerminalStatus` now relabels typed context-overflow rows that killed
+   the run (claw exit ≠ 0) as `terminal_status='harness_error',
+   harness_error='context_overflow', passed=null`. The detector matches three
+   typed patterns from LiteLLM: `BadRequestError` carrying "exceeds the
+   available context size" (llama-server's pre-decode rejection), and
+   `InternalServerError` / `APIError` carrying "Context size has been
+   exceeded" (the same root cause surfaced mid-decode by LiteLLM's streaming
+   path). Transient mid-run overflows that claw recovered from (exit=0) stay
+   labeled `done`. The harvester ([`host/test/scripts/harvest-runs-to-registry.mjs`](../scripts/harvest-runs-to-registry.mjs))
+   passes the full `clawResult` shape to `emitRow` so the relabel fires on
+   offline re-emits.
+
+**Result (N=8 t16 64k confirmatory, [t16-1.20-confirm-n8-iq4xs-64k-...](../.claw-runtime/run_registry.t16-1.20-confirm-n8-iq4xs-64k-20260502-0459.jsonl), 208 attempts):**
+
+| | 1.19 N=8 (32k) | 1.20 N=1 (64k) | 1.20 N=8 (64k) | Δ vs 1.19 |
+|---|---|---|---|---|
+| pass-rate (harness_error excluded) | 176/208 = 84.6% | 24/25 = 96.0% | **177/195 = 90.8%** | +6.2 pp |
+| done-only | 176/179 = 98.3% | 24/24 = 100% | **177/178 = 99.4%** | +1.1 pp |
+| harness-error rate | 28/208 = 13.5% | 1/26 = 3.8% | **13/208 = 6.25%** | −7.25 pp |
+| timeouts | 1/208 = 0.5% | 1/26 = 3.8% | **17/208 = 8.2%** | +7.7 pp |
+
+**Honest framing — partial fix confirmed at scale, not a kill.** 64k cuts
+the harness-error rate by 7.25 pp (13.5% → 6.25%) but trades against an
+8.2% timeout rate driven by the longer context's wallclock pressure.
+expression-eval is the dominant residual overflow site (7/8 reps; observed
+overshoots up to 76 189 tokens against the 65 536 ceiling). The new
+dominant timeout test is csv-parser (8/8 reps timed out at 240s), with
+lru-cache (4/8) and parseISO-with-timezone (2/8) close behind. Net
+pass-rate gain on the 26-test pack is +6.2 pp; the model is still mostly
+correct when it finishes (99.4% done-only).
+
+**Detector widening was load-bearing.** Of the 13 typed harness_error rows,
+only 6 surfaced as `BadRequestError` (llama-server's pre-decode rejection
+path); the other 7 surfaced as `InternalServerError` (5) or `APIError` (2)
+once LiteLLM's streaming body had already opened. Without the
+multi-pattern detector, those 7 (3.4% of total attempts) would have polluted
+the `error` column instead of dropping out of the Layer-A pass-rate
+denominator. Step 2b's relabel is therefore not optional dressing — it is
+the difference between an honest 90.8% pass-rate and a misleading 87.4%.
+
+**Pre-1.20 1.19 confirm rows are not retroactively relabeled** — they were
+emitted before Step 1a's failure-capture patch landed, so the bridge slices
+lack `failure_class`. The 1.19 dataset stands as the pre-fix baseline; the
+1.20 N=8 confirm produces the canonical post-fix dataset.
+
+**Failure-mode reshape vs 1.19.** Failures shifted from typed overflows
+(28 → 13) to wallclock timeouts (1 → 17). This is consistent with the
+mechanism: at 32k the conversation died before the model got a chance to
+spend wallclock on hard tests; at 64k it gets to spend the full 180–240 s
+budget and runs out of clock on the same hard tests. The discrimination
+matrix needs to weight done-only and timeout rates separately if t16 vs
+larger tiers is to remain interpretable.
+
+**Sprint 2 implications:**
+
+- The discrimination-matrix denominator on t16 is self-cleaning — the
+  matrix ships without a "13.5% asterisked" footnote.
+- The 26-test pack still saturates done-only at 99.4% on t16, leaving
+  effectively no headroom. Wilson 95% CIs across per-cell pass-rates
+  cannot separate t16 from larger tiers on this pack. Sprint 1.21's
+  difficulty-extension pack remains a hard precondition before publishing
+  cell-level CIs.
+- The 8.2% timeout rate on t16 is a real ceiling-effect artifact of the
+  64k context, not a bug. Either (a) raise the per-test wallclock budget
+  on the difficulty-extension pack, (b) accept timeouts in the matrix as
+  "fails to complete in tier-realistic time" (the honest read), or (c)
+  scope a t16 quant downgrade exploration to recover speed at the cost of
+  some fidelity. Defer the choice to Sprint 1.21's pack-design decision.

@@ -55,6 +55,12 @@ import { emitRow, assembleRow } from '../lib/run_row.js';
 import { validateRow } from '../lib/registry.js';
 import { readManifest } from '../lib/test_manifest.js';
 
+function readJsonIfExists(dir, fname) {
+  const p = path.join(dir, fname);
+  if (!fs.existsSync(p)) return null;
+  try { return JSON.parse(fs.readFileSync(p, 'utf8')); } catch { return null; }
+}
+
 function parseArgs(argv) {
   const opts = { dryRun: false };
   const a = argv.slice(2);
@@ -190,10 +196,20 @@ function main() {
           : {};
         // emitRow re-validates and appends. We've already validated, but
         // re-validation is cheap and centralizes the appendRow call site.
+        // Sprint 1.20: pass the full clawResult shape that harvestOne built —
+        // run_row.js's pickTerminalStatus now needs `code`/`timeout` to gate
+        // the upstream-failure relabel, and the prior stripped form silently
+        // suppressed it.
+        const summary = readJsonIfExists(path.join(opts.runtimeRoot, runId), 'run_summary.json');
         emitRow({
           runId,
           runDir: path.join(opts.runtimeRoot, runId),
           iterationsPath: path.join(opts.runtimeRoot, runId, 'iterations.jsonl'),
+          runSummaryPath: path.join(opts.runtimeRoot, runId, 'run_summary.json'),
+          code: typeof summary?.exit_code === 'number' ? summary.exit_code : 0,
+          timeout: !!summary?.timeout,
+          signal: null,
+          elapsedMs: summary?.run_elapsed_ms ?? null,
         }, { ...ctx, ...rebuildCtxForRow(result.row), ...target });
         appended += 1;
         console.log(`  appended ${runId} → ${result.row.test_id}`);

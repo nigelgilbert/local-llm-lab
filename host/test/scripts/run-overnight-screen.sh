@@ -64,7 +64,7 @@ GIT_SHA="$(cd "$REPO_DIR" && git rev-parse --short HEAD)"
 # Defaults track the current production models.conf lock-in (Sprint 1.19, 2026-05-01).
 tier_config_id() {
   case "$1" in
-    16) echo "${T16_CANDIDATE_CONFIG_ID:-qwen35-9b-iq4xs-ctx32k-v6antiloop-pp01}" ;;
+    16) echo "${T16_CANDIDATE_CONFIG_ID:-qwen35-9b-iq4xs-ctx64k-v6antiloop-pp01}" ;;
     32) echo "${T32_CANDIDATE_CONFIG_ID:-qwen35-9b-q5kxl-ctx64k-v7noreppen-pp01}" ;;
     64) echo "qwen36-35b-a3b-q4kxl-ctx65k-v1prod-pp01" ;;
     *) echo ""; return 1 ;;
