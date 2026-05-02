@@ -19,7 +19,7 @@
     "harness_version": "d0d46f4",
     "prompt_pack_version": "pp01",
     "tier_compatibility": [16],
-    "notes": "Tier-16 baseline; dense instruct, no thinking. Sourced from host/llama-server/models.conf TIER_16 block."
+    "notes": "**ARCHIVED 2026-05-02** — superseded as tier-16 production by `qwen35-9b-iq4xs-ctx32k-v6antiloop-pp01` (Sprint 1.19 lock-in). Retained for historical comparability with Sprint 1.18 deep-N=8 baseline (`eval8-trimmed-20260429-2240`). Original notes: Tier-16 baseline; dense instruct, no thinking. Sourced from host/llama-server/models.conf TIER_16 block."
   },
   "qwen3-14b-q4km-ctx32k-v1prod-pp01": {
     "model_config_id": "qwen3-14b-q4km-ctx32k-v1prod-pp01",
@@ -41,7 +41,7 @@
     "harness_version": "d0d46f4",
     "prompt_pack_version": "pp01",
     "tier_compatibility": [32],
-    "notes": "Tier-32 baseline; dense hybrid-thinking. Sourced from host/llama-server/models.conf TIER_32 block."
+    "notes": "**ARCHIVED 2026-05-02** — superseded as tier-32 production by `qwen35-9b-q5kxl-ctx64k-v7noreppen-pp01` (Sprint 1.19 lock-in, B2). Retained for historical comparability with Sprint 1.18 deep-N=8 baseline (`eval8-trimmed-20260429-2240`). Original notes: Tier-32 baseline; dense hybrid-thinking. Sourced from host/llama-server/models.conf TIER_32 block."
   },
   "qwen3-14b-q4km-ctx32k-v2thinkrec-pp01": {
     "model_config_id": "qwen3-14b-q4km-ctx32k-v2thinkrec-pp01",
@@ -220,7 +220,7 @@
     "harness_version": "d0d46f4",
     "prompt_pack_version": "pp01",
     "tier_compatibility": [32],
-    "notes": "Sprint 1.19 Sweep 2 cell B2 — cell D winner (Q5_K_XL + rep_pen 1.0) with ctx bump 32k→64k. Pairs with B1 (Q6+rep1.1@64k) to test ctx axis on both 32k-tied winners. Lighter footprint variant; preferred for shipping if it ties B1. Sweep-only config; remove after coalesce."
+    "notes": "Tier-32 production (Sprint 1.19, 2026-05-02). Qwen3.5-9B Q5_K_XL @ ctx 64k with v7-noreppen sampler (rep_pen 1.0). Cell B2 — Sweep 2 cell D winner with ctx bump 32k→64k; tied B1 (Q6@64k) on Sweep 2 → shipped lighter Q5 variant. **N=8 confirm (208 attempts):** 88.9% pass-all (185/208), 99.5% done-only (185/186), 2.9% harness-error rate (6/208), 7.7% timeouts (16/208 — failure mode shifted from errors to clock-exhaustion at 64k). Replaces archived `qwen3-14b-q4km-ctx32k-v1prod-pp01` (Qwen3-14B Q4 @ 32k baseline). Closes 1.18's t16↔t32 Pareto inversion — t32 now cleanly dominates t16 on both metrics. See TIER-EVAL-MEMO-20260502-n8-confirm-vs-baseline.md."
   },
   "qwen35-9b-q5kxl-ctx64k-v8vendormp-pp01": {
     "model_config_id": "qwen35-9b-q5kxl-ctx64k-v8vendormp-pp01",
@@ -335,7 +335,7 @@
     "harness_version": "d0d46f4",
     "prompt_pack_version": "pp01",
     "tier_compatibility": [16],
-    "notes": "Sprint 1.19 Sweep 2 cell E — Qwen3.5-9B IQ4_XS @ ctx 32k for tier-16 candidate (~5 GB weights, matches current 7B Q5 footprint). Same c6 sampler family as cells A/B/C/D for cross-tier comparability. enable_thinking forced true. Sweep-only config; remove after coalesce."
+    "notes": "Tier-16 production (Sprint 1.19, 2026-05-02). Qwen3.5-9B IQ4_XS @ ctx 32k with c6 sampler (~5 GB weights, matches prior 7B Q5 footprint). enable_thinking forced true. **N=8 confirm (208 attempts):** 84.6% pass-all (176/208), 98.3% done-only (176/179), 13.5% harness-error rate (28/208), 1 timeout. Baselines `qwen35-9b-iq4xs-ctx32k-v7noreppen-pp01` (γ), `qwen35-9b-iq4xs-ctx64k-v6antiloop-pp01` (δ), `qwen35-9b-iq4xs-ctx64k-v7noreppen-pp01` (ζ) lost the Sweep 3 sweep — see TIER-EVAL-MEMO-20260502-n8-confirm-vs-baseline.md. Replaces archived `qwen25-7b-instruct-q5km-ctx32k-v1prod-pp01` (Qwen2.5-7B Q5 @ 32k baseline)."
   },
   "qwen35-9b-iq4xs-ctx32k-v7noreppen-pp01": {
     "model_config_id": "qwen35-9b-iq4xs-ctx32k-v7noreppen-pp01",
