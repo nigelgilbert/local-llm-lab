@@ -152,21 +152,20 @@ fi
 # ---- write expected-attempts manifest (Sprint 1.14) ----
 log ""
 log "==> writing expected-attempts manifest..."
-EXPECTED_FILTER_ARG=""
+EXPECTED_ARGS=(plan
+  --tests-dir /test/__tests__/tier-eval
+  --tiers "$EVAL_TIERS"
+  --reps "$EVAL_REPS"
+  --out "/test/.claw-runtime/$(basename "$EXPECTED_PATH")"
+)
 if [ -n "${TIER_EVAL_FILTER:-}" ]; then
-  EXPECTED_FILTER_ARG="--filter ${TIER_EVAL_FILTER}"
+  EXPECTED_ARGS+=(--filter "${TIER_EVAL_FILTER}")
 fi
-# shellcheck disable=SC2086
 docker run --rm \
   -v "$TEST_DIR:/test" \
   -w /test \
   node:24-bookworm-slim \
-  node /test/scripts/expected-attempts.mjs plan \
-    --tests-dir /test/__tests__/tier-eval \
-    --tiers "$EVAL_TIERS" \
-    --reps "$EVAL_REPS" \
-    --out "/test/.claw-runtime/$(basename "$EXPECTED_PATH")" \
-    $EXPECTED_FILTER_ARG \
+  node /test/scripts/expected-attempts.mjs "${EXPECTED_ARGS[@]}" \
   || err "failed to write expected-attempts manifest"
 
 # ---- header ----
