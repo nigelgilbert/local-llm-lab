@@ -1,14 +1,18 @@
-# Productivity-grader design memo (Sprint 0.9)
+# Productivity-grader research notes
 
-**Date:** 2026-04-29
-**Status:** Design document. No graders built yet — that work belongs to
-Sprint 3 (productivity grader + calibration set). This memo locks the
-methodology so Sprint 3 inherits a clear contract and so Sprint 1's
-overnight screen does not accidentally mix uncalibrated productivity
-results into the discrimination matrix.
+**Date:** 2026-04-29 (moved to research/ 2026-05-01)
+**Status:** Research notes, not commitments. No graders built. If a real
+productivity-grading need arises, re-derive the decisions below under the
+constraints that actually exist at that time — don't treat anything here
+as locked.
 
-**Audience:** Harness engineers building Sprint 3, anyone reviewing
-Sprint-3 deliverables, and the calibration humans.
+**Open questions worth keeping warm:**
+- Judge pinning vs floating model id (and how to handle Anthropic version bumps)
+- κ ≥ 0.7 vs Krippendorff's α for ordinal rubrics
+- Calibration-set composition and size
+- Cost ceiling per grade
+- Hybrid grader architecture (deterministic → semantic → judge → human override)
+- Rubric versioning
 
 ---
 
