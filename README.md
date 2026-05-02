@@ -8,7 +8,36 @@ The wager: a single LLM call is brain-like and primitive — what feels useful (
 
 Architecture: [`spec.md`](spec.md). Model selection: [`profiles.md`](profiles.md).
 
-## Profiles
+## Quickstart — install with the wizard
+
+The fastest path to a working code stack (claw-code + LiteLLM bridge + llama-server) is the bundled installer. It's pure Bash, curl-only, no Homebrew required, and **strictly idempotent** — re-runs are safe on a live system.
+
+```sh
+git clone https://github.com/<you>/mac-llm-lab.git
+cd mac-llm-lab
+./wizard/wizard install
+```
+
+The wizard will:
+
+- detect your Mac's RAM and pick a **memory tier** (16 / 32 / 64 GB) — override with ←/→ arrow keys on the slider
+- ask for a **topology** — `full-local` (host + client both on this Mac) or `client-only` (this Mac talks to a host elsewhere on the LAN)
+- install Xcode CLT, cmake, llama.cpp, OrbStack, Ollama, fetch the tier GGUF, build the LiteLLM bridge and claw-code, and bring everything up
+- write generated env files to [`client/claw-code/.env`](client/claw-code/.env) and (full-local only) [`host/litellm/.env`](host/litellm/.env)
+
+After install:
+
+```sh
+./wizard/wizard test       # ephemeral tester orb pings the live bridge
+./wizard/wizard doctor     # read-only state inspection
+./wizard/wizard --help
+```
+
+See [`wizard/README.md`](wizard/README.md) for tier model choices, idempotency guarantees, and trust boundaries (one upstream `curl | sh` for OrbStack, opt-out instructions included).
+
+## Profiles (Open WebUI lineup)
+
+The wizard installs the **code stack** only. The five-profile OWUI chat lineup is the broader `host/` setup — see [Manual / OWUI setup](#manual--owui-setup) below.
 
 | Profile | Use it for | Backing model |
 |---|---|---|
@@ -18,11 +47,11 @@ Architecture: [`spec.md`](spec.md). Model selection: [`profiles.md`](profiles.md
 | `digest` | long-context extract | Qwen3-30B-A3B-Instruct-2507 Q4 |
 | `analyze` | long-context reasoning | Qwen3-30B-A3B-Thinking-2507 Q6 |
 
-One profile resident at a time, swapped on demand. Full rationale in [`profiles.md`](profiles.md). Plus a `claw` coding profile served through the LiteLLM Anthropic-API bridge for agentic work.
+One profile resident at a time, swapped on demand. Full rationale in [`profiles.md`](profiles.md). Plus a `claw` coding profile served through the LiteLLM Anthropic-API bridge for agentic work — that's what the wizard wires up.
 
-## Setup
+## Manual / OWUI setup
 
-In order, each directory has its own README:
+If you want the full chat lineup (Open WebUI, the five profiles, the host orchestration CLI) or prefer to install piece-by-piece, each directory has its own README:
 
 1. [`host/ollama/`](host/ollama/) — install Ollama, stage GGUFs
 2. [`host/ollama/Modelfiles/`](host/ollama/Modelfiles/) — `ollama create` the aliases
@@ -31,6 +60,8 @@ In order, each directory has its own README:
 5. [`host/scripts/`](host/scripts/) — install `mac-llm-lab-hostctl` for orchestration
 6. [`client/`](client/) — install the `mac-llm-lab` CLI on your laptop
 7. [`client/claw-code/`](client/claw-code/) — containerised `claw-code`, pointed at the bridge
+
+The wizard automates 4–7 (and the host-side llama-server for the `claw` profile). The OWUI chat profiles in 1–3 remain manual today.
 
 ## Fork checklist
 
