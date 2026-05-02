@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://mac-llm-lab/schemas/run_registry.schema.json",
   "title": "Tier-Eval v2 Run Registry Row",
-  "description": "Canonical schema for one row in the tier-eval v2 run registry. See host/test/docs/TIER-EVAL-V2-SPRINT-PLAN.md §3 (Sprint 0.1) and the source strategy doc §6.2. Every sweep row — production, pilot, smoke, dry_run, overnight_screen, admission — lands here. Hardware fields are intentionally minimal: tier-16/32/64 each map to a single physical machine, so hardware_id and soc_generation are omitted.",
+  "description": "Canonical schema for one row in the tier-eval v2 run registry. See host/test/docs/base/TIER-EVAL-V2-SPRINT-PLAN.md §3 (Sprint 0.1) and the source strategy doc §6.2. Every sweep row — production, pilot, smoke, dry_run, overnight_screen, admission — lands here. Hardware fields are intentionally minimal: tier-16/32/64 each map to a single physical machine, so hardware_id and soc_generation are omitted.",
   "type": "object",
   "additionalProperties": false,
   "required": [

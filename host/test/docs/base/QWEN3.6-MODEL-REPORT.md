@@ -84,7 +84,7 @@ This is the model the lab should be using at the 64 GB tier. The previous tier-6
 
 ## Addendum 2026-04-28 — context bump to 65536 (A1 verification, n=2)
 
-`TIER_64_CTX` raised from 32768 to 65536 in [models.conf](../../llama-server/models.conf). Two confirmation sweeps run at the new context with the v1 sampler.
+`TIER_64_CTX` raised from 32768 to 65536 in [models.conf](../../../llama-server/models.conf). Two confirmation sweeps run at the new context with the v1 sampler.
 
 | Test | 32k baseline | Sweep 1 (1129) at 64k | Sweep 2 (1142) at 64k |
 |---|---|---|---|
@@ -133,7 +133,7 @@ A2 leaves B3 sampler tuning pointed at lru-cache as the strongest variance lever
 
 Full grid + rationale in [TIER-EVAL-MEMO-20260428-sampler-v2.md](TIER-EVAL-MEMO-20260428-sampler-v2.md). Headline: 8 cells (`temp ∈ {0.3, 0.5, 0.7, 0.9}` × `presence ∈ {0, 1.5}`), n=3 each on 5 tests (mini-vm excluded as no-signal capability ceiling). Three cells achieved 15/15 pass; among them, **`temp=0.5, presence=0`** had the lowest sum-of-medians (143s vs the v1 cell's 212s — 33% faster at the same pass rate).
 
-Adopted in [models.conf](../../llama-server/models.conf): `TIER_64_TEMP=0.5`, `TIER_64_PRESENCE_PENALTY=0`. Other tier-64 sampler knobs unchanged.
+Adopted in [models.conf](../../../llama-server/models.conf): `TIER_64_TEMP=0.5`, `TIER_64_PRESENCE_PENALTY=0`. Other tier-64 sampler knobs unchanged.
 
 ## Addendum 2026-04-28 — C5 re-check of pre-existing tier-64 flakes (n=10 at v2)
 

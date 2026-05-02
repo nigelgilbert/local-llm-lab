@@ -74,7 +74,7 @@ across two N=4 chunks ([t16 chunk1](../../../.claw-runtime/run_registry.t16-conf
 
 ## Recommended next actions
 
-1. Update [`TIER-EVAL-V2-SPRINT-PLAN.md`](../../TIER-EVAL-V2-SPRINT-PLAN.md)
+1. Update [`TIER-EVAL-V2-SPRINT-PLAN.md`](../../base/TIER-EVAL-V2-SPRINT-PLAN.md)
    row 1.19 with the lock-in result and flip the manifesto-framing
    line in row 1.18 to "superseded by Sprint 1.19 confirm."
 2. Triage t16 harness errors (28 across 208) — if they cluster on a
@@ -88,6 +88,6 @@ across two N=4 chunks ([t16 chunk1](../../../.claw-runtime/run_registry.t16-conf
 
 - Source rows: `host/test/.claw-runtime/run_registry.t{16,32}-confirm-n4-chunk{1,2}-*.csv`
 - Baseline rows: `host/test/.claw-runtime/run_registry.eval8-trimmed-20260429-2240.csv`
-  (Sprint 1.18, see [`TIER-EVAL-V2-SPRINT-PLAN.md`](../../TIER-EVAL-V2-SPRINT-PLAN.md) row 1.18)
+  (Sprint 1.18, see [`TIER-EVAL-V2-SPRINT-PLAN.md`](../../base/TIER-EVAL-V2-SPRINT-PLAN.md) row 1.18)
 - Test pack: 26 tier-eval tests, unchanged between baseline and
   confirm.

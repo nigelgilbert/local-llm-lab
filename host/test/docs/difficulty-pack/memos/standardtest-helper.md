@@ -72,7 +72,7 @@ existing 26 tests + the new 12 in 1.22 or 1.23.
 2. Migrate the 38 tests (26 existing + 12 from 1.21) in one PR or in
    per-axis batches. Verification: `expected-attempts.mjs` diff = 0/0
    on a t64 N=1 sweep before/after.
-3. Update [`CODE-REVIEW.md`](../../CODE-REVIEW.md) classification: `keep`
+3. Update [`CODE-REVIEW.md`](../../base/CODE-REVIEW.md) classification: `keep`
    (not `defer-decision`).
 
 ## Evidence the duplication is real technical debt
@@ -102,5 +102,5 @@ avoids.
 ## Status
 
 Planned for Sprint 1.22 or 1.23 per
-[`TIER-EVAL-V2-SPRINT-PLAN.md`](../../TIER-EVAL-V2-SPRINT-PLAN.md) row 1.22.
+[`TIER-EVAL-V2-SPRINT-PLAN.md`](../../base/TIER-EVAL-V2-SPRINT-PLAN.md) row 1.22.
 Not started; this memo is rationale-only.

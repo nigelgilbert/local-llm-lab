@@ -80,7 +80,7 @@ reproduce the run.
 ### llama-server plist sampler
 
 Replaces the production `claw.Modelfile`-mirror block in
-[`host/llama-server/launchd/com.mac-llm-lab.llama-server.plist`](../../llama-server/launchd/com.mac-llm-lab.llama-server.plist):
+[`host/llama-server/launchd/com.mac-llm-lab.llama-server.plist`](../../../llama-server/launchd/com.mac-llm-lab.llama-server.plist):
 
 ```xml
 <!-- sampler — Qwen3.6 vendor non-thinking profile (fast.Modelfile mirror). -->
@@ -173,7 +173,7 @@ through LiteLLM (suspect `drop_params: true` at line 113 of bridge config).
   config — the prose-smush concern doesn't reproduce.
 - **enable_thinking=false**: Qwen3.6 explicitly does not honor `/think`
   `/nothink` soft switches (per its model card and the existing
-  [`fast.Modelfile`](../../ollama/Modelfiles/fast.Modelfile) note); the
+  [`fast.Modelfile`](../../../ollama/Modelfiles/fast.Modelfile) note); the
   `chat_template_kwargs` path is the documented disable mechanism. Mirrors
   what Open WebUI does for the `fast` profile.
 
@@ -198,7 +198,7 @@ why it can't be skipped and what gotchas to watch for.
 
 ### 1. `host/llama-server/models.conf` — touched 3×
 
-Path: [`host/llama-server/models.conf:36-39`](../../llama-server/models.conf#L36-L39).
+Path: [`host/llama-server/models.conf:36-39`](../../../llama-server/models.conf#L36-L39).
 
 ```
 edit 1 (FAILED): TIER_64_GGUF → Qwen3.6-27B-Q8_0.gguf (Ollama-converted VLM blob)
@@ -208,7 +208,7 @@ edit 2 (REVERT): TIER_64_GGUF → Qwen3-Coder-30B-A3B-Instruct-UD-Q6_K_XL.gguf (
 edit 3 (CURRENT): TIER_64_GGUF → Qwen3.6-35B-A3B-UD-Q4_K_XL.gguf (the working one)
 ```
 
-**Why fragile:** the cleanup trap in [`run-tier-eval.sh:56-64`](../run-tier-eval.sh#L56-L64)
+**Why fragile:** the cleanup trap in [`run-tier-eval.sh:56-64`](../../run-tier-eval.sh#L56-L64)
 re-runs `LLAMA_TIER=64 install` on every exit, which re-renders the plist
 from whatever `TIER_64_GGUF` currently points at. So leaving this in a
 half-edited state will silently install the wrong model on the *next* tier
@@ -221,7 +221,7 @@ the swap as durable.
 
 ### 2. `host/llama-server/launchd/com.mac-llm-lab.llama-server.plist` — touched 2×
 
-Path: [`host/llama-server/launchd/com.mac-llm-lab.llama-server.plist:44-60`](../../llama-server/launchd/com.mac-llm-lab.llama-server.plist#L44-L60).
+Path: [`host/llama-server/launchd/com.mac-llm-lab.llama-server.plist:44-60`](../../../llama-server/launchd/com.mac-llm-lab.llama-server.plist#L44-L60).
 
 ```
 edit 1 (Knob 1): temp 0.4 → 0.6, top-p 0.8 → 0.95 (vendor thinking sampler)
@@ -244,7 +244,7 @@ changing the value.
 
 ### 3. `host/litellm/litellm-config.yaml` — touched 1×, bridge restarted
 
-Path: [`host/litellm/litellm-config.yaml:63-78`](../../litellm/litellm-config.yaml#L63-L78).
+Path: [`host/litellm/litellm-config.yaml:63-78`](../../../litellm/litellm-config.yaml#L63-L78).
 
 ```
 edit 1 (Knob 2 = CURRENT): added extra_body.chat_template_kwargs.enable_thinking=false
@@ -303,8 +303,8 @@ flipping back and forth.
    `scripts/install` so each tier carries its own sampler. Without this,
    A/B reruns require manual plist edits.
 3. **Production swap decision.** If knob-2 holds at ≥18/20 mean, swap
-   tier-64 to 3.6-35B-A3B in `models.conf`. Update [`README.md`](../../llama-server/README.md)
-   tier table, [`profiles.md`](../../../profiles.md) if affected, and
+   tier-64 to 3.6-35B-A3B in `models.conf`. Update [`README.md`](../../../llama-server/README.md)
+   tier table, [`profiles.md`](../../../../profiles.md) if affected, and
    `TIER-EVAL-REPORT.md` (since deleted).
 4. **Latency regression check.** TTFT went from 81 ms → 137 ms. Verify this
    isn't a chat_template_kwargs forwarding overhead at the bridge that
@@ -313,9 +313,9 @@ flipping back and forth.
 
 ## Result files (this session)
 
-- [`TIER-EVAL-RESULTS-20260428-0324.md`](../logs/TIER-EVAL-RESULTS-20260428-0324.md) — Pass 1, thinking on, claw sampler. 15/20.
-- [`TIER-EVAL-RESULTS-20260428-0334.md`](../logs/TIER-EVAL-RESULTS-20260428-0334.md) — Knob 1, thinking on, vendor sampler. 14/20.
-- [`TIER-EVAL-RESULTS-20260428-0341.md`](../logs/TIER-EVAL-RESULTS-20260428-0341.md) — **Knob 2, thinking off, vendor non-thinking sampler. 20/20.**
+- [`TIER-EVAL-RESULTS-20260428-0324.md`](../../logs/TIER-EVAL-RESULTS-20260428-0324.md) — Pass 1, thinking on, claw sampler. 15/20.
+- [`TIER-EVAL-RESULTS-20260428-0334.md`](../../logs/TIER-EVAL-RESULTS-20260428-0334.md) — Knob 1, thinking on, vendor sampler. 14/20.
+- [`TIER-EVAL-RESULTS-20260428-0341.md`](../../logs/TIER-EVAL-RESULTS-20260428-0341.md) — **Knob 2, thinking off, vendor non-thinking sampler. 20/20.**
 
 ## Current rig state
 

@@ -28,7 +28,7 @@ Both tiers are **at the 26-test pack ceiling.** Wilson 95% CIs at p=0.99, N=8 ar
 
 Sprint 2's deliverable (`discrimination_matrix_v1.csv` with Wilson CIs, point spreads, credible-spread flags) is meaningless without cells where the underlying pass rate is in the discriminative middle. That is what this pack delivers.
 
-Source memo: [`memos/n8-confirm-vs-baseline.md`](memos/n8-confirm-vs-baseline.md), "Recommended next actions" item 3. Sibling sprint plan: [`../TIER-EVAL-V2-SPRINT-PLAN.md`](../TIER-EVAL-V2-SPRINT-PLAN.md).
+Source memo: [`memos/n8-confirm-vs-baseline.md`](memos/n8-confirm-vs-baseline.md), "Recommended next actions" item 3. Sibling sprint plan: [`../TIER-EVAL-V2-SPRINT-PLAN.md`](../base/TIER-EVAL-V2-SPRINT-PLAN.md).
 
 ---
 
@@ -64,7 +64,7 @@ Hand-authored cap dropped from 5–6 → 3 per design review, then bumped back t
 
 ### Failure modes deliberately probed
 
-Drawn from observed Qwen3.5-9B failure signatures (Sprint 1.18 tier-16/32 data, [`../NEW-EVALS-REPORT.md`](../NEW-EVALS-REPORT.md) Round-2/3 calibration):
+Drawn from observed Qwen3.5-9B failure signatures (Sprint 1.18 tier-16/32 data, [`../NEW-EVALS-REPORT.md`](../base/NEW-EVALS-REPORT.md) Round-2/3 calibration):
 
 | Failure mode | Probed by | Rationale |
 |---|---|---|
@@ -78,7 +78,7 @@ Drawn from observed Qwen3.5-9B failure signatures (Sprint 1.18 tier-16/32 data, 
 
 - **Productivity** — deferred to Sprint 3 (grader-human calibration prerequisite). Bolts on as a separate task suite per user direction.
 - **Library-API axis (BigCodeBench-style)** — would require npm deps in the test container, against `Dockerfile` design. Out for 1.21; revisit if a future sprint accepts the container-rebuild cost.
-- **Hidden-holdout siblings** — Sprint 4 territory per `../HIDDEN-HOLDOUT-POLICY.md`. Public tests authored here may have hidden siblings *later*; do not author both in 1.21.
+- **Hidden-holdout siblings** — Sprint 4 territory per `../base/HIDDEN-HOLDOUT-POLICY.md`. Public tests authored here may have hidden siblings *later*; do not author both in 1.21.
 - **t64 discrimination** — t64 still runs Qwen3.6-35B-A3B; cross-tier comparison would mix model families. Out until t64 model swap.
 - **Multi-SWE-bench full integration** — npm-install workspace adapter is genuine harness work; defer to a focused future sprint.
 
@@ -157,7 +157,7 @@ Reference: [Bowyer, Aitchison, Ivanova. "Position: Don't Use the CLT in LLM Eval
 
 ### Saturation budget for the 12 new tests
 
-Even if every new test lands cleanly in the discriminative middle, the *combined* 38-test pack (26 existing + 12 new) will still aggregate-saturate because the 26 are still ceiling-pinned. **Per-test cell-level Wilson CIs are what Sprint 2 needs**, not aggregate pass rate. The aggregate is already not a publishable metric per [`../EVAL-DESIGN.md`](../EVAL-DESIGN.md) ("Forbidden in any leadership-facing artifact: 'tier-32 scored X%'"). So this is not a problem; we just need to remember it when describing results.
+Even if every new test lands cleanly in the discriminative middle, the *combined* 38-test pack (26 existing + 12 new) will still aggregate-saturate because the 26 are still ceiling-pinned. **Per-test cell-level Wilson CIs are what Sprint 2 needs**, not aggregate pass rate. The aggregate is already not a publishable metric per [`../EVAL-DESIGN.md`](../base/EVAL-DESIGN.md) ("Forbidden in any leadership-facing artifact: 'tier-32 scored X%'"). So this is not a problem; we just need to remember it when describing results.
 
 ---
 
@@ -317,7 +317,7 @@ The proposal mixes "what to build" (Sourcing) with "how to test it" (Calibration
 ### Hard prerequisites (do not start 1.21 calibration until landed)
 
 1. **Sprint 1.20** (t16 harness-error triage) — without this, R3 calibration check is uninterpretable on t16. Per the V2 plan, 1.20 is "soft gate" for matrix; for *this* proposal it's a partial dependency (see R-5 above).
-2. **Sprint 1.5 cuts** — code-review verdicts shouldn't be in flight while we author against `lib/`. Most cuts already documented in [`../CODE-REVIEW.md`](../CODE-REVIEW.md) per V2 plan §1.5.
+2. **Sprint 1.5 cuts** — code-review verdicts shouldn't be in flight while we author against `lib/`. Most cuts already documented in [`../CODE-REVIEW.md`](../base/CODE-REVIEW.md) per V2 plan §1.5.
 
 ### Parallelizable streams (independent; can be authored concurrently)
 
@@ -340,7 +340,7 @@ See **Execution order** table above (steps 7–10). Expect ~25% rejection rate (
 ### To modify
 
 - `host/test/__tests__/tier-eval/<new-test-id>.test.js` — 12 new files
-- [`../TIER-EVAL-V2-SPRINT-PLAN.md`](../TIER-EVAL-V2-SPRINT-PLAN.md) — flip row 1.21 from `planned` → `in-progress` → `done`
+- [`../TIER-EVAL-V2-SPRINT-PLAN.md`](../base/TIER-EVAL-V2-SPRINT-PLAN.md) — flip row 1.21 from `planned` → `in-progress` → `done`
 - [`memos/n8-confirm-vs-baseline.md`](memos/n8-confirm-vs-baseline.md) — annotate "Recommended next actions" item 3 as in-flight
 
 ### To reuse without modification
@@ -404,7 +404,7 @@ The following are **out of scope for 1.21** and tracked for future sprints:
 
 5. **Yang et al.** *SWE-bench: Can Language Models Resolve Real-World GitHub Issues?* [swebench.com](https://www.swebench.com/) / SWE-bench Multilingual / SWE-bench Pro. Cited as the inspiration for Multi-SWE-bench JS/TS deferred work.
 
-6. **Internal:** [`../EVAL-DESIGN.md`](../EVAL-DESIGN.md) — eight rules + difficulty-band definitions + decision rule (§9.2). All R1–R8 reject criteria trace to one of these.
+6. **Internal:** [`../EVAL-DESIGN.md`](../base/EVAL-DESIGN.md) — eight rules + difficulty-band definitions + decision rule (§9.2). All R1–R8 reject criteria trace to one of these.
 
 7. **Internal:** [`memos/n8-confirm-vs-baseline.md`](memos/n8-confirm-vs-baseline.md) — saturation finding driving this work.
 

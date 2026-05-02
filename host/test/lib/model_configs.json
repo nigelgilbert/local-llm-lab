@@ -472,6 +472,6 @@
     "harness_version": "d0d46f4",
     "prompt_pack_version": "pp01",
     "tier_compatibility": [64],
-    "notes": "Tier-64 baseline; MoE hybrid attention/SSM, thinking suppressed via litellm route. Sampler v1 per host/llama-server/models.conf TIER_64 block; pending confirmatory n=7 separation between three tied 15/15 cells (see TIER-EVAL-MEMO-20260428-sampler-v2.md)."
+    "notes": "Tier-64 baseline; MoE hybrid attention/SSM, thinking suppressed via litellm route. Sampler v1 per host/llama-server/models.conf TIER_64 block; pending confirmatory n=7 separation between three tied 15/15 cells (see host/test/docs/base/TIER-EVAL-MEMO-20260428-sampler-v2.md)."
   }
 }
