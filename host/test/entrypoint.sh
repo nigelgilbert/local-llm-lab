@@ -17,6 +17,11 @@
 # TEST_SUITE scoping: when TEST_SUITE is set, override $@ to run only that
 # subdirectory so run-backend-ab.sh and run-model-ab.sh each fire their own
 # tests. Unset (or "all") runs everything under __tests__/.
+#
+# TIER_EVAL_FILTER: when TEST_SUITE=tier-eval and this is a non-empty space-
+# separated list of test_id stems (e.g. "wordy alphametics forth"), restrict
+# the run to those files only. Used by Sprint 1.21 explore-cycle.sh for
+# scoped pilot sweeps.
 
 set -eu
 
@@ -46,7 +51,18 @@ case "${TEST_SUITE:-}" in
   backend-ab)   set -- node --test --test-concurrency=1 --test-reporter=spec __tests__/backend-ab/*.test.js ;;
   model-ab)     set -- node --test --test-concurrency=1 --test-reporter=spec __tests__/model-ab/*.test.js ;;
   settings-ab)  set -- node --test --test-concurrency=1 --test-reporter=spec __tests__/settings-ab/*.test.js ;;
-  tier-eval)    set -- node --test --test-concurrency=1 --test-reporter=spec __tests__/tier-eval/*.test.js ;;
+  tier-eval)
+    if [ -n "${TIER_EVAL_FILTER:-}" ]; then
+      files=""
+      for stem in $TIER_EVAL_FILTER; do
+        files="$files __tests__/tier-eval/${stem}.test.js"
+      done
+      # shellcheck disable=SC2086
+      set -- node --test --test-concurrency=1 --test-reporter=spec $files
+    else
+      set -- node --test --test-concurrency=1 --test-reporter=spec __tests__/tier-eval/*.test.js
+    fi
+    ;;
   *)            : ;;
 esac
 

@@ -152,6 +152,11 @@ fi
 # ---- write expected-attempts manifest (Sprint 1.14) ----
 log ""
 log "==> writing expected-attempts manifest..."
+EXPECTED_FILTER_ARG=""
+if [ -n "${TIER_EVAL_FILTER:-}" ]; then
+  EXPECTED_FILTER_ARG="--filter ${TIER_EVAL_FILTER}"
+fi
+# shellcheck disable=SC2086
 docker run --rm \
   -v "$TEST_DIR:/test" \
   -w /test \
@@ -161,6 +166,7 @@ docker run --rm \
     --tiers "$EVAL_TIERS" \
     --reps "$EVAL_REPS" \
     --out "/test/.claw-runtime/$(basename "$EXPECTED_PATH")" \
+    $EXPECTED_FILTER_ARG \
   || err "failed to write expected-attempts manifest"
 
 # ---- header ----
@@ -215,8 +221,9 @@ run_one_pass() {
     -e BACKEND=llama-server \
     -e TIER="$tier" \
     -e TEST_SUITE=tier-eval \
+    -e TIER_EVAL_FILTER="${TIER_EVAL_FILTER:-}" \
     -e RUN_REGISTRY_EMIT=1 \
-    -e RUN_REGISTRY_KIND=overnight_screen \
+    -e RUN_REGISTRY_KIND="${RUN_REGISTRY_KIND:-overnight_screen}" \
     -e RUN_REGISTRY_HARDWARE_TIER="$tier" \
     -e RUN_REGISTRY_MEMORY_GB="$tier" \
     -e RUN_REGISTRY_MODEL_CONFIG_ID="$cfg_id" \
