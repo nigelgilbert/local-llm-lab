@@ -19,10 +19,10 @@ reps.
 | t32 | Qwen3-14B Q4_K_M @ 32k, baseline sampler | Qwen3.5-9B Q5_K_XL @ 64k, sampler `v7noreppen-pp01` (rep10, cell B2) — `qwen35-9b-q5kxl-ctx64k-v7noreppen-pp01` |
 
 Both new runs: 26 tier-eval tests × 8 reps = 208 attempts each, split
-across two N=4 chunks ([t16 chunk1](../.claw-runtime/run_registry.t16-confirm-n4-chunk1-e-iq4xs-32k-rep11-20260501-2152.csv),
-[t16 chunk2](../.claw-runtime/run_registry.t16-confirm-n4-chunk2-e-iq4xs-32k-rep11-20260502-0044.csv),
-[t32 chunk1](../.claw-runtime/run_registry.t32-confirm-n4-chunk1-b2-q5kxl-64k-rep10-20260501-1841.csv),
-[t32 chunk2](../.claw-runtime/run_registry.t32-confirm-n4-chunk2-b2-q5kxl-64k-rep10-20260501-2307.csv)).
+across two N=4 chunks ([t16 chunk1](../../../.claw-runtime/run_registry.t16-confirm-n4-chunk1-e-iq4xs-32k-rep11-20260501-2152.csv),
+[t16 chunk2](../../../.claw-runtime/run_registry.t16-confirm-n4-chunk2-e-iq4xs-32k-rep11-20260502-0044.csv),
+[t32 chunk1](../../../.claw-runtime/run_registry.t32-confirm-n4-chunk1-b2-q5kxl-64k-rep10-20260501-1841.csv),
+[t32 chunk2](../../../.claw-runtime/run_registry.t32-confirm-n4-chunk2-b2-q5kxl-64k-rep10-20260501-2307.csv)).
 
 ## Headline numbers
 
@@ -74,7 +74,7 @@ across two N=4 chunks ([t16 chunk1](../.claw-runtime/run_registry.t16-confirm-n4
 
 ## Recommended next actions
 
-1. Update [`TIER-EVAL-V2-SPRINT-PLAN.md`](TIER-EVAL-V2-SPRINT-PLAN.md)
+1. Update [`TIER-EVAL-V2-SPRINT-PLAN.md`](../../TIER-EVAL-V2-SPRINT-PLAN.md)
    row 1.19 with the lock-in result and flip the manifesto-framing
    line in row 1.18 to "superseded by Sprint 1.19 confirm."
 2. Triage t16 harness errors (28 across 208) — if they cluster on a
@@ -88,6 +88,6 @@ across two N=4 chunks ([t16 chunk1](../.claw-runtime/run_registry.t16-confirm-n4
 
 - Source rows: `host/test/.claw-runtime/run_registry.t{16,32}-confirm-n4-chunk{1,2}-*.csv`
 - Baseline rows: `host/test/.claw-runtime/run_registry.eval8-trimmed-20260429-2240.csv`
-  (Sprint 1.18, see [`TIER-EVAL-V2-SPRINT-PLAN.md`](TIER-EVAL-V2-SPRINT-PLAN.md) row 1.18)
+  (Sprint 1.18, see [`TIER-EVAL-V2-SPRINT-PLAN.md`](../../TIER-EVAL-V2-SPRINT-PLAN.md) row 1.18)
 - Test pack: 26 tier-eval tests, unchanged between baseline and
   confirm.
