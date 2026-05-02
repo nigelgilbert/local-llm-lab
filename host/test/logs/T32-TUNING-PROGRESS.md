@@ -841,3 +841,51 @@ host/test/.claw-runtime/run_registry.t32-sweep4-cellE-q6kxl-64k-rep10-20260501-1
 caveats as before; will go away once n=8 confirmatory closes out the new
 candidate baselines and the production plist is the only path needed.
 
+
+## N=8 Confirmatory — both tier winners (2026-05-02)
+
+Run as 4 chunks of N=4 (2 chunks per model) so individual sweeps stayed
+under the screen-saver / pmset-contamination window. Combined registries:
+
+- tier-32 B2: chunks `t32-confirm-n4-chunk{1,2}-b2-q5kxl-64k-rep10-*.jsonl`
+- tier-16 E:  chunks `t16-confirm-n4-chunk{1,2}-e-iq4xs-32k-rep11-*.jsonl`
+
+| Tier | Cell | n=2 baseline | N=8 confirm | Lower-CI Δ | Promotion |
+|------|------|--------------|-------------|-----------|-----------|
+| 32   | B2   | 49/49 = 100%, lower=0.927 | 185/186 = 99.5%, lower=0.970 | +0.043 | ✓ PASS |
+| 16   | E    | 47/47 = 100%, lower=0.924 | 176/179 = 98.3%, lower=0.952 | +0.028 | ✓ PASS |
+
+Both lock-ins hold. Lower-CI moved up at both tiers; the 100% point
+estimate at n=2 was inside the confidence interval, not the per-test
+ceiling.
+
+### Per-test breaks at N=8
+
+- **tier-32 B2**: `expression-eval` 1/2 done (50%) — sole break across 26
+  tests. Other 25 all 100% across 5–8 attempts each.
+- **tier-16 E**:
+  - `lru-cache` 3/4 done (75%, −25pp vs baseline 100%@n=2) — only
+    multi-attempt regression.
+  - `expression-eval` 0/1 and `csv-parser` 0/1 — single-attempt failures
+    not present in the n=2 baseline; treat as N=8 first-look signals,
+    not regressions.
+
+Drift advisory rose +7–8pp at both tiers (17→24%, 21→26%) — same
+direction at both, suggests workload-side effect (more tests sampled
+across thermal envelope), not a model-side change.
+
+### Updated baseline rates (use for future Δ comparisons)
+
+| Tier | Config | model_config_id | Rate | Lower-CI |
+|------|--------|-----------------|------|----------|
+| 32   | Qwen3.5-9B UD-Q5_K_XL @ 64k | `qwen35-9b-q5kxl-ctx64k-v7noreppen-pp01` | 99.5% | 0.970 |
+| 16   | Qwen3.5-9B IQ4_XS @ 32k     | `qwen35-9b-iq4xs-ctx32k-v6antiloop-pp01` | 98.3% | 0.952 |
+
+run-overnight-screen.sh defaults updated to map tier→config_id without
+needing T{16,32}_CANDIDATE_CONFIG_ID env hooks.
+
+**Still pending:** reference sweep on prior baselines (Qwen3-14B Q4_K_M
+c6, Qwen2.5-7B Q5 v1-prod) under new model_config_id schema, to flip
+canonical_status flags and frame Δ in writeup. Variant plist +
+install-qwen35 can now be deleted (production plist is the only path).
+
