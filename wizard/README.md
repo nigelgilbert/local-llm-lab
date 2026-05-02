@@ -24,8 +24,8 @@ Homebrew. Strictly idempotent.
 
 | Tier | Model                              | GGUF size |
 |------|-------------------------------------|-----------|
-| 16   | Qwen2.5-7B-Instruct Q5_K_M          | ~5.07 GB  |
-| 32   | Qwen3-14B Q4_K_M                    | ~8.4  GB  |
+| 16   | Qwen3.5-9B IQ4_XS                   | ~5.0  GB  |
+| 32   | Qwen3.5-9B UD-Q5_K_XL               | ~6.5  GB  |
 | 64   | Qwen3.6-35B-A3B UD-Q4_K_XL          | ~21   GB  |
 
 Tier auto-detects from `sysctl hw.memsize`; the slider lets you override
