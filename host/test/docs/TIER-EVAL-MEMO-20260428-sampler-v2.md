@@ -14,7 +14,7 @@ This memo is that grid — and the **honest finding is a negative result**: at n
 - **Held fixed:** `top_p=0.8, top_k=20, repeat_penalty=1.0, ctx=65536`.
 - **Tests (n=3 each):** `csv-parser`, `lru-cache`, `json-schema-validate`, `multi-bug-decoy`, `expression-eval`.
 - **Excluded from grid:** `mini-vm` — fails universally regardless of sampler (4 prior swings, 0 passes); 240s × 24 runs would burn 96 min on a known no-signal test. Probed at the v2 candidate post-grid (n=2): 0/2, 240s timeouts each. Capability ceiling confirmed.
-- **Driver:** [host/test/logs/a2/run-sampler-grid.sh](../logs/a2/run-sampler-grid.sh). Cleanup trap restores the prior sampler on exit.
+- **Driver:** `host/test/logs/a2/run-sampler-grid.sh` (since deleted). Cleanup trap restores the prior sampler on exit.
 - **Wall-clock:** 12:14 → 13:54 = ~100 min for 24 docker invocations × ~4 min each.
 
 ## Results

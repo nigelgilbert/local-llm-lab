@@ -86,7 +86,7 @@ One test outside the new-evals scope flaked once in six sweeps: `prose quality v
 
 ## Addendum 2026-04-28 — lower-tier calibration (recommendation #4 closure)
 
-Round-2 + round-3 evals run at tier-32 (Qwen3-14B Q4_K_M, sampler temp=0.4 presence=0) and tier-16 (Qwen2.5-7B-Instruct Q5_K_M, same sampler), n=3 each. Driver: [host/test/logs/a2/LOWER-TIER-CALIB-20260428-1407.md](../logs/a2/LOWER-TIER-CALIB-20260428-1407.md).
+Round-2 + round-3 evals run at tier-32 (Qwen3-14B Q4_K_M, sampler temp=0.4 presence=0) and tier-16 (Qwen2.5-7B-Instruct Q5_K_M, same sampler), n=3 each. Driver: `host/test/logs/a2/LOWER-TIER-CALIB-20260428-1407.md` (since deleted).
 
 | Test | Round | tier-64 (sampler v2) | tier-32 (n=3) | tier-16 (n=3) |
 |---|---|---|---|---|

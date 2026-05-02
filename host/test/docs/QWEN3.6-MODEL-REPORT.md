@@ -109,7 +109,7 @@ Action items spawned by A1:
 
 ## Addendum 2026-04-28 — A2 stability sweep (n=7 at 64k, sampler v1)
 
-Loop driver in [host/test/logs/a2/STABILITY-20260428-1156.md](../logs/a2/STABILITY-20260428-1156.md). Same prompt, same config, 7 back-to-back iterations of 4 tests.
+Loop driver in `host/test/logs/a2/STABILITY-20260428-1156.md` (since deleted). Same prompt, same config, 7 back-to-back iterations of 4 tests.
 
 | Test | n | pass | elapsed (ms), iter 1→7 | min | med | max | spread |
 |---|---|---|---|---|---|---|---|
@@ -142,7 +142,7 @@ Two TODOs predating Qwen3.6 documented tier-64 flakes against the prior model (Q
 | TODO | Prior fingerprint (Qwen3-Coder-30B) | Current (Qwen3.6 at v2 sampler, n=10) |
 |---|---|---|
 | `TODO-AGENT-SINGLE-FLAKE.md` (since deleted) — prose-only completion on short prompts | ~1-in-3: 930ms exit=0, no `hello.py`, model emitted prose | **10/10 pass** (1219–5175ms, median ~1.3s) |
-| [TODO-MULTI-FILE-RENAME-FLAKE.md](../../llama-server/docs/TODO-MULTI-FILE-RENAME-FLAKE.md) — claw 240s timeout on 3-file rename | 1-of-1 hit 240s wallclock | **10/10 pass** (6138–8310ms, median ~7.1s) |
+| `TODO-MULTI-FILE-RENAME-FLAKE.md` (since deleted) — claw 240s timeout on 3-file rename | 1-of-1 hit 240s wallclock | **10/10 pass** (6138–8310ms, median ~7.1s) |
 
 Both flakes are gone under Qwen3.6 + v2 sampler. The grammar+model+sampler combination no longer permits the failure modes the TODOs describe. Both TODOs can be closed; this addendum + the n=10 evidence are the receipts.
 

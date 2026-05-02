@@ -1,7 +1,7 @@
 # Tier-Eval Suite v2 — Sprint Plan
 
 **Date:** 2026-04-29
-**Status:** Sprint 0 closed. Sprint 1 in flight (1.18 done; 1.19 planned).
+**Status:** Sprint 0 closed. Sprint 1 closed through 1.19 (2026-05-02). Sprint 1.20 (t16 harness-error triage) and 1.21 (difficulty-extension test pack) logged as open follow-ups before Sprint 2.
 **Source:** Derived from `Tier-Eval Suite Improvement Plan V2` (2026-04-29) plus the Q&A below.
 **Audience:** Harness engineers continuing this work across sessions/compactions.
 

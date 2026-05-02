@@ -18,34 +18,34 @@ Recommendations: **K** (keep), **D** (drop), **Q** (quarantine for harness fix),
 
 | Test | Empirical fail rate at tier-64 | Source | Reco | One-line rationale |
 |---|---|---|---|---|
-| adversarial-input | **42%** (10/24) | logs/a2/SAMPLER-GRID-20260428-1213.md | **K** | Slugify edge cases produce model-level spec-failure trace; high signal-per-run. |
+| adversarial-input | **42%** (10/24) | logs/a2/SAMPLER-GRID (deleted) | **K** | Slugify edge cases produce model-level spec-failure trace; high signal-per-run. |
 | agent-parallel | no data | — | **C** | Tool-discipline target; pilot first to see if it produces gradeable traces vs hard-fail. |
 | agent-single | ~33% (Qwen3-Coder TTFT-fail) | calibration notes | **K** | Rare failure mode (model emits prose, no tool call). One of the few D-class candidates. |
 | algorithm-intervals | no data | — | **C** | Edge-case-rich (touching intervals, unsorted, containment); pilot. |
 | api-evolution | no data | — | **C** | Multi-file refactor (2 files, signature change). Class C/multi-file candidate. |
-| cascading-bugs | 4% (1/24) | logs/a2/SAMPLER-GRID | **D** | Too stable; n=20 produces 0–1 failures. No κ contribution. |
+| cascading-bugs | 4% (1/24) | logs/a2/SAMPLER-GRID (deleted) | **D** | Too stable; n=20 produces 0–1 failures. No κ contribution. |
 | code-self-test | no data | — | **C** | Likely high pass; deprioritize unless pilot surprises. |
-| comment-spec | 8% (2/24) | logs/a2/SAMPLER-GRID | **D** | Too stable; below n=20 threshold for ≥4 failures per cell. |
+| comment-spec | 8% (2/24) | logs/a2/SAMPLER-GRID (deleted) | **D** | Too stable; below n=20 threshold for ≥4 failures per cell. |
 | csv-parser | **0%** (0/40) at widened timeout | n=20 noisy-suite sweep 2026-04-29 | **D** | Was the calibration anchor; now produces no failures. Drop from iter-dist sweep (keep in tier-eval suite for general regression). |
-| deep-equal | **25%** (6/24) | logs/a2/SAMPLER-GRID | **K** | NaN / +0/-0 corner cases; consistent fail trigger; clean spec-precision trace. |
+| deep-equal | **25%** (6/24) | logs/a2/SAMPLER-GRID (deleted) | **K** | NaN / +0/-0 corner cases; consistent fail trigger; clean spec-precision trace. |
 | dependency-graph | no data | — | **C** | Cycle detection + topological sort; pilot. Plausible spec-precision target. |
 | distractor | no data | — | **C** | Debugging-class test; pilot. |
 | expression-eval | **25%** (10/40) at widened timeout | n=20 noisy-suite sweep 2026-04-29 | **K** | 25+ assertions, recursive-descent parser; the cell carrying failed-tail today. |
 | json-schema-validate | no data | — | **C** | Recursive descent + error accumulation; pilot. |
 | large-refactor | no data | — | **C** | 5 call sites × 4 files. Strongest cross-cell candidate for context-drift (C). Pilot. |
 | latency | informational only | — | **D** | Not pass/fail. Belongs in a separate health-check suite, not iter-dist. |
-| long-horizon-bugs | 4% (1/24) | logs/a2/SAMPLER-GRID | **D** | Too stable at tier-64. Consider re-tagging at tier-128 if that exists. |
+| long-horizon-bugs | 4% (1/24) | logs/a2/SAMPLER-GRID (deleted) | **D** | Too stable at tier-64. Consider re-tagging at tier-128 if that exists. |
 | lru-cache | **0%** (0/40) at widened timeout | n=20 noisy-suite sweep 2026-04-29 | **D** | Same story as csv-parser. Drop from iter-dist; keep in regression suite. |
 | mini-vm | **100% fail** but timeout-bound | logs/TIER-EVAL-RESULTS-20260428-1142 | **Q** | Hits 240s timeout consistently; not model-level failure. Quarantine until either (a) timeout extension produces real model-failure data, or (b) harness limit raised. |
 | multi-bug | no data | — | **C** | 3 independent bugs in one file. Pilot. Plausible Class A target. |
 | multi-bug-decoy | **harness-blocked** | logs/TIER-EVAL-RESULTS-20260428-1142 | **Q** | LiteLLM MidStreamFallbackError on context-size-exceeded. Fix harness, then re-evaluate. |
 | multi-file-rename | no data | — | **C** | Cross-file rename + signature change. Plausible C-class. Pilot. |
 | null-default | no data | — | **C** | `??` vs `\|\|` gotcha. Likely high pass; deprioritize. |
-| prose-quality | 12% (3/24) | logs/a2/SAMPLER-GRID | **D** | Borderline; format-output failures aren't the failure mode iter-dist cares about. Better suited to a prose-focused suite. |
+| prose-quality | 12% (3/24) | logs/a2/SAMPLER-GRID (deleted) | **D** | Borderline; format-output failures aren't the failure mode iter-dist cares about. Better suited to a prose-focused suite. |
 | refactor | no data | — | **C** | Off-by-one fix. Likely high pass. |
 | spec-compliance | no data | — | **C** | Tightly-spec'd 4-bullet output; pilot. Plausible spec-precision class. |
 | spec-precedence | no data | — | **C** | 5 ordered rules; pilot. |
-| state-machine | **17%** (4/24) | logs/a2/SAMPLER-GRID | **K** | FSM transitions + invalid-state handling. Good stateful-logic candidate. Borderline n=20 contributor. |
+| state-machine | **17%** (4/24) | logs/a2/SAMPLER-GRID (deleted) | **K** | FSM transitions + invalid-state handling. Good stateful-logic candidate. Borderline n=20 contributor. |
 | subtle-bug | no data | — | **C** | Lexicographic vs numeric sort. Single-line debugging fix; likely high pass. |
 | tool-discipline | informational only | — | **D** | Health check, not iter-dist material. |
 | two-step-refactor | no data | — | **C** | Extract + fix latent bug. Plausible C-class candidate. Pilot. |
@@ -172,8 +172,8 @@ Five candidates, each rated for the gap it addresses. The analysis team owns imp
 
 - `host/test/.claw-runtime/_archive-2026-04-28/iter-distribution-runs.csv` — n=20 archived dataset (proxy-based passed)
 - `host/test/.claw-runtime/iter-distribution-runs.csv` — current n=20 noisy-suite sweep (real assertion-based passed)
-- `host/test/logs/a2/SAMPLER-GRID-20260428-1213.md` — sampler grid, 5 tests × 8 cells × n=3
-- `host/test/logs/a2/LOWER-TIER-CALIB-20260428-1407.md` — tier-32 calibration data
+- `host/test/logs/a2/SAMPLER-GRID` (deleted) — sampler grid, 5 tests × 8 cells × n=3
+- `host/test/logs/a2/LOWER-TIER-CALIB` (deleted) — tier-32 calibration data
 - `host/test/logs/TIER-EVAL-RESULTS-20260428-1142.md` — single-run tier-64 across all tests (mini-vm + multi-bug-decoy harness issues)
 - [W4-TAXONOMY.md](W4-TAXONOMY.md) and [W4-TAXONOMY-PRODUCTIVE.md](W4-TAXONOMY-PRODUCTIVE.md) — frozen taxonomies the analysis is validating against
 - [W2-W3-RESULTS-20260428.md](W2-W3-RESULTS-20260428.md) — prior n=20 analysis output

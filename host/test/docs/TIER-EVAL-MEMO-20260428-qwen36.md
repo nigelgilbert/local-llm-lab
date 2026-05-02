@@ -24,9 +24,8 @@ tool-roundtrip vs production; capability gain is +3 tests.
 ## The case for swapping tier-64 to Qwen3.6-35B-A3B
 
 1. **Capability ceiling is higher.** Production Coder-30B's known weak spots
-   (`multi-file-rename` claw timeout per
-   [`TODO-MULTI-FILE-RENAME-FLAKE.md`](../../llama-server/docs/TODO-MULTI-FILE-RENAME-FLAKE.md);
-   `prose-quality:bridge` chronic ✖) all cleared on knob 2. The 35B-A3B isn't
+   (`multi-file-rename` claw timeout per `TODO-MULTI-FILE-RENAME-FLAKE.md`
+   (since deleted); `prose-quality:bridge` chronic ✖) all cleared on knob 2. The 35B-A3B isn't
    a coder-specialist (it's a multimodal hybrid attention/SSM MoE) but it
    reasons through code tasks more reliably.
 
