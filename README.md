@@ -1,6 +1,6 @@
 # mac-llm-lab
 
-Truly useful local AI on Apple Silicon. A worked reference rig at the **64 GB tier** (M5 Max Pro), with the **32 GB and 16 GB tiers on the roadmap** — the goal is one architecture, three SoC budgets, so anyone with the Mac they already own can run real models locally.
+Truly useful local AI on Apple Silicon. A worked reference rig across **16 GB, 32 GB, and 64 GB** — one architecture, three SoC budgets, so anyone with the Mac they already own can run real models locally.
 
 The wager: a single LLM call is brain-like and primitive — what feels useful (ChatGPT, Claude Code) is a *system* of models, retrieval, tools, and routing. This project builds that system locally with small open models and proves they can be insanely useful. Read [`MANIFESTO.md`](MANIFESTO.md) for the why.
 

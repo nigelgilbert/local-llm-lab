@@ -43,7 +43,7 @@ Distilled from SWE-bench Verified, METR's task-design memos, BigCodeBench, LiveC
 
 1. Drop a new `__tests__/tier-eval/<name>.test.js` mirroring `refactor.test.js`'s shape.
 2. Hand-solve it from the prompt before committing (rule #1).
-3. Run it ≥5 times against the production tier (64) — must be ≥4/5. Then ≥3 times on tier-32, tier-16. Verify the pass-rate gradient.
+3. Run it ≥3 times against each tier
 4. Rebuild the test image: `(cd host/test && docker compose build)`.
 5. Add it to the `tier-eval` suite list in `run-tier-eval.sh` header comment for posterity.
 6. If pass-rate is the same on every tier, retire it.

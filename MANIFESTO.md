@@ -14,7 +14,7 @@ The frontier hides this. Consumers see a chat box and infer that "the model" is 
 
 A 64 GB Apple Silicon laptop is not a frontier datacenter, but it can run real, useful models — and a 16 GB MacBook Air is now within striking distance of capability that, a generation ago, lived behind an API key and a credit card. The point is to make that real, not theoretical.
 
-This repo's worked reference is the 64 GB tier (M5 Max Pro). The **32 GB and 16 GB tiers are the explicit goal** — same architecture, same workflow, smaller profile set tuned to the unified-memory budget. The roadmap is to publish all three so a student, a hobbyist, or anyone with the laptop they already own can stand the rig up and learn by running it.
+This repo supports **16 GB, 32 GB, and 64 GB** — same architecture, profile sets tuned to each budget. The 64 GB rig (M5 Max Pro) is the development reference because it's the hardware on hand. Anyone with the laptop they already own can stand the rig up and learn by running it.
 
 LLMs are about to be the substrate of how knowledge work happens. They should not be a thing you only get to touch through someone else's billing portal.
 
