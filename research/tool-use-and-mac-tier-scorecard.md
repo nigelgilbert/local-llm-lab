@@ -1,4 +1,4 @@
-# Research Proposal v2 - Protocol-Faithful Tool Use and Mac-Tier Agent Scorecard
+# Research Proposal v2 — Protocol-Faithful Tool Use and Mac-Tier Agent Scorecard
 
 **Status:** Revised draft for research-team review  
 **Date:** 2026-04-30  
@@ -14,7 +14,7 @@ The original proposal is directionally strong: it picks an important systems bot
 
 Material changes in this revision:
 
-1. **Replace "GBNF -> XGrammar" as the first milestone with a structured-output backend bake-off.** XGrammar and XGrammar-2 are compelling research targets, but llama.cpp already has LLGuidance support while XGrammar is not yet a drop-in llama.cpp backend. Treat LLGuidance as the in-tree control, GBNF as the current baseline, and XGrammar/XGrammar-2 as research adapters.
+1. **Replace "GBNF → XGrammar" as the first milestone with a structured-output backend bake-off.** XGrammar and XGrammar-2 are compelling research targets, but llama.cpp already has LLGuidance support while XGrammar is not yet a drop-in llama.cpp backend. Treat LLGuidance as the in-tree control, GBNF as the current baseline, and XGrammar/XGrammar-2 as research adapters.
 2. **Add a real tool-calling benchmark.** Wrap-rate alone is too narrow, and coding benchmarks do not isolate protocol failures. The scorecard now includes BFCL-style function-calling evaluation plus an internal Anthropic protocol matrix.
 3. **Decouple "decide to call a tool" from "format a valid tool call."** A two-phase decoder only helps if the transition into the constrained phase is reliable. The proposal now measures call-decision precision/recall separately from argument-schema conformance.
 4. **Repair the evaluation tiers.** A 30-instance coding dev set is unlikely to run in 30 minutes on local Mac hardware once Docker setup, repository tests, and local model latency are included. This version separates a fast smoke set, a nightly dev set, and milestone/full runs.
@@ -27,8 +27,8 @@ Material changes in this revision:
 
 Build a useful local coding agent harness for 16 GB, 32 GB, and 64 GB Apple Silicon machines. The core thesis is that local models become materially more useful when the orchestration layer is protocol-faithful, latency-aware, and measured against realistic agent workloads. The project therefore has two coupled threads:
 
-- **Thread A - Protocol-faithful tool use.** Improve the local model server's ability to produce correct Anthropic-style tool-use turns, including multi-tool selection, parallel calls, multi-turn `tool_result` continuation, and schema-conformant arguments, without degrading free-form reasoning.
-- **Thread B - Mac-tier scorecard.** Build the measurement layer that makes Thread A and future work falsifiable across 16 GB, 32 GB, and 64 GB Apple Silicon tiers.
+- **Thread A — Protocol-faithful tool use.** Improve the local model server's ability to produce correct Anthropic-style tool-use turns, including multi-tool selection, parallel calls, multi-turn `tool_result` continuation, and schema-conformant arguments, without degrading free-form reasoning.
+- **Thread B — Mac-tier scorecard.** Build the measurement layer that makes Thread A and future work falsifiable across 16 GB, 32 GB, and 64 GB Apple Silicon tiers.
 
 The proposal's output is not only a feature. It is a reusable experimental apparatus: a trace schema, benchmark runner, hardware profile matrix, result format, and reporting template that future research directions must use before claiming wins.
 
@@ -36,15 +36,15 @@ The proposal's output is not only a feature. It is a reusable experimental appar
 
 ## 2. Research questions and hypotheses
 
-### RQ1 - Which structured-output backend should a Mac-local Anthropic-compatible server use?
+### RQ1 — Which structured-output backend should a Mac-local Anthropic-compatible server use?
 
 **Hypothesis.** For current llama.cpp-based serving, LLGuidance is the most practical near-term structured-output backend because it is already integrated upstream. XGrammar/XGrammar-2 may become the best research backend if we can amortize dynamic per-request schema compilation and integrate token masking cleanly at the llama-server boundary.
 
 **Rationale.** XGrammar reports up to 100x speedups and near-zero serving overhead for structured generation by prechecking context-independent tokens and optimizing context-dependent checks. XGrammar-2 is even more directly relevant because it targets dynamic structured-generation workloads such as tool calling and conditional protocols. However, llama.cpp already supports GBNF and LLGuidance, while XGrammar integration would be new engineering. LLGuidance also supports JSON Schema, regular expressions, and context-free grammars through Lark-like formats and is already integrated in llama.cpp.
 
-### RQ2 - Can constrained decoding be applied only where it helps?
+### RQ2 — Can constrained decoding be applied only where it helps?
 
-**Hypothesis.** A gated two-phase policy - free reasoning until the system decides a tool call is needed, then constrained decoding only for the tool-use payload - will preserve more reasoning quality than single-phase grammar masking while retaining protocol fidelity.
+**Hypothesis.** A gated two-phase policy — free reasoning until the system decides a tool call is needed, then constrained decoding only for the tool-use payload — will preserve more reasoning quality than single-phase grammar masking while retaining protocol fidelity.
 
 **Important correction to the original draft.** The hard part is not just switching the grammar on after `<tool_call>`. The hard part is making the transition decision reliable. The evaluation must therefore measure:
 
@@ -58,7 +58,7 @@ The proposal's output is not only a feature. It is a reusable experimental appar
 
 This directly addresses evidence that stricter format restrictions can degrade reasoning performance, and keeps the experiment honest about whether two-phase decoding helps or merely hides failures in the trigger mechanism.
 
-### RQ3 - What scorecard proves local Mac usefulness rather than narrow protocol compliance?
+### RQ3 — What scorecard proves local Mac usefulness rather than narrow protocol compliance?
 
 **Hypothesis.** A useful local agent must be evaluated across three axes simultaneously: protocol fidelity, coding utility, and Mac viability. Any decoder or KV-cache change that improves wrap-rate but worsens real editing success, time-to-first-edit, memory pressure, or multi-turn stability is not a win.
 
@@ -92,7 +92,7 @@ This directly addresses evidence that stricter format restrictions can degrade r
 
 ---
 
-## 4. Thread A - Protocol-faithful tool use
+## 4. Thread A — Protocol-faithful tool use
 
 ### 4.1 Baseline and instrumentation first
 
@@ -149,15 +149,15 @@ Unsupported schema constructs must fail closed in strict mode and fall back to v
 
 ### 4.4 Gated two-phase decoder
 
-The original proposal's "free reasoning -> grammar-masked tool call" idea is retained, but with a more precise policy.
+The original proposal's "free reasoning → grammar-masked tool call" idea is retained, but with a more precise policy.
 
 **Phase 1: unconstrained deliberation or answer drafting.** The model can reason and decide whether a tool is needed.
 
 **Gate: deterministic transition.** The server detects one of three states:
 
-1. no tool needed -> finish normally;
-2. tool required by harness or `tool_choice` -> force the structured phase;
-3. tool optional -> enter structured phase only when a high-confidence trigger is present.
+1. no tool needed → finish normally;
+2. tool required by harness or `tool_choice` → force the structured phase;
+3. tool optional → enter structured phase only when a high-confidence trigger is present.
 
 **Phase 2: constrained tool-use payload.** The backend constrains only the machine-readable content block or internal proxy format. The server then serializes to canonical Anthropic-compatible content blocks.
 
@@ -185,7 +185,7 @@ The internal synthetic suite should cover the Anthropic client-tool surface, not
 
 ---
 
-## 5. Thread B - Mac-tier scorecard
+## 5. Thread B — Mac-tier scorecard
 
 ### 5.1 Metric stack
 
@@ -223,7 +223,7 @@ The scorecard has four metric families. Wrap-rate remains as a sanity check but 
 | Milestone | Publishable internal comparison | Full protocol suite, BFCL selected/full, Aider 225, LiveCodeBench selected/full, SWE-bench Lite 300 | Thread milestones | Hours per model/config |
 | Audit | Stress long-horizon claims | SWE-bench Verified, SWE-EVO or SWE-bench Pro subset, larger contexts | Monthly or release-gated | 64 GB tier or external grader |
 
-This structure preserves the original intent - fast iteration and credible full results - without making unrealistic runtime promises.
+This structure preserves the original intent — fast iteration and credible full results — without making unrealistic runtime promises.
 
 ### 5.4 Apple Silicon evaluation caveat
 
@@ -255,7 +255,7 @@ Do not claim a 1 pp win or loss on the smoke/dev set. Use dev results to decide 
 
 ## 6. First experiments
 
-### E0 - Scorecard t=0 baseline
+### E0 — Scorecard t=0 baseline
 
 **Question.** What does the current system actually do on each Mac tier?
 
@@ -270,7 +270,7 @@ Do not claim a 1 pp win or loss on the smoke/dev set. Use dev results to decide 
 
 **Gate.** No Thread A decoder change starts until E0 has produced at least smoke and dev baselines.
 
-### E1 - Structured-output backend bake-off
+### E1 — Structured-output backend bake-off
 
 **Question.** Is the current GBNF path the right baseline, or should LLGuidance replace it before XGrammar work?
 
@@ -280,7 +280,7 @@ Do not claim a 1 pp win or loss on the smoke/dev set. Use dev results to decide 
 
 **Decision.** Pick the near-term backend for E2. Keep XGrammar/XGrammar-2 as a research track only if it beats LLGuidance on dynamic schema workload or supports schema constructs LLGuidance/GBNF cannot handle cleanly.
 
-### E2 - Single-phase vs gated two-phase decoding
+### E2 — Single-phase vs gated two-phase decoding
 
 **Question.** Does gating constrained decoding recover reasoning quality without losing protocol fidelity?
 
@@ -300,7 +300,7 @@ Do not claim a 1 pp win or loss on the smoke/dev set. Use dev results to decide 
 
 **Success criterion.** Two-phase must be non-inferior to free-form coding quality on milestone runs while materially reducing malformed or unparseable tool calls. A small latency cost is acceptable only if Mac-tier end-to-end task time does not regress meaningfully.
 
-### E3 - KV-cache quantization sweep
+### E3 — KV-cache quantization sweep
 
 **Question.** Which KV cache setting maximizes useful local context per Mac tier?
 
@@ -319,7 +319,7 @@ Do not claim a 1 pp win or loss on the smoke/dev set. Use dev results to decide 
 
 **Decision.** Select per-tier defaults. The 16 GB tier may prioritize survival and 32K context; the 64 GB tier may prioritize quality and longer context. Do not pick one global default unless the data supports it.
 
-### E4 - Protocol stress and negative controls
+### E4 — Protocol stress and negative controls
 
 **Question.** Are improvements real, or are we overfitting prompt and schema formats?
 
@@ -354,6 +354,18 @@ Thread B is successful if:
 6. reports include confidence intervals, task lists, hardware metadata, and contamination notes;
 7. every future decoder, KV, prompt, model, or harness change can be reported as a delta against t=0.
 
+### Useful-ness as a second axis (note for future scope)
+
+The current tier-eval suite is a **capability-gradient instrument** — designed to rank model/quant/context choices across 16/32/64. It has done that job: tier-16 and tier-32 capability are both up ~30% from baseline through Sprints 0–1.19, and the aggregate pass-rate has been the right scalar for that comparison. Nothing in this section proposes changing that.
+
+What is *not* yet measured directly is the orthogonal question: "would a real user find the stack useful for their workflow at tier-16/32?" The aggregate doesn't answer it because the suite mixes three classes of test that move under different levers:
+
+- **Agent-loop** (~7 tests: cascading-bugs, long-horizon-bugs, multi-bug-decoy, two-step-refactor, multi-bug, refactor, subtle-bug; arguably multi-file-rename, api-evolution, large-refactor) — iterative read/edit/run; sensitive to harness loop quality and context budget.
+- **Codegen-ceiling** (~16 tests incl. csv-parser, expression-eval, lru-cache, parseISO, json-schema-validate) — single-shot spec implementation; sensitive to base-model quality, mostly insensitive to harness changes.
+- **Infra** (prose-quality, tool-discipline, latency) — renderer/grammar/server health.
+
+If/when a useful-ness research thread opens, it would overlay (not replace) the gradient suite by emitting per-class pass-rates in `run_summary.json` and scoring sprint deltas per-class. Bottlenecks differ by tier: tier-16 is context-budget-bound (most fails are mid-loop `exceeds 32768`), tier-32 is codegen-quality-bound (the loop runs to completion but the model can't one-shot the spec). Out of scope for the current proposal; flagged here so the suite shape doesn't have to change before that thread starts.
+
 ---
 
 ## 8. Risks and mitigations
@@ -374,37 +386,37 @@ Thread B is successful if:
 
 ## 9. Milestone plan
 
-### Gate 0 - Measurement skeleton
+### Gate 0 — Measurement skeleton
 
 - Define result JSON schema and trace schema.
 - Add hardware/profile metadata capture.
 - Add protocol matrix runner.
 - Add smoke/dev/full tier selection files.
 
-### Gate 1 - t=0 baselines
+### Gate 1 — t=0 baselines
 
 - Run current system across target Mac tiers where hardware is available.
 - Publish baseline report with failure taxonomy.
 - Validate SWE-bench Docker mode on Apple Silicon for selected tasks.
 
-### Gate 2 - Backend bake-off
+### Gate 2 — Backend bake-off
 
 - Run E1 on smoke and dev.
 - Pick near-term backend for E2.
 - Decide whether XGrammar/XGrammar-2 remains active in this proposal or moves to a follow-on integration project.
 
-### Gate 3 - Gated two-phase decoder
+### Gate 3 — Gated two-phase decoder
 
 - Implement gate and constrained payload phase.
 - Run E2 on dev.
 - Advance to milestone only if protocol metrics improve and coding quality is non-inferior on dev.
 
-### Gate 4 - KV-tier defaults
+### Gate 4 — KV-tier defaults
 
 - Run E3 by tier.
 - Publish default model/context/KV profile per Mac tier.
 
-### Gate 5 - Milestone report
+### Gate 5 — Milestone report
 
 - Run milestone scorecard for selected model/config pairs.
 - Publish results, traces, and analysis.
@@ -443,7 +455,7 @@ Thread B is successful if:
 
 ---
 
-## Appendix A - Minimal scorecard JSON shape
+## Appendix A — Minimal scorecard JSON shape
 
 ```json
 {
