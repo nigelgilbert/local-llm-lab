@@ -11,7 +11,7 @@
  *   "expected_tier_signature": "monotonic_improving",
  *   "known_confounds": [],
  *   "introduced_in": "1.21",
- *   "notes": "Adapted from Exercism JS 'word-search' (MIT); mutation depth: STANDARD; key changes: locate(targets, board) free function (not class+find), 4 directions only (drop diagonals — H L→R, H R→L, V T→B, V B→T), 0-indexed coordinates with named axes {begin:{row,col}, finish:{row,col}} (not 1-indexed [r,c] arrays), absent words return null (not undefined). Canonical at host/test/docs/difficulty-pack/canonicals/word-search/"
+ *   "notes": "Adapted from Exercism JS 'word-search' (MIT); mutation depth: STANDARD; key changes: locate(targets, board) free function (not class+find), 4 directions only (drop diagonals — H L→R, H R→L, V T→B, V B→T), 0-indexed coordinates with named axes {begin:{row,col}, finish:{row,col}} (not 1-indexed [r,c] arrays), absent words return null (not undefined). Canonical at host/test/docs/difficulty-pack/canonicals/word-search/. Cycle-3 tweak (analyze-agent): replaced per-key deepEqual with a check() helper that includes expected vs actual + full result object in messages on failure; consolidated the 5-word multi-target case into a single combined assertion so the model sees all word locations and the missing-key sentinel together (one shot vs five iterative debugging cycles). Targets c2 'ran out of budget after 9 iters' pattern."
  * }
  */
 
@@ -28,24 +28,38 @@ const VERIFY_JS = `\
 import assert from 'node:assert/strict';
 import { locate } from './word-search.js';
 
+function check(label, expected, actual) {
+  try {
+    assert.deepEqual(actual, expected);
+  } catch (e) {
+    const msg = label + ' — expected ' + JSON.stringify(expected) +
+                ', got ' + JSON.stringify(actual);
+    assert.deepEqual(actual, expected, msg);
+  }
+}
+
 // Trivial: single word, horizontal L→R in row 0
 {
   const board = ['CAT', 'XYZ', 'PQR'];
   const r = locate(['CAT'], board);
-  assert.deepEqual(r, {
+  check('CAT L→R row 0 / full result', {
     CAT: { begin: { row: 0, col: 0 }, finish: { row: 0, col: 2 } },
-  }, 'CAT horizontal L→R in row 0');
+  }, r);
 }
 
 // Horizontal R→L: word reversed in the grid (begin col > finish col)
 {
   const board = ['XCATX', 'YYYYY'];   // contains 'CAT' L→R at (0,1..3)
   const r1 = locate(['CAT'], board);
-  assert.deepEqual(r1.CAT, { begin: { row: 0, col: 1 }, finish: { row: 0, col: 3 } }, 'CAT in middle of row');
+  check('CAT L→R mid-row at (0,1..3)',
+        { begin: { row: 0, col: 1 }, finish: { row: 0, col: 3 } },
+        r1.CAT);
 
   const board2 = ['YTACY'];            // contains 'CAT' R→L at (0,3..1)
   const r2 = locate(['CAT'], board2);
-  assert.deepEqual(r2.CAT, { begin: { row: 0, col: 3 }, finish: { row: 0, col: 1 } }, 'CAT R→L: begin > finish');
+  check('CAT R→L: begin.col > finish.col (3>1)',
+        { begin: { row: 0, col: 3 }, finish: { row: 0, col: 1 } },
+        r2.CAT);
 }
 
 // Vertical T→B
@@ -56,10 +70,12 @@ import { locate } from './word-search.js';
     'XTX',
   ];
   const r = locate(['CAT'], board);
-  assert.deepEqual(r.CAT, { begin: { row: 0, col: 1 }, finish: { row: 2, col: 1 } }, 'CAT vertical T→B');
+  check('CAT vertical T→B at col 1',
+        { begin: { row: 0, col: 1 }, finish: { row: 2, col: 1 } },
+        r.CAT);
 }
 
-// Vertical B→T
+// Vertical B→T: begin.row > finish.row
 {
   const board = [
     'XTX',
@@ -67,14 +83,18 @@ import { locate } from './word-search.js';
     'XCX',
   ];
   const r = locate(['CAT'], board);
-  assert.deepEqual(r.CAT, { begin: { row: 2, col: 1 }, finish: { row: 0, col: 1 } }, 'CAT vertical B→T: begin row > finish row');
+  check('CAT vertical B→T: begin.row > finish.row (2>0)',
+        { begin: { row: 2, col: 1 }, finish: { row: 0, col: 1 } },
+        r.CAT);
 }
 
-// Word not present → null
+// Word not present → null (NOT undefined)
 {
   const board = ['ABC', 'DEF', 'GHI'];
   const r = locate(['DOG'], board);
-  assert.equal(r.DOG, null, 'absent word returns null (not undefined)');
+  assert.equal(r.DOG, null,
+    'absent word: r.DOG must be null (not undefined / not missing). got ' +
+    JSON.stringify(r.DOG) + '; full result ' + JSON.stringify(r));
 }
 
 // Diagonal NOT supported: 'CAT' on the diagonal must NOT be found
@@ -85,10 +105,14 @@ import { locate } from './word-search.js';
     'XXT',
   ];
   const r = locate(['CAT'], board);
-  assert.equal(r.CAT, null, 'diagonal placement is NOT a match (only 4 directions supported)');
+  assert.equal(r.CAT, null,
+    'diagonal placement is NOT a match (only 4 cardinal directions: H L→R, H R→L, V T→B, V B→T). ' +
+    'Diagonals must return null. got ' + JSON.stringify(r.CAT) +
+    '; full result ' + JSON.stringify(r));
 }
 
-// Multiple words, mixed presence
+// Multiple words, mixed presence — single combined assertion so the model sees
+// all word locations at once instead of debugging one at a time.
 {
   const board = [
     'WORDXX',
@@ -97,31 +121,38 @@ import { locate } from './word-search.js';
     'BAZXXX',
   ];
   const r = locate(['WORD', 'FOO', 'BAR', 'BAZ', 'MISSING'], board);
-  assert.deepEqual(r.WORD, { begin: { row: 0, col: 0 }, finish: { row: 0, col: 3 } }, 'WORD');
-  assert.deepEqual(r.FOO,  { begin: { row: 1, col: 2 }, finish: { row: 1, col: 4 } }, 'FOO');
-  assert.deepEqual(r.BAR,  { begin: { row: 2, col: 3 }, finish: { row: 2, col: 5 } }, 'BAR');
-  assert.deepEqual(r.BAZ,  { begin: { row: 3, col: 0 }, finish: { row: 3, col: 2 } }, 'BAZ');
-  assert.equal(r.MISSING, null, 'MISSING returns null');
+  check('multi-word board: 4 words present in 4 directions, MISSING returns null', {
+    WORD:    { begin: { row: 0, col: 0 }, finish: { row: 0, col: 3 } },
+    FOO:     { begin: { row: 1, col: 2 }, finish: { row: 1, col: 4 } },
+    BAR:     { begin: { row: 2, col: 3 }, finish: { row: 2, col: 5 } },
+    BAZ:     { begin: { row: 3, col: 0 }, finish: { row: 3, col: 2 } },
+    MISSING: null,
+  }, r);
 }
 
 // Empty targets → empty result object
 {
   const r = locate([], ['ABC']);
-  assert.deepEqual(r, {}, 'empty targets returns {}');
+  check('empty targets returns {}', {}, r);
 }
 
-// Single-letter word: begin === finish
+// Single-letter word: begin === finish (same cell)
 {
   const board = ['XAX', 'YYY'];
   const r = locate(['A'], board);
-  assert.deepEqual(r.A, { begin: { row: 0, col: 1 }, finish: { row: 0, col: 1 } }, 'single letter');
+  check('single-letter word: begin === finish at (0,1)',
+        { begin: { row: 0, col: 1 }, finish: { row: 0, col: 1 } },
+        r.A);
 }
 
 // Returned object has exactly the keys of targets (no extras)
 {
   const board = ['HELLO'];
   const r = locate(['HELLO', 'NOPE'], board);
-  assert.deepEqual(Object.keys(r).sort(), ['HELLO', 'NOPE'], 'exactly target keys present');
+  const keys = Object.keys(r).sort();
+  assert.deepEqual(keys, ['HELLO', 'NOPE'],
+    'returned keys must exactly match input targets. expected ["HELLO","NOPE"], got ' +
+    JSON.stringify(keys) + '; full result ' + JSON.stringify(r));
 }
 `;
 
