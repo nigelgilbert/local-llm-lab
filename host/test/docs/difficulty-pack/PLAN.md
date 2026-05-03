@@ -3,7 +3,9 @@
 **Author:** Tier-eval harness team
 **Date:** 2026-05-02
 **Audience:** ML PhD staff scientist review; harness engineers implementing
-**Status:** Proposal, pre-implementation. Hard gate for Sprint 2 matrix publish.
+**Status:** In-flight; cycles 1+2 complete. Hard gate for Sprint 2 matrix publish.
+
+**Post-cycle-2 update (2026-05-03):** Three tests (`alphametics`, `forth`, `semver-range`) floored at 0% across t32 (N=3) and t16 (N=2) despite clearing the 10-min hand-solve rule. Relocated to [`host/test/__tests__/tier-eval/frontier/`](../../__tests__/tier-eval/frontier/) and reclassified `suite_layer: D, difficulty_band: frontier` — held as documented capability gaps for current Qwen3.5-9B at t16/t32. Active screening set is now 9 tests; `scripts/explore-cycle.sh` filter trimmed accordingly. Test-pack composition table below records original 12; current verification-gate denominator is 9.
 **Canonical:** `host/test/docs/difficulty-pack/PLAN.md`
 **Working copy (plan-mode):** `~/.claude/plans/you-re-a-phd-student-deep-moler.md`
 

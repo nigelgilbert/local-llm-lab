@@ -20,9 +20,9 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { runClaw, writeAssertionResult } from '../../lib/claw.js';
-import * as workspace from '../../lib/workspace.js';
-import { clawModel, TIER_LABEL } from '../../lib/tier.js';
+import { runClaw, writeAssertionResult } from '../../../lib/claw.js';
+import * as workspace from '../../../lib/workspace.js';
+import { clawModel, TIER_LABEL } from '../../../lib/tier.js';
 
 const VERIFY_JS = `\
 import assert from 'node:assert/strict';

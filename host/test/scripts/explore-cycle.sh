@@ -52,11 +52,13 @@ TEST_DIR=$(cd "$SCRIPT_DIR/.." && pwd)
 DOCS_DIR="$TEST_DIR/docs/difficulty-pack"
 EXPLORE_DIR="$DOCS_DIR/explore/c${CYCLE}"
 
-# The 12 new tests authored in commit 2ecb3c0. Order matches the
-# 1.21-handsolve-log.md table.
+# Active difficulty-pack tests after Sprint 1.21 cycle 2. Three tests
+# (alphametics, forth, semver-range) were relocated to
+# __tests__/tier-eval/frontier/ as floor/frontier reserves and are no longer
+# part of the screening filter. Order matches 1.21-handsolve-log.md table.
 NEW_TESTS=(
-  wordy alphametics book-store forth grade-school word-search two-bucket
-  count-power-of-two cascade-eight twelve-file-refactor semver-range ini-parser
+  wordy book-store grade-school word-search two-bucket
+  count-power-of-two cascade-eight twelve-file-refactor ini-parser
 )
 
 DATESTAMP=$(date +%Y%m%d-%H%M)

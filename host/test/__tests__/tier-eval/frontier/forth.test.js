@@ -4,14 +4,14 @@
  *   "test_version": "v1",
  *   "primary_axis": "stateful_logic",
  *   "secondary_axes": ["spec_precision"],
- *   "suite_layer": "B",
- *   "difficulty_band": "hard",
+ *   "suite_layer": "D",
+ *   "difficulty_band": "frontier",
  *   "oracle_type": "public_verifier",
- *   "keep_drop_rule": "Drop if t16 pass rate ≥85% across two consecutive confirmatory sweeps.",
- *   "expected_tier_signature": "monotonic_improving",
+ *   "keep_drop_rule": "Frontier reserve. Stays in Layer D unless pilot shows t32 ≥ 30% — then promote to suite_layer B with band hard.",
+ *   "expected_tier_signature": "floor",
  *   "known_confounds": [],
  *   "introduced_in": "1.21",
- *   "notes": "Adapted from Exercism JS 'forth' (MIT); mutation depth: STANDARD; key changes: class StackMachine with run(program)+state getter (not Forth+evaluate+stack), def/end syntax (not :/;), MOD operator added, OVER operator dropped, state returns number[] (not space-joined string). Word-redefinition parse-time semantic preserved (the canonical correctness trap). Cycle 1+2 floored 0/0 — snapshot showed model thrashing on case-insensitivity for builtins map; prompt now explicitly recommends a canonicalize-on-lookup strategy without weakening any verifier assertion."
+ *   "notes": "Adapted from Exercism JS 'forth' (MIT); mutation depth: STANDARD; key changes: class StackMachine with run(program)+state getter (not Forth+evaluate+stack), def/end syntax (not :/;), MOD operator added, OVER operator dropped, state returns number[] (not space-joined string). Word-redefinition parse-time semantic preserved (the canonical correctness trap). Cycle 1+2 floored 0/0 — snapshot showed model thrashing on case-insensitivity dispatch (canonicalize-on-lookup hint did not break the floor). Sprint 1.21 post-cycle-2: relocated to __tests__/tier-eval/frontier/ and reclassified suite_layer B→D, band hard→frontier. Held as frontier reserve documenting case-folding-dispatch + stack-machine failure mode."
  * }
  */
 
@@ -20,9 +20,9 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { runClaw, writeAssertionResult } from '../../lib/claw.js';
-import * as workspace from '../../lib/workspace.js';
-import { clawModel, TIER_LABEL } from '../../lib/tier.js';
+import { runClaw, writeAssertionResult } from '../../../lib/claw.js';
+import * as workspace from '../../../lib/workspace.js';
+import { clawModel, TIER_LABEL } from '../../../lib/tier.js';
 
 const VERIFY_JS = `\
 import assert from 'node:assert/strict';

@@ -4,14 +4,14 @@
  *   "test_version": "v1",
  *   "primary_axis": "spec_precision",
  *   "secondary_axes": ["convergence"],
- *   "suite_layer": "B",
- *   "difficulty_band": "hard",
+ *   "suite_layer": "D",
+ *   "difficulty_band": "frontier",
  *   "oracle_type": "public_verifier",
- *   "keep_drop_rule": "Drop if t16 pass rate ≥85% across two consecutive confirmatory sweeps.",
- *   "expected_tier_signature": "monotonic_improving",
+ *   "keep_drop_rule": "Frontier reserve. Stays in Layer D unless pilot shows t32 ≥ 30% — then promote to suite_layer B with band hard.",
+ *   "expected_tier_signature": "floor",
  *   "known_confounds": [],
  *   "introduced_in": "1.21",
- *   "notes": "Adapted from Exercism JS 'alphametics' (MIT); mutation depth: HEAVY; key changes: assignDigits(equation) not solve(puzzle), result is sorted [{symbol,code}] array not letter→digit map, '=' may appear on either side, non-canonical word sets (no SEND+MORE=MONEY); canonical at host/test/docs/difficulty-pack/canonicals/alphametics/. Cycle 1+2 pilot: floor 0/3 t32 + 0/2 t16 — applied mutations.md §3 mutation-depth gate, dropped '*' extension; addition-only now per canonical (rename + return-shape + bidirectional '=' retained as anti-recall). Cycle-3 tweak (analyze-agent): added a strategy hint in the prompt nudging toward simple permutation backtracking (no algorithmic crutch beyond what the canonical Exercism solution uses); snapshot showed model over-engineering a column-by-column solver and burning iterations — the hint preserves the capability test (still must implement permutation+constraints) while reducing wasted iterations on incorrect approach selection."
+ *   "notes": "Adapted from Exercism JS 'alphametics' (MIT); mutation depth: HEAVY; key changes: assignDigits(equation) not solve(puzzle), result is sorted [{symbol,code}] array not letter→digit map, '=' may appear on either side, non-canonical word sets (no SEND+MORE=MONEY); canonical at host/test/docs/difficulty-pack/canonicals/alphametics/. Cycle 1+2 pilot: floor 0/3 t32 + 0/2 t16 — applied mutations.md §3 mutation-depth gate, dropped '*' extension; addition-only now per canonical. Sprint 1.21 post-cycle-2: relocated to __tests__/tier-eval/frontier/ and reclassified suite_layer B→D, band hard→frontier (capability beyond current Qwen3.5-9B at t16/t32). Held as frontier reserve documenting permutation+constraints failure mode."
  * }
  */
 
@@ -20,9 +20,9 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
-import { runClaw, writeAssertionResult } from '../../lib/claw.js';
-import * as workspace from '../../lib/workspace.js';
-import { clawModel, TIER_LABEL } from '../../lib/tier.js';
+import { runClaw, writeAssertionResult } from '../../../lib/claw.js';
+import * as workspace from '../../../lib/workspace.js';
+import { clawModel, TIER_LABEL } from '../../../lib/tier.js';
 
 const VERIFY_JS = `\
 import assert from 'node:assert/strict';
