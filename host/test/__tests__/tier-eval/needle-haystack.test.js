@@ -3,7 +3,7 @@
  *   "test_id": "needle-haystack",
  *   "test_version": "v1",
  *   "primary_axis": "multi_file_context",
- *   "secondary_axes": ["retrieval_over_distance"],
+ *   "secondary_axes": ["tool_discipline"],
  *   "suite_layer": "B",
  *   "difficulty_band": "hard",
  *   "oracle_type": "public_verifier",
@@ -11,7 +11,7 @@
  *   "expected_tier_signature": "monotonic_improving",
  *   "known_confounds": ["context_pressure_high"],
  *   "introduced_in": "1.21",
- *   "notes": "H5 hand-authored (added cycle 4). NIAH apply-the-needle: 30 small JS files (~1.5kb each, ~45kb total) seeded into a synthetic workspace across lib/utils/, lib/core/, lib/handlers/, data/, and config/ subdirs. Contents generated programmatically via sha256(VERSION_SEED + filepath) PRNG so each file is stable per seed but differs across test versions to defeat memorization. Exactly ONE file (NEEDLE_FILE = lib/handlers/auth.js for v1) places `export const REGION_KEY = '<6-char hex>'` at line 47; the other 29 files place a similarly-shaped distractor (`export const REGION_PREFIX = ...`, REGION_FALLBACK, etc.) at the same position. The model must locate the constant named EXACTLY REGION_KEY (a coarse `grep REGION_` returns 30 matches; the discriminator is between the search-tool-using approach vs read-files-one-by-one) and write solve.js exporting getMagicCode() that returns the value. Predicted t32 (Q5_K_XL @64k) 80-100%; t16 (IQ4_XS @32k) 30-70% — at the edge of t16 ctx if the model takes a less efficient retrieval strategy, which is the discrimination signal we want. If saturating at both tiers, bump file count for v2; if R9-B (both tiers ctx-overflow), trim file count."
+ *   "notes": "H5 hand-authored (added cycle 4). NIAH apply-the-needle: 30 small JS files (~1.25kb each, ~38kb total) seeded into a synthetic workspace across lib/utils/, lib/core/, lib/handlers/, data/, and config/ subdirs. Contents generated programmatically via sha256(VERSION_SEED + filepath) PRNG so each file is stable per seed but differs across test versions to defeat memorization. Exactly ONE file (NEEDLE_FILE = lib/handlers/auth.js for v1) places `export const REGION_KEY = '<6-char hex>'` at line 47; the other 29 files place a similarly-shaped distractor (`export const REGION_PREFIX = ...`, REGION_FALLBACK, etc.) at the same position. The model must locate the constant named EXACTLY REGION_KEY and write solve.js exporting getMagicCode() that returns the value. Cycle-5 v1 pilot saturated 100/100% at both tiers in 8-11s per rep — model uses `grep -rn REGION_KEY` in 1 iter and writes solve.js immediately. tool_discipline is fine at IQ4_XS for this task; the haystack of ~9.4k tokens is too small to pressure 32k ctx because grep never loads file bodies. v2 needs a multi-step retrieval (e.g., split needle, indirect lookup) to defeat single-grep-then-done. Schema note: `retrieval_over_distance` was the original v1 secondary_axis but is not in the schema enum (cycle-5 manifest validation failure caused empty registry); replaced with `tool_discipline` which is the closer match within the existing axis taxonomy."
  * }
  */
 
