@@ -31,10 +31,15 @@
 #   EVAL_TIERS="16 32" EVAL_REPS=8 host/test/scripts/run-overnight-screen.sh
 #
 # Env knobs:
-#   EVAL_TIERS    space-separated tiers (default: "16 32 64")
-#   EVAL_REPS     full-suite passes per tier (default: 10)
-#   SWEEP_LABEL   subdir suffix under .claw-runtime/ (default: a timestamp)
-#   DRY_RUN       1 = print plan + tier installs but do not run claw
+#   EVAL_TIERS                   space-separated tiers (default: "16 32 64")
+#   EVAL_REPS                    full-suite passes per tier (default: 10)
+#   SWEEP_LABEL                  subdir suffix under .claw-runtime/ (default: a timestamp)
+#   DRY_RUN                      1 = print plan + tier installs but do not run claw
+#   AUTO_REBUILD                 1 (default) = rebuild mac-llm-lab-test:local if any
+#                                input under host/test/{Dockerfile,package.json,lib,
+#                                __tests__,entrypoint.sh} is newer than the image.
+#                                0 = refuse with rebuild instructions instead.
+#   SKIP_IMAGE_FRESHNESS_CHECK   1 = bypass the freshness check entirely (use with care).
 
 set -eu
 
@@ -81,6 +86,78 @@ docker image inspect mac-llm-lab-test:local >/dev/null 2>&1 \
   || err "missing image mac-llm-lab-test:local — build it: (cd $TEST_DIR && docker compose build)"
 curl -fsS "$BRIDGE_HEALTH" >/dev/null 2>&1 \
   || err "bridge unreachable at $BRIDGE_HEALTH — start it: (cd $REPO_DIR/host/litellm && docker compose up -d)"
+
+# ---- image freshness check (Sprint 1.21 cycle-4 postmortem) ----
+# Test code is COPYed into mac-llm-lab-test:local at build time, NOT mounted.
+# c4 ran with a pre-corrective-work image because the operator (me) forgot to
+# rebuild after editing tests; result: cascade-eight checksum gate + two-bucket
+# revert silently did not run. RUN_REGISTRY_HARNESS_VERSION on rows is the
+# host's git rev, not the image's, so the misalignment is invisible until
+# forensics. Refuse (or auto-rebuild) when any input baked into the Dockerfile
+# (Dockerfile, package.json, lib/, __tests__/, entrypoint.sh) is newer than
+# the last successful build through this script.
+#
+# Implementation: a marker file (.image-fresh-marker) is `touch`ed after every
+# successful rebuild. We compare input mtimes against the marker, not against
+# the image's docker-reported `.Created`, because BuildKit is content-hash
+# cached: a `touch` of a file with unchanged bytes produces a no-op rebuild
+# and the image's `Created` timestamp does NOT advance. The marker sidesteps
+# that. If the marker is missing (first run, or operator built manually
+# outside this script), we rebuild conservatively — cheap when cache is warm.
+#
+# Caveat: this does NOT cover the claw-code:local upstream — if you rebuilt
+# claw, also rebuild this image manually (the marker won't notice).
+FRESHNESS_MARKER="$TEST_DIR/.claw-runtime/.image-fresh-marker"
+stat_mtime() { stat -f %m "$1" 2>/dev/null || stat -c %Y "$1" 2>/dev/null; }
+
+if [ "${SKIP_IMAGE_FRESHNESS_CHECK:-0}" = "1" ]; then
+  log "[freshness] SKIP_IMAGE_FRESHNESS_CHECK=1 — skipping (operator override)"
+else
+  newest_epoch=0
+  newest_path=""
+  while IFS= read -r f; do
+    m=$(stat_mtime "$f") || continue
+    [ -z "$m" ] && continue
+    if [ "$m" -gt "$newest_epoch" ]; then
+      newest_epoch=$m
+      newest_path=$f
+    fi
+  done < <(find \
+      "$TEST_DIR/Dockerfile" \
+      "$TEST_DIR/package.json" \
+      "$TEST_DIR/lib" \
+      "$TEST_DIR/__tests__" \
+      "$TEST_DIR/entrypoint.sh" \
+      -type f 2>/dev/null)
+
+  marker_epoch=0
+  marker_reason="absent"
+  if [ -f "$FRESHNESS_MARKER" ]; then
+    marker_epoch=$(stat_mtime "$FRESHNESS_MARKER")
+    marker_reason="last build"
+  fi
+
+  if [ "$newest_epoch" -gt "$marker_epoch" ]; then
+    marker_human=$(date -r "$marker_epoch" '+%Y-%m-%dT%H:%M:%S' 2>/dev/null || echo "never")
+    newer_human=$(date -r "$newest_epoch" '+%Y-%m-%dT%H:%M:%S' 2>/dev/null || echo "$newest_epoch")
+    log ""
+    log "[freshness] mac-llm-lab-test:local marker is STALE ($marker_reason)"
+    log "[freshness]   marker mtime:   $marker_human"
+    log "[freshness]   newer on disk:  $newer_human  $newest_path"
+    if [ "${AUTO_REBUILD:-1}" = "1" ]; then
+      log "[freshness] AUTO_REBUILD=1 (default) — running 'docker compose build test' now"
+      log "[freshness]   to refuse instead of auto-rebuilding, set AUTO_REBUILD=0"
+      log ""
+      ( cd "$TEST_DIR" && docker compose build test ) \
+        || err "auto-rebuild failed — run manually: (cd $TEST_DIR && docker compose build test)"
+      touch "$FRESHNESS_MARKER"
+      log ""
+      log "[freshness] rebuild complete; marker bumped; continuing sweep"
+    else
+      err "image marker stale and AUTO_REBUILD=0 — rebuild manually: (cd $TEST_DIR && docker compose build test && touch $FRESHNESS_MARKER) [or set SKIP_IMAGE_FRESHNESS_CHECK=1 to ignore]"
+    fi
+  fi
+fi
 
 # Verify each tier has its GGUF and a manifest entry.
 # shellcheck source=../../llama-server/models.conf
