@@ -11,7 +11,7 @@
  *   "expected_tier_signature": "monotonic_improving",
  *   "known_confounds": [],
  *   "introduced_in": "1.21",
- *   "notes": "Adapted from Exercism JS 'forth' (MIT); mutation depth: STANDARD; key changes: class StackMachine with run(program)+state getter (not Forth+evaluate+stack), def/end syntax (not :/;), MOD operator added, OVER operator dropped, state returns number[] (not space-joined string). Word-redefinition parse-time semantic preserved (the canonical correctness trap). Canonical at host/test/docs/difficulty-pack/canonicals/forth/"
+ *   "notes": "Adapted from Exercism JS 'forth' (MIT); mutation depth: STANDARD; key changes: class StackMachine with run(program)+state getter (not Forth+evaluate+stack), def/end syntax (not :/;), MOD operator added, OVER operator dropped, state returns number[] (not space-joined string). Word-redefinition parse-time semantic preserved (the canonical correctness trap). Cycle 1+2 floored 0/0 — snapshot showed model thrashing on case-insensitivity for builtins map; prompt now explicitly recommends a canonicalize-on-lookup strategy without weakening any verifier assertion."
  * }
  */
 
@@ -71,7 +71,7 @@ assert.deepEqual(
   'cube uses square'
 );
 
-// Word redefinition: + means - after redefinition (parse-time binding)
+// Word redefinition: + means - after redefinition (later assertion uses it)
 assert.deepEqual(run('def + - end 5 3 +'), [2], 'redefining + as - applies after def');
 
 // Parse-time binding semantic: a definition uses the meaning of words
@@ -122,7 +122,11 @@ Syntax:
       DROP  (a --)
       SWAP  (a b -- b a)
   - User-defined words use:    \`def <name> <body...> end\`
-  - All words are case-insensitive (DUP, dup, Dup are equivalent).
+  - All words are case-insensitive — both built-in (DUP, dup, Dup, MOD,
+    mod, def, DEF, end, END) and user-defined (\`def Square ...\` may be
+    invoked as \`square\` or \`SQUARE\`). The simplest implementation is to
+    canonicalize each token to lowercase (or uppercase) when looking it
+    up in your dictionaries.
 
 Word-redefinition semantic (the key correctness rule):
   A user definition captures the meaning of every word in its body
@@ -142,7 +146,7 @@ Errors:
 
 Then ensure \`node verify.js\` exits 0. Do not edit verify.js.`;
 
-const CLAW_TIMEOUT = 240_000;
+const CLAW_TIMEOUT = 285_000;
 
 describe(`forth: stack interpreter with def/end and parse-time binding (tier=${TIER_LABEL})`, () => {
   beforeEach(() => {

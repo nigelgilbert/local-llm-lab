@@ -11,7 +11,7 @@
  *   "expected_tier_signature": "monotonic_improving",
  *   "known_confounds": ["repo_size_dependent", "context_pressure_high"],
  *   "introduced_in": "1.21",
- *   "notes": "H2 hand-authored; extends large-refactor.test.js (6-file, 1-param) to 12 files threading 2 params (currency + locale) through 8 call sites. Each call site reads its params from a different idiomatic source (this.x, parameter, module-level constant, options bag, config object on this, jurisdiction record, etc.). PLAN.md spec mentioned a circular-import trap; deferred to v2 — base-difficulty (12 files × 8 call sites × 2 params) likely lands in band on its own. Pilot will tell."
+ *   "notes": "H2 hand-authored; extends large-refactor.test.js (6-file, 1-param) to 12 files threading 2 params (currency + locale) through 8 call sites. Each call site reads its params from a different idiomatic source (this.x, parameter, module-level constant, options bag, config object on this, jurisdiction record, etc.). PLAN.md spec mentioned a circular-import trap; deferred to v2. Cycle 1+2 saturated 100/100% — added thousands-separator requirement (de uses '.' for thousands, en omits) and stricter format spec; partial impls that only swap '.' for ',' on decimal now fail the larger-amount assertions. Cycle-3 tweak (analyze-agent): added negative-amount sign-placement spec (minus prefix, not accounting parens) plus multi-thousands grouping (7-digit numbers) — pushes a naive `toFixed(2)+swap-chars` impl below threshold without changing the refactor surface."
  * }
  */
 
@@ -24,12 +24,15 @@ import { runClaw, writeAssertionResult } from '../../lib/claw.js';
 import * as workspace from '../../lib/workspace.js';
 import { clawModel, TIER_LABEL } from '../../lib/tier.js';
 
-const FORMAT_JS = `\
 // formatPrice — formats an amount. Currency and locale are currently hardcoded.
 // Refactor: take currency and locale as second and third params and emit
-// "<CCY> <amount-with-2-decimals>" for currency=USD locale=en
-// or                  "<amount>,<2-decimals> <CCY>" for locale=de
-// (i.e. en uses period decimal, de uses comma decimal.)
+//   "<CCY> <amount-with-2-decimals>" for locale=en (period decimal, no thousands sep)
+//   "<amount>,<2-decimals> <CCY>"    for locale=de (comma decimal,
+//                                                   period as thousands sep,
+//                                                   e.g. 1.234,56)
+// Both locales use exactly two fraction digits; integer thousands grouping
+// applies for de but not en.
+const FORMAT_JS = `\
 export function formatPrice(amount) {
   return 'USD ' + amount.toFixed(2);
 }
@@ -179,6 +182,34 @@ assert.equal(sum, 'AUD 3.30', 'summary: en from opts');
 // taxes uses jurisdiction record.
 const tx = taxLine(200, { name: 'CA', rate: 0.10, currency: 'CAD', locale: 'en' });
 assert.equal(tx, 'CA tax: CAD 20.00', 'tax line: en from jurisdiction');
+
+// Thousands grouping: de uses '.' as thousands separator, en uses none.
+{
+  const big = receipt([{ name: 'big', price: 1234.5 }], 'EUR', 'de');
+  assert.equal(big, 'big: 1.234,50 EUR', 'receipt: de uses period as thousands separator');
+}
+{
+  const bigEn = new Cart('USD', 'en');
+  bigEn.add({ name: 'p', price: 12345.67 });
+  assert.equal(bigEn.total(), 'USD 12345.67', 'cart: en omits thousands separator');
+}
+
+// Negative amounts: minus sign is the FIRST character before any digits or
+// thousands separators (parenthesized accounting style is NOT used).
+{
+  const negEn = logFinancial({ amount: -42.5, currency: 'USD', locale: 'en', kind: 'REFUND' });
+  assert.equal(negEn, 'REFUND|USD -42.50', 'audit: negative en — minus directly before number');
+}
+{
+  const negDe = logFinancial({ amount: -1234.5, currency: 'EUR', locale: 'de', kind: 'REFUND' });
+  assert.equal(negDe, 'REFUND|-1.234,50 EUR', 'audit: negative de — minus before thousands group');
+}
+
+// Multi-thousands grouping: 7-digit amount in de
+{
+  const huge = receipt([{ name: 'm', price: 1234567.89 }], 'EUR', 'de');
+  assert.equal(huge, 'm: 1.234.567,89 EUR', 'receipt: de groups every three digits');
+}
 `;
 
 const PROMPT = `\
@@ -186,10 +217,27 @@ This workspace contains 12 files. The function \`formatPrice\` in format.js
 currently hardcodes the currency to "USD" and the locale to a period decimal.
 
 Refactor format.js so that \`formatPrice(amount, currency, locale)\`:
-  - For locale === 'en': returns "<CCY> <amount.toFixed(2)>"
-      e.g. formatPrice(15.5, 'GBP', 'en') → "GBP 15.50"
-  - For locale === 'de': returns "<amount> <CCY>" with the decimal point
-      replaced by a comma: e.g. formatPrice(99, 'EUR', 'de') → "99,00 EUR"
+  - For locale === 'en': returns "<CCY> <amount.toFixed(2)>" with NO
+      thousands separator. e.g.
+        formatPrice(15.5,    'GBP', 'en') → "GBP 15.50"
+        formatPrice(12345.67,'USD', 'en') → "USD 12345.67"
+  - For locale === 'de': returns "<amount> <CCY>" where the integer
+      portion uses '.' as thousands separator and the decimal point is
+      replaced by ',' . e.g.
+        formatPrice(99,     'EUR', 'de') → "99,00 EUR"
+        formatPrice(1234.5, 'EUR', 'de') → "1.234,50 EUR"
+
+  Always emit exactly two fraction digits (use \`amount.toFixed(2)\` as the
+  starting point and adjust the formatting from there).
+
+  Negative amounts: prepend a single '-' immediately before the first digit
+  (or the first thousands group). Do NOT use parenthesized accounting style.
+  Examples:
+    formatPrice(-42.5,    'USD', 'en') → "USD -42.50"
+    formatPrice(-1234.5,  'EUR', 'de') → "-1.234,50 EUR"
+
+  Multi-thousands grouping in de: group every three digits, e.g.
+    formatPrice(1234567.89, 'EUR', 'de') → "1.234.567,89 EUR"
 
 Then update every caller so it threads BOTH \`currency\` and \`locale\`
 through to formatPrice. Each caller obtains them from its own idiomatic
@@ -207,7 +255,7 @@ After your edits, running \`node test.js\` must exit 0. Do not edit test.js.
 Files notify.js, helper.js, and constants.js are distractors that do NOT
 call formatPrice — leave them alone.`;
 
-const CLAW_TIMEOUT = 240_000;
+const CLAW_TIMEOUT = 285_000;
 
 describe(`twelve-file-refactor: thread two params through 7 call sites in 12 files (tier=${TIER_LABEL})`, () => {
   beforeEach(() => {

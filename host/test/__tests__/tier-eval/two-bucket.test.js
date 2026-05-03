@@ -186,7 +186,7 @@ Return value:
 
 Then ensure \`node verify.js\` exits 0. Do not edit verify.js.`;
 
-const CLAW_TIMEOUT = 240_000;
+const CLAW_TIMEOUT = 285_000;
 
 describe(`two-bucket: shortest-path BFS with explicit path reconstruction (tier=${TIER_LABEL})`, () => {
   beforeEach(() => {

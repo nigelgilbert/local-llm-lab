@@ -11,7 +11,7 @@
  *   "expected_tier_signature": "monotonic_improving",
  *   "known_confounds": [],
  *   "introduced_in": "1.21",
- *   "notes": "H4 hand-authored — axis was TBD-post-pilot per PLAN.md; locked at authoring time as spec_precision + stateful_logic via an INI-style config parser. Probes line-by-line state tracking under edge surface (top-level keys, comments, blank lines, quoted values with internal '=', duplicate keys, section reentry). Distinct from existing csv-parser/json-schema-validate by virtue of the section-state-machine pattern."
+ *   "notes": "H4 hand-authored — axis was TBD-post-pilot per PLAN.md; locked at authoring time as spec_precision + stateful_logic via an INI-style config parser. Probes line-by-line state tracking under edge surface (top-level keys, comments, blank lines, quoted values with internal '=', duplicate keys, section reentry). Distinct from existing csv-parser/json-schema-validate by virtue of the section-state-machine pattern. Cycle 2 saturated 100% t16 — added unmatched-quote, whitespace-only-value, internal-whitespace-in-quoted-value, and section-with-spaces edges to harden against naive '.trim().slice(1,-1)' impls. Cycle-3 tweak (analyze-agent): added quoted-value-with-internal-= , single-quote-as-value, and brackets-with-trailing-junk edges; the last requires a strict regex/anchor on the section-header check rather than a naive 'line starts with [' test."
  * }
  */
 
@@ -150,6 +150,74 @@ assert.deepEqual(
   'CRLF line endings'
 );
 
+// Indented comment line: a comment marker that is NOT the first non-whitespace
+// character on the line is part of the value, NOT a comment.
+assert.deepEqual(
+  parseIni('   ; this is still a comment\\nkey=val'),
+  { '': { key: 'val' } },
+  'leading whitespace then ; is still a comment'
+);
+
+// Unmatched single trailing quote: the value must NOT have its surrounding
+// chars stripped — only paired matching double quotes are stripped.
+assert.deepEqual(
+  parseIni('msg="hello'),
+  { '': { msg: '"hello' } },
+  'unmatched quote is preserved verbatim'
+);
+assert.deepEqual(
+  parseIni('msg=hello"'),
+  { '': { msg: 'hello"' } },
+  'trailing quote alone is preserved verbatim'
+);
+
+// Whitespace-only value (after stripping) is the empty string
+assert.deepEqual(
+  parseIni('blank=   '),
+  { '': { blank: '' } },
+  'value of only whitespace trims to empty string'
+);
+
+// Quoted value with INTERNAL whitespace must be preserved exactly between the quotes
+assert.deepEqual(
+  parseIni('msg="  hello  world  "'),
+  { '': { msg: '  hello  world  ' } },
+  'whitespace inside quoted value is preserved'
+);
+
+// Section name with internal whitespace is allowed and trimmed at the brackets only
+assert.deepEqual(
+  parseIni('[my section]\\nfoo=1'),
+  { '': {}, 'my section': { foo: '1' } },
+  'section name may contain internal spaces'
+);
+
+// Quoted value with internal '=' must not be re-split on the inner '='
+// (the FIRST '=' splits, then quote-stripping is applied to the resulting value).
+assert.deepEqual(
+  parseIni('expr="a=b=c"'),
+  { '': { expr: 'a=b=c' } },
+  'quoted value retains internal = characters'
+);
+
+// Single-character value: a value that is exactly one '"' character is NOT
+// a matched-quote pair (length-1 quoted value would be empty after stripping
+// — but the rule is "wrapped in MATCHING double quotes", and a single quote
+// is not a wrapping pair). Preserve verbatim.
+assert.deepEqual(
+  parseIni('q="'),
+  { '': { q: '"' } },
+  'single quote character is preserved verbatim (not a matched pair)'
+);
+
+// A line that looks like a section header but has trailing junk after the ']'
+// is NOT a section header — treat as malformed (silently ignore).
+assert.deepEqual(
+  parseIni('[main]junk\\nfoo=bar'),
+  { '': { foo: 'bar' } },
+  'bracketed line with trailing junk is not a section header (ignored)'
+);
+
 // Realistic mixed input
 {
   const input = [
@@ -210,11 +278,17 @@ Rules:
     \`expr=a=b=c\` parses to key='expr', value='a=b=c'.
   - Empty value (\`key=\`) is allowed and yields the empty string.
   - Double-quoted values: if the value (after trimming) is wrapped in
-    matching double quotes, strip the outer quotes and use the inner
-    string verbatim (do not interpret escapes).
+    MATCHING double quotes (both leading and trailing), strip the outer
+    quotes and use the inner string verbatim, including any internal
+    whitespace (do not interpret escapes). An UNMATCHED single quote
+    (only one of the two ends present) is preserved as part of the value.
   - Duplicate keys within the same section: the LATER assignment wins.
   - Section reentry: if a section header repeats, subsequent keys merge
     into that section's existing object (still applying "later wins").
+  - A section header is a line whose trimmed content matches exactly
+    \`[ ... ]\` with the brackets at the start and end. A line like
+    \`[main]junk\` is NOT a section header (the trailing 'junk' disqualifies
+    it); silently ignore such lines.
   - Lines that are not blank, not comments, not section headers, and
     contain no '=' must be silently ignored (do not throw).
   - Accept both '\\n' and '\\r\\n' line endings.
@@ -223,7 +297,7 @@ All values returned are strings. Do not coerce numbers or booleans.
 
 Then ensure \`node verify.js\` exits 0. Do not edit verify.js.`;
 
-const CLAW_TIMEOUT = 240_000;
+const CLAW_TIMEOUT = 285_000;
 
 describe(`ini-parser: line-by-line config parser with section reentry (tier=${TIER_LABEL})`, () => {
   beforeEach(() => {

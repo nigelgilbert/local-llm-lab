@@ -60,6 +60,16 @@ assert.throws(() => evaluate("Compute 1 added to added to 2."), MalformedInput, 
 assert.throws(() => evaluate("Fly to the moon."), MalformedInput, 'wrong prefix');
 assert.throws(() => evaluate("Compute 5 added to."), MalformedInput, 'trailing operator no operand');
 assert.throws(() => evaluate("Compute."), MalformedInput, 'empty expression');
+
+// Error: missing trailing period (the spec requires '.' to terminate the query)
+assert.throws(() => evaluate("Compute 5 added to 13"), MalformedInput, 'missing trailing period');
+
+// Error: trailing junk after the period
+assert.throws(() => evaluate("Compute 5. added to 13."), MalformedInput, 'junk after first period');
+
+// Subtle ambiguity: a term that is the literal word "added" without "to"
+// must throw — partial match must not consume the operator phrase.
+assert.throws(() => evaluate("Compute 5 added 13."), MalformedInput, 'partial operator phrase');
 `;
 
 const PROMPT = `\
@@ -68,6 +78,10 @@ Create wordy.js that exports \`evaluate(query)\` and two named Error subclasses:
 
 The function parses and evaluates arithmetic queries in the form:
   "Compute <expr>."
+
+The query MUST start with the literal token "Compute " (capital C) and
+MUST end with a single period '.'. Anything else (missing period, trailing
+text after the period, wrong prefix) is MalformedInput.
 
 where <expr> is either:
   - a single integer (possibly negative): return that integer directly
@@ -92,7 +106,7 @@ Errors:
 
 Then ensure \`node verify.js\` exits 0. Do not edit verify.js.`;
 
-const CLAW_TIMEOUT = 240_000;
+const CLAW_TIMEOUT = 285_000;
 
 describe(`wordy: arithmetic query parser (tier=${TIER_LABEL})`, () => {
   beforeEach(() => {

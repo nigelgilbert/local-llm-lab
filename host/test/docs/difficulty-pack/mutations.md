@@ -143,6 +143,12 @@ unexpected floor (t32 < 25%), drop the `*` extension and revert to
 addition-only — keep the rename + return-shape changes only. Document the
 revert in the PR.
 
+**Gate fired (Sprint 1.21 cycle 1+2 pilot, 2026-05-02):** alphametics
+floored 0/3 t32 + 0/2 t16 — `*` extension dropped per gate. Test now
+addition-only; rename, bidirectional `=`, and `[{symbol,code}]` return
+shape retained. See `explore/c2/snapshots/alphametics.t16.jsonl` for the
+7-iteration confused-solver trace that triggered the revert.
+
 ---
 
 ## 4. word-search — STANDARD mutation

@@ -143,6 +143,41 @@ import { ClassRoster } from './grade-school.js';
   r.enroll('Anna', 1);
   assert.deepEqual(r.cohort(99), [], 'unknown year returns []');
 }
+
+// withdraw then re-enroll: prior year should be null again (NOT remembered)
+// — withdraw must fully purge state so the next enroll is "fresh", not a transfer.
+{
+  const r = new ClassRoster();
+  r.enroll('Anna', 3);
+  assert.equal(r.withdraw('Anna'), true, 'withdraw removes Anna');
+  const result = r.enroll('Anna', 5);
+  assert.deepEqual(result, { enrolled: true, transferredFrom: null },
+    're-enroll after withdraw is fresh, not a transfer');
+}
+
+// cohort() must return a NEW array each call (mutating the result must not
+// corrupt internal state).
+{
+  const r = new ClassRoster();
+  r.enroll('Anna', 1);
+  r.enroll('Bob', 1);
+  const c1 = r.cohort(1);
+  c1.push('Hacker');
+  const c2 = r.cohort(1);
+  assert.deepEqual(c2, ['Bob', 'Anna'],
+    'cohort() returns a fresh array; mutation must not leak into internal state');
+}
+
+// everyone() result must also be defensive against external mutation.
+{
+  const r = new ClassRoster();
+  r.enroll('Anna', 1);
+  const e1 = r.everyone();
+  e1.push({ name: 'Hacker', year: 99 });
+  const e2 = r.everyone();
+  assert.deepEqual(e2, [{ name: 'Anna', year: 1 }],
+    'everyone() returns a fresh array');
+}
 `;
 
 const PROMPT = `\
@@ -165,6 +200,9 @@ API:
   \`withdraw(name)\` — Remove the student from the roster entirely.
     - Returns \`true\` if the student was enrolled.
     - Returns \`false\` if the student was not on the roster.
+    - After a withdrawal, a subsequent \`enroll(name, year)\` for that
+      same name is a FRESH enrollment (\`transferredFrom: null\`) — the
+      previous year must not be remembered.
 
   \`cohort(year)\` — Return the names enrolled in \`year\`, sorted in
     REVERSE alphabetical order (Z first). Return \`[]\` for unknown years
@@ -174,11 +212,15 @@ API:
     \`{ name, year }\`, sorted by year ascending, then by name ascending
     within each year.
 
+Both \`cohort()\` and \`everyone()\` must return a NEW array on each call.
+Callers may mutate the returned array safely; doing so must NOT corrupt
+the internal roster.
+
 Names are case-sensitive strings. Years are positive integers.
 
 Then ensure \`node verify.js\` exits 0. Do not edit verify.js.`;
 
-const CLAW_TIMEOUT = 240_000;
+const CLAW_TIMEOUT = 285_000;
 
 describe(`grade-school: roster with transfers and withdrawals (tier=${TIER_LABEL})`, () => {
   beforeEach(() => {

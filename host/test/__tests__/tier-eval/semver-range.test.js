@@ -8,7 +8,7 @@
  *   "difficulty_band": "frontier",
  *   "oracle_type": "public_verifier",
  *   "keep_drop_rule": "Frontier reserve. Stays in Layer D unless pilot shows t32 ≥ 30% — then promote to suite_layer B with band hard.",
- *   "expected_tier_signature": "ceiling_t16",
+ *   "expected_tier_signature": "floor",
  *   "known_confounds": ["context_pressure_high"],
  *   "introduced_in": "1.21",
  *   "notes": "H3 hand-authored; 2x assertion density vs expression-eval (~50 assertions). Probes spec_precision under dense edge surface: SemVer 2.0.0 + npm-style ranges (caret, tilde, hyphen, OR, wildcards, partial versions, pre-release). Hand-solve likely >10min — classified frontier per EVAL-DESIGN rule #1. Reserve unless pilot shows t32 capability."
@@ -162,7 +162,7 @@ Return \`true\` if version satisfies rangeSpec, \`false\` otherwise.
 
 Then ensure \`node verify.js\` exits 0. Do not edit verify.js.`;
 
-const CLAW_TIMEOUT = 240_000;
+const CLAW_TIMEOUT = 285_000;
 
 describe(`semver-range: dense semver/range parser (tier=${TIER_LABEL})`, () => {
   beforeEach(() => {

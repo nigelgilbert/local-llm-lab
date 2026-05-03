@@ -11,7 +11,7 @@
  *   "expected_tier_signature": "monotonic_improving",
  *   "known_confounds": [],
  *   "introduced_in": "1.21",
- *   "notes": "Adapted from Exercism JS 'alphametics' (MIT); mutation depth: HEAVY; key changes: assignDigits(equation) not solve(puzzle), result is sorted [{symbol,code}] array not letter→digit map, equation grammar supports + and * operators (not just +), '=' may appear on either side, non-canonical word sets (no SEND+MORE=MONEY); canonical at host/test/docs/difficulty-pack/canonicals/alphametics/"
+ *   "notes": "Adapted from Exercism JS 'alphametics' (MIT); mutation depth: HEAVY; key changes: assignDigits(equation) not solve(puzzle), result is sorted [{symbol,code}] array not letter→digit map, '=' may appear on either side, non-canonical word sets (no SEND+MORE=MONEY); canonical at host/test/docs/difficulty-pack/canonicals/alphametics/. Cycle 1+2 pilot: floor 0/3 t32 + 0/2 t16 — applied mutations.md §3 mutation-depth gate, dropped '*' extension; addition-only now per canonical (rename + return-shape + bidirectional '=' retained as anti-recall). Cycle-3 tweak (analyze-agent): added a strategy hint in the prompt nudging toward simple permutation backtracking (no algorithmic crutch beyond what the canonical Exercism solution uses); snapshot showed model over-engineering a column-by-column solver and burning iterations — the hint preserves the capability test (still must implement permutation+constraints) while reducing wasted iterations on incorrect approach selection."
  * }
  */
 
@@ -46,7 +46,7 @@ function valueOf(word, m) {
 // Helper: validate that a returned solution actually satisfies the equation,
 // has all-distinct codes, no leading zero on any multi-letter word, and the
 // returned array is sorted by symbol.
-function validate(result, leftTerms, leftOps, rightWord) {
+function validate(result, leftTerms, rightWord) {
   if (result === null) return false;
   const m = toMap(result);
   // sorted by symbol
@@ -62,103 +62,47 @@ function validate(result, leftTerms, leftOps, rightWord) {
   for (const w of [...leftTerms, rightWord]) {
     if (w.length > 1 && m[w[0]] === 0) return false;
   }
-  // arithmetic: standard precedence — collect *-chains, then sum them
-  for (const op of leftOps) if (op !== '+' && op !== '*') return false;
-  const groups = [[valueOf(leftTerms[0], m)]];
-  for (let i = 0; i < leftOps.length; i++) {
-    const v = valueOf(leftTerms[i+1], m);
-    if (leftOps[i] === '*') groups[groups.length - 1].push(v);
-    else groups.push([v]);
-  }
-  const acc = groups.reduce((sum, g) => sum + g.reduce((p, x) => p * x, 1), 0);
+  // arithmetic: simple sum of left terms equals right
+  const acc = leftTerms.reduce((sum, w) => sum + valueOf(w, m), 0);
   return acc === valueOf(rightWord, m);
 }
 
 // Solvable, addition-only
 {
   const r = assignDigits('CAT + DOG = PET');
-  assert.ok(validate(r, ['CAT', 'DOG'], ['+'], 'PET'), 'CAT + DOG = PET solution must satisfy the equation');
+  assert.ok(validate(r, ['CAT', 'DOG'], 'PET'), 'CAT + DOG = PET solution must satisfy the equation');
 }
 
-// Solvable, '=' on the left
+// Solvable, '=' on the left (anti-recall: canonical Exercism only accepts left-of-=)
 {
   const r = assignDigits('PET = CAT + DOG');
-  assert.ok(validate(r, ['CAT', 'DOG'], ['+'], 'PET'), 'reversed = sides must still solve');
-}
-
-// Solvable with multiplication
-{
-  // A * B = AB  (single-digit × single-digit = two-digit)
-  // Hand-solvable: e.g. A=3, B=5 → 3*5=15 → A=1, B=5? No, A appears in both.
-  // Try: A=2, B=8 → 2*8=16, but result is "AB" so A=1, B=6, but then 1*6=6 not 16.
-  // The constraint: A * B = 10*A + B. For A=1: B = 10 + B, impossible.
-  // For A=2: 2B = 20 + B → B = 20, no. So this equation is unsolvable in base 10.
-  const r = assignDigits('A * B = AB');
-  assert.equal(r, null, 'A * B = AB has no base-10 solution');
-}
-
-// Solvable with multiplication: I * IS = HIS (two-digit-ish)
-{
-  // Easier: BOY * 2 isn't valid (we need words). Try IF + IT = IS, well-known solvable.
-  // Pure multiplication with solution: try simple "BE * BE = BEE" — likely unsolvable.
-  // Use a constructed solvable mult equation: AB * C = DBC
-  // Skip the constructed-mult and use a confirmed addition case to keep this clean.
-  // Replace this slot with a verified-solvable addition.
-  const r = assignDigits('IF + IT = IS');
-  // I appears in both terms and result. F+T = S (with possible carry into the I column).
-  // F + T = S (no carry): I + I = I means I=0, but I is a leading letter. No.
-  // F + T = S + 10 (carry 1): then I + I + 1 = I → I = -1. No.
-  // So actually unsolvable. Confirm null.
-  assert.equal(r, null, 'IF + IT = IS has no base-10 solution');
+  assert.ok(validate(r, ['CAT', 'DOG'], 'PET'), 'reversed = sides must still solve');
 }
 
 // Solvable: AS + A = MOM  (small, hand-verified)
-// A + A in ones col: 2A = M (mod 10), carry c1 = floor(2A / 10)
-// S + 0 + c1 in tens? Wait, AS + A: AS is two-digit (A tens, S ones). A is one-digit.
-// ones: S + A = M (mod 10), carry c1
-// tens: A + 0 + c1 = O (mod 10), carry c2
-// hundreds: c2 = M
-// So M = c2 ∈ {0,1}; M is leading so M = 1. Therefore c2 = 1.
-// Then A + c1 ≥ 10, so O = A + c1 - 10.
-// S + A = M + 10 → S + A = 11.
-// All distinct, leading letters {A, M} ≠ 0.
-// Try A=4, S=7: c1=1, A+c1=5, so O=5-10? No, 5 < 10. Need A+c1 ≥ 10.
-// A=9, S=2: S+A=11 ✓, c1=1, A+c1=10, O=0, c2=1 ✓, M=1.
-//   Check distinct: A=9, S=2, O=0, M=1. All distinct. ✓
-// So solution exists.
+// Solution: A=9, S=2, O=0, M=1. Distinct, no multi-letter word leading zero. ✓
 {
   const r = assignDigits('AS + A = MOM');
-  assert.ok(validate(r, ['AS', 'A'], ['+'], 'MOM'), 'AS + A = MOM must solve');
+  assert.ok(validate(r, ['AS', 'A'], 'MOM'), 'AS + A = MOM must solve');
 }
 
 // Multi-term: A + B + C = ABC  (3-term addition)
-// A+B+C = 100A + 10B + C → 99A + 9B = 0 → impossible for A≥1. So unsolvable.
+// A+B+C = 100A + 10B + C → 99A + 9B = 0 → impossible for A≥1. Unsolvable.
 {
   const r = assignDigits('A + B + C = ABC');
   assert.equal(r, null, 'A + B + C = ABC has no base-10 solution');
 }
 
-// Mixed-operator equation: A * B + C = DE
-// Construct one we know solves: e.g. A=2, B=3, C=4 → 2*3+4 = 10 → DE=10, D=1, E=0.
-// Distinct: A=2, B=3, C=4, D=1, E=0. All distinct. ✓
-// Leading letters: A, D — both nonzero. ✓
+// Unsolvable: IF + IT = IS — no carry config satisfies I in tens column.
 {
-  const r = assignDigits('A * B + C = DE');
-  assert.ok(validate(r, ['A', 'B', 'C'], ['*', '+'], 'DE'),
-    'A * B + C = DE must produce a valid digit assignment');
-}
-
-// Unsolvable: AB = BA in pure equation form (no operator on left)
-// AB = BA means 10a+b = 10b+a → a=b, violates distinctness.
-{
-  const r = assignDigits('AB = BA');
-  assert.equal(r, null, 'AB = BA forces a=b which violates distinctness');
+  const r = assignDigits('IF + IT = IS');
+  assert.equal(r, null, 'IF + IT = IS has no base-10 solution');
 }
 
 // Whitespace tolerance
 {
   const r = assignDigits('  CAT   +   DOG   =   PET  ');
-  assert.ok(validate(r, ['CAT', 'DOG'], ['+'], 'PET'), 'extra whitespace must be tolerated');
+  assert.ok(validate(r, ['CAT', 'DOG'], 'PET'), 'extra whitespace must be tolerated');
 }
 `;
 
@@ -172,13 +116,12 @@ Equation grammar:
   <left> = <right>      OR      <right> = <left>
 
 where <right> is a single word (uppercase letters) and <left> is one or more
-words connected by binary operators '+' (addition) and '*' (multiplication).
-Operators are evaluated with standard precedence: '*' before '+'.
+words connected by '+' (addition only).
 
 Examples:
   "CAT + DOG = PET"
   "PET = CAT + DOG"
-  "A * B + C = DE"
+  "A + B + C = ABC"
 
 Constraints on a valid solution:
   - Each letter maps to a unique digit 0-9
@@ -192,9 +135,15 @@ Return value:
 
 Whitespace inside the equation may be uneven; tolerate runs of spaces.
 
+Strategy hint: the equations in the verifier use at most ~7 distinct
+letters, so a straightforward backtracking permutation over digits 0-9
+(prune on the leading-zero rule and check the equation at each leaf) is
+fast enough — you do not need a column-by-column constraint solver.
+Aim for a complete-but-simple permutation search before optimizing.
+
 Then ensure \`node verify.js\` exits 0. Do not edit verify.js.`;
 
-const CLAW_TIMEOUT = 240_000;
+const CLAW_TIMEOUT = 285_000;
 
 describe(`alphametics: cryptarithmetic with + and * (tier=${TIER_LABEL})`, () => {
   beforeEach(() => {

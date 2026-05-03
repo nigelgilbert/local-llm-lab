@@ -11,7 +11,7 @@
  *   "expected_tier_signature": "monotonic_improving",
  *   "known_confounds": ["context_pressure_high"],
  *   "introduced_in": "1.21",
- *   "notes": "H1 hand-authored; extends cascading-bugs.test.js (5-step) to 8 unrelated bugs across 8 files. Single test runner reports only the first failing assertion, so each fix exposes the next failure — model must loop fix→re-run→fix until clean. Bugs are individually trivial; the test measures the LOOP, not per-bug skill."
+ *   "notes": "H1 hand-authored; extends cascading-bugs.test.js (5-step) to 8 unrelated bugs across 8 files. Single test runner reports only the first failing assertion, so each fix exposes the next failure — model must loop fix→re-run→fix until clean. Cycle 1+2 saturated 100/100% — hardened isEven (subtle zero-handling bug masked by short-circuit; needs both isEven(4)=true AND isEven(0)=true assertions) and sumArr (string-concat masquerading as numeric reduce); naive 'fix the obvious bug' heuristic now fails. Cycle-3 tweak (analyze-agent): added a 9th file i.js with a NaN/indexOf trap (test_id retained for registry continuity, not literally 'eight'); the bug requires the model to know that indexOf uses === so NaN is unfindable and the fix must use Array.prototype.includes (which uses SameValueZero)."
  * }
  */
 
@@ -37,7 +37,8 @@ export function negate(n) { return n; }   // bug: should be -n
 `;
 
 const D_JS = `\
-export function isEven(n) { return n % 2 === 1; }   // bug: should be === 0
+// bug: misses zero-handling — isEven(0) returns false because 0 || ... short-circuits
+export function isEven(n) { return (n % 2 === 0) && n !== 0; }
 `;
 
 const E_JS = `\
@@ -49,11 +50,22 @@ export function last(arr) { return arr[arr.length]; }   // bug: off-by-one; shou
 `;
 
 const G_JS = `\
-export function sumArr(arr) { return arr.reduce((s, x) => s + x, 1); }   // bug: initial value should be 0
+// bug: subtle — uses Array.prototype.reduce with initial value but accumulator
+// is a string concat instead of numeric sum. Returns "01234" instead of 10.
+export function sumArr(arr) { return arr.reduce((s, x) => '' + s + x, 0); }
 `;
 
 const H_JS = `\
 export function clamp(n, lo, hi) { return Math.min(lo, Math.max(n, hi)); }   // bug: min and max swapped
+`;
+
+// Subtle: indexOf-based contains misses NaN because NaN !== NaN.
+// The "obvious" fix (return arr.includes(x)) PASSES the visible test but
+// also requires the model to recognize that includes() handles NaN where
+// indexOf does not — a JS quirk that distinguishes "fix the symptom" from
+// "fix the cause."
+const I_JS = `\
+export function contains(arr, x) { return arr.indexOf(x) !== -1; }   // bug: NaN never equals itself
 `;
 
 const RUN_JS = `\
@@ -66,27 +78,31 @@ import { head }    from './e.js';
 import { last }    from './f.js';
 import { sumArr } from './g.js';
 import { clamp }  from './h.js';
+import { contains } from './i.js';
 
 // node assert short-circuits — only the first failing assertion is reported.
 assert.equal(inc(1),                 2,    'inc(1) === 2');
 assert.equal(double(3),              6,    'double(3) === 6');
 assert.equal(negate(5),              -5,   'negate(5) === -5');
 assert.equal(isEven(4),              true, 'isEven(4) === true');
+assert.equal(isEven(0),              true, 'isEven(0) === true (zero is even)');
 assert.equal(head([7, 8, 9]),        7,    'head([7,8,9]) === 7');
 assert.equal(last([7, 8, 9]),        9,    'last([7,8,9]) === 9');
-assert.equal(sumArr([1, 2, 3, 4]),  10,    'sumArr([1,2,3,4]) === 10');
+assert.equal(sumArr([1, 2, 3, 4]),  10,    'sumArr([1,2,3,4]) === 10 (numeric sum, not string concat)');
 assert.equal(clamp(15, 0, 10),      10,    'clamp(15, 0, 10) === 10');
+assert.equal(contains([1, 2, NaN, 3], NaN), true, 'contains: NaN must be findable (indexOf does not find NaN)');
+assert.equal(contains([1, 2, 3], 4),         false, 'contains: missing element returns false');
 console.log('all-pass');
 `;
 
 const PROMPT =
-  'run.js executes assertions on eight helpers from a.js through h.js, ' +
+  'run.js executes assertions on nine helpers from a.js through i.js, ' +
   'and exits non-zero on the first failure. There are several bugs across ' +
   'the helper files. Run `node run.js`, observe the failure, fix the ' +
   'responsible helper, then run again. Continue until `node run.js` exits ' +
   '0 (printing "all-pass"). Do not edit run.js.';
 
-const CLAW_TIMEOUT = 240_000;
+const CLAW_TIMEOUT = 285_000;
 
 describe(`cascade-eight: 8 sequential failures, one runner (tier=${TIER_LABEL})`, () => {
   beforeEach(() => {
@@ -99,6 +115,7 @@ describe(`cascade-eight: 8 sequential failures, one runner (tier=${TIER_LABEL})`
     fs.writeFileSync(path.join(workspace.WORKSPACE, 'f.js'),    F_JS);
     fs.writeFileSync(path.join(workspace.WORKSPACE, 'g.js'),    G_JS);
     fs.writeFileSync(path.join(workspace.WORKSPACE, 'h.js'),    H_JS);
+    fs.writeFileSync(path.join(workspace.WORKSPACE, 'i.js'),    I_JS);
     fs.writeFileSync(path.join(workspace.WORKSPACE, 'run.js'),  RUN_JS);
   });
 
