@@ -11,7 +11,7 @@
  *   "expected_tier_signature": "monotonic_improving",
  *   "known_confounds": [],
  *   "introduced_in": "1.21",
- *   "notes": "Adapted from Exercism JS 'two-bucket' (MIT); mutation depth: HEAVY; key changes: findShortestPath(vesselA,vesselB,target,primary) not solve(...), avoid (3,5,*) and (3,7,*) capacities (use (3,8,*), (4,7,*) instead), result keys actionCount/holder/residual (not moves/goalBucket/otherBucket), holder values 'A'/'B' (not 'one'/'two'), unsolvable returns null (not throws), path: Array<[a,b]> array added (forces BFS-path reconstruction). Per mutations.md §7 mutation-depth gate, the rule-3 'forbid both at same amount < target' twist deferred from v1 to limit ambiguity; revisit after pilot. Canonical at host/test/docs/difficulty-pack/canonicals/two-bucket/. Cycle-3 tweak (analyze-agent): every assertion message in verify.js now includes the model's full returned object via JSON.stringify(r); prompt gained a worked example for findShortestPath(3,8,5,'A') with explicit move-by-move state path. Targets c2 'result_changed_vs_previous_same_call: false' iter-storm — model wrote slightly-different code 12 times without reading what its output looked like."
+ *   "notes": "Adapted from Exercism JS 'two-bucket' (MIT); mutation depth: HEAVY; key changes: findShortestPath(vesselA,vesselB,target,primary) not solve(...), avoid (3,5,*) and (3,7,*) capacities (use (3,8,*), (4,7,*) instead), result keys actionCount/holder/residual (not moves/goalBucket/otherBucket), holder values 'A'/'B' (not 'one'/'two'), unsolvable returns null (not throws), path: Array<[a,b]> array added (forces BFS-path reconstruction). Per mutations.md §7 mutation-depth gate, the rule-3 'forbid both at same amount < target' twist deferred from v1 to limit ambiguity; revisit after pilot. Canonical at host/test/docs/difficulty-pack/canonicals/two-bucket/. Cycle-3 tweak round 1 (commit 2bfadb9): added per-assertion JSON.stringify(r) payload — REVERTED after c3 evidence that the larger payloads compounded the t16 ctx-overflow problem (B-tweak wrong axis: addressed 'model can't read output' when binding constraint was iter-storm). Cycle-3 tweak round 2 (kept): worked example for findShortestPath(3,8,5,'A') in PROMPT — lower-token cost, clarifies return shape with a concrete trace."
  * }
  */
 
@@ -55,39 +55,38 @@ function isValidStep(prev, curr, capA, capB) {
 
 function checkSolvable(capA, capB, target, primary, expected, label) {
   const r = findShortestPath(capA, capB, target, primary);
-  const dump = () => 'returned ' + JSON.stringify(r);
-  assert.notEqual(r, null, label + ': must find a solution (got null); expected ' + JSON.stringify(expected));
-  assert.equal(typeof r, 'object', label + ': result must be object; ' + dump());
-  assert.equal(r.actionCount, expected.actionCount, label + ': actionCount mismatch — expected ' + expected.actionCount + ', ' + dump());
-  assert.equal(r.holder, expected.holder, label + ': holder mismatch — expected "' + expected.holder + '", ' + dump());
-  assert.equal(r.residual, expected.residual, label + ': residual mismatch — expected ' + expected.residual + ', ' + dump());
+  assert.notEqual(r, null, label + ': must find a solution');
+  assert.equal(typeof r, 'object', label + ': result must be object');
+  assert.equal(r.actionCount, expected.actionCount, label + ': actionCount');
+  assert.equal(r.holder, expected.holder, label + ': holder');
+  assert.equal(r.residual, expected.residual, label + ': residual');
 
   // Path: array of [a,b] state pairs; length === actionCount + 1; starts at [0,0]
-  assert.ok(Array.isArray(r.path), label + ': path must be an array; ' + dump());
-  assert.equal(r.path.length, r.actionCount + 1, label + ': path length must be actionCount+1 (=' + (r.actionCount + 1) + '), got ' + r.path.length + '; ' + dump());
-  assert.deepEqual(r.path[0], [0, 0], label + ': path[0] must be [0,0], got ' + JSON.stringify(r.path[0]) + '; ' + dump());
+  assert.ok(Array.isArray(r.path), label + ': path is array');
+  assert.equal(r.path.length, r.actionCount + 1, label + ': path length === actionCount + 1');
+  assert.deepEqual(r.path[0], [0, 0], label + ': path starts at [0,0]');
 
   // Move 1 must fill the primary bucket (canonical rule)
   if (primary === 'A') {
-    assert.deepEqual(r.path[1], [capA, 0], label + ': first move must fill primary A → expected [' + capA + ',0], got ' + JSON.stringify(r.path[1]) + '; ' + dump());
+    assert.deepEqual(r.path[1], [capA, 0], label + ': first move fills primary A');
   } else {
-    assert.deepEqual(r.path[1], [0, capB], label + ': first move must fill primary B → expected [0,' + capB + '], got ' + JSON.stringify(r.path[1]) + '; ' + dump());
+    assert.deepEqual(r.path[1], [0, capB], label + ': first move fills primary B');
   }
 
   // Each step is a legal move
   for (let i = 1; i < r.path.length; i++) {
     const op = isValidStep(r.path[i-1], r.path[i], capA, capB);
-    assert.ok(op !== null, label + ': illegal step ' + i + ': ' + JSON.stringify(r.path[i-1]) + ' → ' + JSON.stringify(r.path[i]) + ' is not one of fillA/fillB/emptyA/emptyB/pourAB/pourBA; ' + dump());
+    assert.ok(op !== null, label + ': step ' + i + ' is illegal: ' + JSON.stringify(r.path[i-1]) + '→' + JSON.stringify(r.path[i]));
   }
 
   // Final state must match holder/residual
   const [finalA, finalB] = r.path[r.path.length - 1];
   if (r.holder === 'A') {
-    assert.equal(finalA, target, label + ': final A must equal target ' + target + ', got ' + finalA + '; ' + dump());
-    assert.equal(finalB, r.residual, label + ': final B must equal residual ' + r.residual + ', got ' + finalB + '; ' + dump());
+    assert.equal(finalA, target, label + ': final A === target');
+    assert.equal(finalB, r.residual, label + ': final B === residual');
   } else {
-    assert.equal(finalB, target, label + ': final B must equal target ' + target + ', got ' + finalB + '; ' + dump());
-    assert.equal(finalA, r.residual, label + ': final A must equal residual ' + r.residual + ', got ' + finalA + '; ' + dump());
+    assert.equal(finalB, target, label + ': final B === target');
+    assert.equal(finalA, r.residual, label + ': final A === residual');
   }
 }
 
