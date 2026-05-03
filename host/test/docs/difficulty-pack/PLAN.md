@@ -15,6 +15,8 @@
 
 Author **~12 new tier-eval tests** that drop done-only pass rate into the 50–85% Wilson-discriminable band on at least one of t16 or t32, so Sprint 2's discrimination matrix has cells where 95% Wilson CIs can separate. Source mix: **7 Aider/Exercism-inspired hand-translations** (JS subset, mutated for contamination resistance) + **1 post-Feb-2026 AtCoder Hard port** (provably post-Qwen3.5 release, JS-translated, presented at relaxed N for hand-solvability) + **4 hand-authored gap-fillers** (long-horizon convergence, multi-file scale, denser spec, plus one TBD post-pilot axis-gap-filler). Stay strictly within the existing five coding axes (no productivity, no library-API). Calibrate at N=5 pilot before commit; size Sprint 2 confirmatory at **N ≈ 55–60 per cell** (re-derived from Newcombe-Wilson power calc, not the N=40 the original V2 plan footnote suggested).
 
+**Verification gate (post-cycle-3 reframe):** ≥6 cells qualifying, where qualifying = (pass-rate middle band [10–80% on t16 OR 25–85% on t32]) ∪ (R9-A `ctx_discriminator`). R9-A is a NEW classifier added 2026-05-03 after cycle-3 evidence showed `t16 ctx-overflow / t32 clean-pass` is genuine architectural discrimination on the per-turn-context-efficiency axis (model needs more turns at IQ4_XS than Q5_K_XL → trips the 32k ceiling at t16 before convergence). See §R9 below.
+
 ---
 
 ## Context — why this work
@@ -117,6 +119,33 @@ Run with `RUN_REGISTRY_EMIT=1` and frozen `--ctx` JSON for each tier. (Reminder:
 - t32 pass rate ∈ **[25%, 85%]** (tighter ceiling than scoping draft, per design review — 95% would re-create saturation)
 - |t32 − t16| ≥ 15pp at N=5 OR test is axis-critical (e.g., the only spec_precision test landing in band)
 - All R1–R8 cleared
+
+**OR:** test classifies under R9-A (`ctx_discriminator`) — see §R9. R9-A cells skip Step-4 keep-band and qualify directly toward the verification gate.
+
+### R9 — ctx-axis classifier (NEW 2026-05-03; cycle-3 reframe)
+
+R1–R8 above are **reject** criteria (test fails, drop or move to frontier). R9 is a **classifier** — it does not reject; it labels a cell as belonging to a separate discrimination axis (per-turn context efficiency) that the original keep-band was blind to.
+
+Cycle-3 evidence: tests like `book-store` and `two-bucket` produced t16 0% / t32 100% on N=3, with t16 failures all `ctx_overflow_400` (legitimate "request exceeds 32k context" 400 from llama-server). At t32 (Q5_K_XL @ 64k ctx) the same tests converge cleanly. This is real architectural signal — model converges in fewer turns at higher quant, fits in less ctx — but the keep-band would have rejected these as floor (R1) on t16. They are not floor; they are ctx-discriminating.
+
+**R9-A `ctx_discriminator` (counts toward verification gate):**
+
+| Tier | Condition |
+|---|---|
+| Tier X | ≥66% of reps end in `terminal_status='error'` AND error class is `ctx_overflow_400` (real "request exceeds context size" 400 from llama-server, **NOT** bridge `stream_aborted_mid_run+count_mismatch` noise) |
+| Tier Y (the OTHER) | ≥66% of reps pass cleanly (`terminal_status='done'` AND `passed=true`) |
+
+Direction-agnostic: works whether t16 is the ctx-bound side (the expected case for this model + configs) or t32 (theoretical; not observed yet). At N=3 screening, ≥66% means 2/3 or 3/3.
+
+**R9-B `ctx_floor` (Tier D — does NOT count):**
+
+- ≥66% `ctx_overflow_400` on **both** tiers → cell is a genuine ctx ceiling for current model + configs at both tiers (e.g., `wordy` post-cycle-3). Reclassify `suite_layer: D, difficulty_band: frontier` and reserve.
+
+**Transient filter (mandatory before R9 fires):**
+
+R9 distinguishes legitimate `ctx_overflow_400` (real model behavior — claw stderr shows `request (NNNNN tokens) > NNNNN ctx`) from bridge `stream_aborted_mid_run+count_mismatch` (the bridge dropped the SSE stream, claw eventually timed out from above, model never had a fair chance — see [`../../../litellm/TODO-1.21-bridge-error-diagnostics.md`](../../../litellm/TODO-1.21-bridge-error-diagnostics.md) anomaly #2). Filter out the latter as transient noise BEFORE counting toward R9-A or R9-B. At Sprint 2 confirmatory N=60, the ~5–8% bridge-transient rate would otherwise inflate the ctx_overflow_400 count and could mislabel a cell.
+
+**Verification gate count = (pass-rate keep-band cells) ∪ (R9-A cells), targeting ≥6.**
 
 ### Step 5 — Classify and merge
 

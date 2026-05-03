@@ -56,9 +56,12 @@ EXPLORE_DIR="$DOCS_DIR/explore/c${CYCLE}"
 # (alphametics, forth, semver-range) were relocated to
 # __tests__/tier-eval/frontier/ as floor/frontier reserves and are no longer
 # part of the screening filter. Order matches 1.21-handsolve-log.md table.
+# Cycle 4 added needle-haystack (H5, multi_file_context+retrieval_over_distance)
+# as a NIAH-style test targeting the t16 ctx-pressure axis surfaced by R9-A.
 NEW_TESTS=(
   wordy book-store grade-school word-search two-bucket
   count-power-of-two cascade-eight twelve-file-refactor ini-parser
+  needle-haystack
 )
 
 # Honor a caller-supplied TIER_EVAL_FILTER (e.g. when re-sampling a subset or
