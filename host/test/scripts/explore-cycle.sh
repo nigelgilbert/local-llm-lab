@@ -61,6 +61,11 @@ NEW_TESTS=(
   count-power-of-two cascade-eight twelve-file-refactor ini-parser
 )
 
+# Honor a caller-supplied TIER_EVAL_FILTER (e.g. when re-sampling a subset or
+# pulling in a frontier test from outside NEW_TESTS); otherwise default to the
+# full active screening set.
+EFFECTIVE_FILTER="${TIER_EVAL_FILTER:-${NEW_TESTS[*]}}"
+
 DATESTAMP=$(date +%Y%m%d-%H%M)
 SWEEP_LABEL="explore-c${CYCLE}-${DATESTAMP}"
 
@@ -70,13 +75,13 @@ echo "==> Sprint 1.21 explore cycle ${CYCLE}"
 echo "    tiers:        $TIERS"
 echo "    reps:         ${EVAL_REPS:-3}"
 echo "    sweep label:  $SWEEP_LABEL"
-echo "    filter:       ${NEW_TESTS[*]}"
+echo "    filter:       ${EFFECTIVE_FILTER}"
 echo "    explore dir:  $EXPLORE_DIR"
 echo ""
 
 # Run the sweep. run-overnight-screen.sh reads TIER_EVAL_FILTER, EVAL_TIERS,
 # EVAL_REPS, SWEEP_LABEL, RUN_REGISTRY_KIND, DRY_RUN from the environment.
-TIER_EVAL_FILTER="${NEW_TESTS[*]}" \
+TIER_EVAL_FILTER="$EFFECTIVE_FILTER" \
 EVAL_TIERS="$TIERS" \
 EVAL_REPS="${EVAL_REPS:-3}" \
 SWEEP_LABEL="$SWEEP_LABEL" \
@@ -102,7 +107,7 @@ docker run --rm \
   node /test/scripts/explore-summarize.mjs \
     --registry "/test/.claw-runtime/$(basename "$REGISTRY_JSONL")" \
     --runtime-dir /test/.claw-runtime \
-    --tests "$(IFS=' '; echo "${NEW_TESTS[*]}")" \
+    --tests "$EFFECTIVE_FILTER" \
     --cycle "$CYCLE" \
     --out-dir "/test/docs/difficulty-pack/explore/c${CYCLE}" \
   || { echo "ERROR: explore-summarize.mjs failed" >&2; exit 1; }
