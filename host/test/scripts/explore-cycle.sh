@@ -59,8 +59,8 @@ EXPLORE_DIR="$DOCS_DIR/explore/c${CYCLE}"
 # Cycle 4 added needle-haystack (H5, multi_file_context+retrieval_over_distance)
 # as a NIAH-style test targeting the t16 ctx-pressure axis surfaced by R9-A.
 NEW_TESTS=(
-  wordy book-store grade-school word-search two-bucket
-  count-power-of-two cascade-eight twelve-file-refactor ini-parser
+  wordy book-store word-search two-bucket
+  twelve-file-refactor ini-parser
   needle-haystack
 )
 
