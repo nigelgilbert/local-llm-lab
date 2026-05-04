@@ -23,3 +23,10 @@ venv/
 
 # Logs
 *.log
+
+# Per-cycle sweep stdout dumps from run-overnight-screen.sh.
+# These are raw `docker compose run ... | tee` traces — the analytical rollup
+# lives in host/test/docs/difficulty-pack/explore/cN/summary.md. Keep
+# pre-existing sprint-baseline reports (T32-TUNING-PROGRESS.md,
+# TIER-EVAL-V2-SPRINT-1-BASELINE.md) which sit beside this pattern.
+host/test/logs/OVERNIGHT-SCREEN-explore-*.md
