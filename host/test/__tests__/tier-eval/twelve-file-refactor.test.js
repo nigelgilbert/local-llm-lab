@@ -1,7 +1,7 @@
 /** @manifest
  * {
  *   "test_id": "twelve-file-refactor",
- *   "test_version": "v1",
+ *   "test_version": "v3",
  *   "primary_axis": "multi_file_context",
  *   "secondary_axes": ["convergence"],
  *   "suite_layer": "B",
@@ -11,7 +11,7 @@
  *   "expected_tier_signature": "monotonic_improving",
  *   "known_confounds": ["repo_size_dependent", "context_pressure_high"],
  *   "introduced_in": "1.21",
- *   "notes": "H2 hand-authored; extends large-refactor.test.js (6-file, 1-param) to 12 files threading 2 params (currency + locale) through 8 call sites. Each call site reads its params from a different idiomatic source (this.x, parameter, module-level constant, options bag, config object on this, jurisdiction record, etc.). PLAN.md spec mentioned a circular-import trap; deferred to v2. Cycle 1+2 saturated 100/100% — added thousands-separator requirement (de uses '.' for thousands, en omits) and stricter format spec; partial impls that only swap '.' for ',' on decimal now fail the larger-amount assertions. Cycle-3 tweak (analyze-agent): added negative-amount sign-placement spec (minus prefix, not accounting parens) plus multi-thousands grouping (7-digit numbers) — pushes a naive `toFixed(2)+swap-chars` impl below threshold without changing the refactor surface."
+ *   "notes": "v3 cycle-19 — v2 still saturated at t16 in 20 iters: model read all 14 files, wrote a config-driven formatPrice in one shot, took one debug iter to fix float precision in the fractional part (Math.round). Round-trip alone wasn't enough friction. v3 splits fraction-digit count off the locale and into a NEW currency-config.js (CURRENCIES map: USD/EUR/GBP/CHF/CAD/AUD = 2, JPY/KRW = 0, BHD/KWD = 3). format-parse.js does a two-step parse: extract the [A-Z]{3} currency at the locale's known position, look up CURRENCIES[ccy].fractionDigits, then build the per-currency amount regex. test.js now exercises a 0-decimal currency (JPY in receipt) and a 3-decimal currency (BHD in summary) — so a hardcoded toFixed(2) can no longer round-trip. Same 12 source files; workspace adds format-config.js + format-parse.js + currency-config.js (3 verifier-owned files, total 15). Allowed edits exclude all three verifier files."
  * }
  */
 
@@ -25,16 +25,124 @@ import * as workspace from '../../lib/workspace.js';
 import { clawModel, TIER_LABEL } from '../../lib/tier.js';
 
 // formatPrice — formats an amount. Currency and locale are currently hardcoded.
-// Refactor: take currency and locale as second and third params and emit
-//   "<CCY> <amount-with-2-decimals>" for locale=en (period decimal, no thousands sep)
-//   "<amount>,<2-decimals> <CCY>"    for locale=de (comma decimal,
-//                                                   period as thousands sep,
-//                                                   e.g. 1.234,56)
-// Both locales use exactly two fraction digits; integer thousands grouping
-// applies for de but not en.
+// Refactor target: take (amount, currency, locale) and emit a string that
+// round-trips through parsePrice (in format-parse.js). Locale rules live in
+// format-config.js as data — not in this comment, not in the prompt, not in
+// the test assertions.
 const FORMAT_JS = `\
 export function formatPrice(amount) {
   return 'USD ' + amount.toFixed(2);
+}
+`;
+
+// format-config.js — locale rules (presentation: decimal char, thousands
+// char, currency position, separator, negative sign). The fraction-digit
+// count is NOT here — it's per-currency, defined in currency-config.js.
+const FORMAT_CONFIG_JS = `\
+// Per-locale presentation rules. Fraction-digit count is defined per
+// currency in currency-config.js — formatPrice and parsePrice both have to
+// merge the two configs.
+//
+// Fields:
+//   decimal           character separating integer from fraction digits
+//                     (only emitted when fractionDigits > 0)
+//   thousands         character grouping every 3 integer digits ('' = none)
+//   currencyPosition  'prefix' | 'suffix' relative to the amount text
+//   sep               literal character placed between amount and currency code
+//   negativeSign      '-' placed immediately before the first digit/group
+//                     (parenthesized accounting style is NOT used)
+export const LOCALES = {
+  en: {
+    decimal: '.',
+    thousands: '',
+    currencyPosition: 'prefix',
+    sep: ' ',
+    negativeSign: '-',
+  },
+  de: {
+    decimal: ',',
+    thousands: '.',
+    currencyPosition: 'suffix',
+    sep: ' ',
+    negativeSign: '-',
+  },
+};
+`;
+
+// currency-config.js — per-currency fraction-digit count. Real-world ISO 4217
+// minor-unit conventions: most currencies use 2; JPY/KRW use 0; BHD/KWD use 3.
+// formatPrice MUST consult this map (not hardcode toFixed(2)).
+const CURRENCY_CONFIG_JS = `\
+// ISO-4217-style minor-unit counts used by formatPrice and parsePrice.
+// fractionDigits === 0 means: no decimal separator is emitted at all.
+export const CURRENCIES = {
+  USD: { fractionDigits: 2 },
+  EUR: { fractionDigits: 2 },
+  GBP: { fractionDigits: 2 },
+  CHF: { fractionDigits: 2 },
+  CAD: { fractionDigits: 2 },
+  AUD: { fractionDigits: 2 },
+  JPY: { fractionDigits: 0 },
+  KRW: { fractionDigits: 0 },
+  BHD: { fractionDigits: 3 },
+  KWD: { fractionDigits: 3 },
+};
+`;
+
+// format-parse.js — strict, two-step parser. Step 1 extracts the [A-Z]{3}
+// currency code at the locale's known position (prefix/suffix). Step 2 looks
+// up CURRENCIES[ccy].fractionDigits and validates the amount text against a
+// per-currency-aware regex. fractionDigits === 0 means: NO decimal separator
+// at all — just a signed integer.
+const FORMAT_PARSE_JS = `\
+import { LOCALES }    from './format-config.js';
+import { CURRENCIES } from './currency-config.js';
+
+function escapeRegex(s) {
+  return s.replace(/[.*+?^\${}()|[\\]\\\\]/g, '\\\\$&');
+}
+
+// parsePrice(s, locale) → { amount: number, currency: string } | null
+//
+// Strict: anchored ^...$, no leading/trailing chars tolerated. Two-step:
+//   1. peel the [A-Z]{3} currency code at the locale's currencyPosition.
+//   2. look up CURRENCIES[ccy].fractionDigits → build the precise amount
+//      regex (with or without a decimal sub-pattern) and match.
+export function parsePrice(s, locale) {
+  const cfg = LOCALES[locale];
+  if (!cfg) throw new Error('unknown locale: ' + locale);
+  if (typeof s !== 'string') return null;
+
+  const sep = escapeRegex(cfg.sep);
+  const ccyHead = cfg.currencyPosition === 'prefix'
+    ? new RegExp('^([A-Z]{3})' + sep + '(.*)$')
+    : new RegExp('^(.*)' + sep + '([A-Z]{3})$');
+  const headM = s.match(ccyHead);
+  if (!headM) return null;
+  const [currency, amtText] = cfg.currencyPosition === 'prefix'
+    ? [headM[1], headM[2]]
+    : [headM[2], headM[1]];
+
+  const ccyCfg = CURRENCIES[currency];
+  if (!ccyCfg) return null;
+
+  const dec  = escapeRegex(cfg.decimal);
+  const thou = cfg.thousands ? escapeRegex(cfg.thousands) : '';
+  const intPart = thou
+    ? '\\\\d{1,3}(?:' + thou + '\\\\d{3})*'
+    : '\\\\d+';
+  const fracPart = ccyCfg.fractionDigits > 0
+    ? dec + '\\\\d{' + ccyCfg.fractionDigits + '}'
+    : '';
+  const amtRe = new RegExp('^-?' + intPart + fracPart + '$');
+  if (!amtRe.test(amtText)) return null;
+
+  let normalized = amtText;
+  if (cfg.thousands)        normalized = normalized.split(cfg.thousands).join('');
+  if (cfg.decimal !== '.')  normalized = normalized.replace(cfg.decimal, '.');
+  const amountN = Number(normalized);
+  if (!Number.isFinite(amountN)) return null;
+  return { amount: amountN, currency };
 }
 `;
 
@@ -142,102 +250,169 @@ export const CCY_NAMES = { USD: 'US Dollar', EUR: 'Euro', GBP: 'Pound', JPY: 'Ye
 export const LOCALE_NAMES = { en: 'English', de: 'German', fr: 'French' };
 `;
 
+// test.js is the round-trip verifier. It does NOT contain literal expected
+// price strings; it imports the canonical strict parser from format-parse.js
+// and asserts parsePrice(formatPrice(amount, currency, locale), locale)
+// returns { amount, currency } for every call site. Per-call-site wrappers
+// ('Total: ', 'INVOICE: ', 'PAY|', 'CA tax: ', 'name: ') are still asserted
+// structurally so the model can't smuggle the format through the wrapper.
 const TEST_JS = `\
 import assert from 'node:assert/strict';
-import { Cart }          from './cart.js';
-import { receipt }       from './receipt.js';
-import { report }        from './report.js';
-import { Invoice }       from './invoice.js';
+import { Cart }         from './cart.js';
+import { receipt }      from './receipt.js';
+import { report }       from './report.js';
+import { Invoice }      from './invoice.js';
 import { logFinancial } from './audit.js';
 import { summaryRow }   from './summary.js';
 import { taxLine }      from './taxes.js';
+import { parsePrice }   from './format-parse.js';
 
-// Cart uses this.currency + this.locale.
-const c = new Cart('GBP', 'en');
-c.add({ name: 'a', price: 10 });
-c.add({ name: 'b', price: 5.5 });
-assert.equal(c.total(), 'GBP 15.50', 'cart: en locale uses period');
+function approx(a, b) { return Math.abs(a - b) < 1e-9; }
 
-// receipt uses passed-in currency + locale; here de locale uses comma decimal.
-const r = receipt([{ name: 'x', price: 3 }, { name: 'y', price: 4.25 }], 'JPY', 'de');
-assert.equal(r, 'x: 3,00 JPY\\ny: 4,25 JPY', 'receipt: de locale uses comma');
+function expectFmt(out, expectedAmount, expectedCcy, locale, label) {
+  const p = parsePrice(out, locale);
+  assert.ok(p !== null, label + ': parsePrice rejected ' + JSON.stringify(out));
+  assert.equal(p.currency, expectedCcy,
+    label + ': currency ' + p.currency + ' != ' + expectedCcy);
+  assert.ok(approx(p.amount, expectedAmount),
+    label + ': amount ' + p.amount + ' != ' + expectedAmount);
+}
 
-// report uses module-level DEFAULT_CURRENCY=EUR, DEFAULT_LOCALE=de.
-assert.equal(report(99), 'Total: 99,00 EUR', 'report: module defaults EUR/de');
+// Cart — uses this.currency + this.locale.
+{
+  const c = new Cart('GBP', 'en');
+  c.add({ name: 'a', price: 10 });
+  c.add({ name: 'b', price: 5.5 });
+  expectFmt(c.total(), 15.5, 'GBP', 'en', 'cart en');
+}
 
-// Invoice uses this.config.currency + this.config.locale.
-const inv = new Invoice({ currency: 'USD', locale: 'en' });
-inv.addLine({ amount: 100 });
-inv.addLine({ amount: 50 });
-assert.equal(inv.render(), 'INVOICE: USD 150.00', 'invoice: USD/en');
+// receipt — passes currency + locale; joins per-line "<name>: <formatted>".
+// JPY has 0 fraction digits per currency-config — outputs are bare integers.
+{
+  const r = receipt([{ name: 'x', price: 3 }, { name: 'y', price: 4 }], 'JPY', 'de');
+  const lines = r.split('\\n');
+  assert.equal(lines.length, 2, 'receipt: 2 lines');
+  assert.ok(lines[0].startsWith('x: '), 'receipt: line 0 prefix');
+  assert.ok(lines[1].startsWith('y: '), 'receipt: line 1 prefix');
+  expectFmt(lines[0].slice('x: '.length), 3, 'JPY', 'de', 'receipt de jpy line 0');
+  expectFmt(lines[1].slice('y: '.length), 4, 'JPY', 'de', 'receipt de jpy line 1');
+}
 
-// audit uses fields on the record itself.
-const log = logFinancial({ amount: 42, currency: 'CHF', locale: 'de', kind: 'PAY' });
-assert.equal(log, 'PAY|42,00 CHF', 'audit: de from record');
+// report — uses module-level DEFAULT_CURRENCY=EUR, DEFAULT_LOCALE=de.
+{
+  const out = report(99);
+  const PREFIX = 'Total: ';
+  assert.ok(out.startsWith(PREFIX), 'report: prefix preserved');
+  expectFmt(out.slice(PREFIX.length), 99, 'EUR', 'de', 'report (module defaults)');
+}
 
-// summary uses options bag.
-const sum = summaryRow([{ price: 1.1 }, { price: 2.2 }], { currency: 'AUD', locale: 'en' });
-assert.equal(sum, 'AUD 3.30', 'summary: en from opts');
+// Invoice — uses this.config.currency + this.config.locale.
+{
+  const inv = new Invoice({ currency: 'USD', locale: 'en' });
+  inv.addLine({ amount: 100 });
+  inv.addLine({ amount: 50 });
+  const out = inv.render();
+  const PREFIX = 'INVOICE: ';
+  assert.ok(out.startsWith(PREFIX), 'invoice: prefix preserved');
+  expectFmt(out.slice(PREFIX.length), 150, 'USD', 'en', 'invoice');
+}
 
-// taxes uses jurisdiction record.
-const tx = taxLine(200, { name: 'CA', rate: 0.10, currency: 'CAD', locale: 'en' });
-assert.equal(tx, 'CA tax: CAD 20.00', 'tax line: en from jurisdiction');
+// audit — uses record.currency + record.locale.
+{
+  const log = logFinancial({ amount: 42, currency: 'CHF', locale: 'de', kind: 'PAY' });
+  const PREFIX = 'PAY|';
+  assert.ok(log.startsWith(PREFIX), 'audit: prefix preserved');
+  expectFmt(log.slice(PREFIX.length), 42, 'CHF', 'de', 'audit');
+}
 
-// Thousands grouping: de uses '.' as thousands separator, en uses none.
+// summary — uses opts.currency + opts.locale. BHD has 3 fraction digits per
+// currency-config, so the formatter must respect per-currency decimal counts.
+{
+  const sum = summaryRow([{ price: 1.234 }, { price: 2.345 }], { currency: 'BHD', locale: 'en' });
+  expectFmt(sum, 1.234 + 2.345, 'BHD', 'en', 'summary BHD (3 fraction digits)');
+}
+
+// taxes — uses jurisdiction.currency + jurisdiction.locale.
+{
+  const tx = taxLine(200, { name: 'CA', rate: 0.10, currency: 'CAD', locale: 'en' });
+  const PREFIX = 'CA tax: ';
+  assert.ok(tx.startsWith(PREFIX), 'taxes: prefix preserved');
+  expectFmt(tx.slice(PREFIX.length), 20, 'CAD', 'en', 'taxes');
+}
+
+// Thousands grouping: 4-digit amount in de must be grouped per format-config.
 {
   const big = receipt([{ name: 'big', price: 1234.5 }], 'EUR', 'de');
-  assert.equal(big, 'big: 1.234,50 EUR', 'receipt: de uses period as thousands separator');
+  expectFmt(big.slice('big: '.length), 1234.5, 'EUR', 'de', 'receipt de big (4-digit)');
 }
+// Thousands grouping: 5-digit amount in en must NOT be grouped per format-config.
 {
   const bigEn = new Cart('USD', 'en');
   bigEn.add({ name: 'p', price: 12345.67 });
-  assert.equal(bigEn.total(), 'USD 12345.67', 'cart: en omits thousands separator');
+  expectFmt(bigEn.total(), 12345.67, 'USD', 'en', 'cart en big (5-digit)');
 }
 
-// Negative amounts: minus sign is the FIRST character before any digits or
-// thousands separators (parenthesized accounting style is NOT used).
+// Negative amounts.
 {
   const negEn = logFinancial({ amount: -42.5, currency: 'USD', locale: 'en', kind: 'REFUND' });
-  assert.equal(negEn, 'REFUND|USD -42.50', 'audit: negative en — minus directly before number');
+  assert.ok(negEn.startsWith('REFUND|'), 'audit negative en: prefix preserved');
+  expectFmt(negEn.slice('REFUND|'.length), -42.5, 'USD', 'en', 'audit negative en');
 }
 {
   const negDe = logFinancial({ amount: -1234.5, currency: 'EUR', locale: 'de', kind: 'REFUND' });
-  assert.equal(negDe, 'REFUND|-1.234,50 EUR', 'audit: negative de — minus before thousands group');
+  assert.ok(negDe.startsWith('REFUND|'), 'audit negative de: prefix preserved');
+  expectFmt(negDe.slice('REFUND|'.length), -1234.5, 'EUR', 'de', 'audit negative de');
 }
 
-// Multi-thousands grouping: 7-digit amount in de
+// Multi-thousands grouping (de): 7-digit amount must be grouped every 3 digits.
 {
   const huge = receipt([{ name: 'm', price: 1234567.89 }], 'EUR', 'de');
-  assert.equal(huge, 'm: 1.234.567,89 EUR', 'receipt: de groups every three digits');
+  expectFmt(huge.slice('m: '.length), 1234567.89, 'EUR', 'de', 'receipt de huge (7-digit)');
+}
+
+// Thousands grouping × 0 fraction digits (KRW in de): no decimal at all,
+// just a grouped integer. Forces the formatter to suppress the decimal
+// separator (and the trailing fraction) when CURRENCIES[ccy].fractionDigits
+// === 0.
+{
+  const huge = receipt([{ name: 'k', price: 1234567 }], 'KRW', 'de');
+  expectFmt(huge.slice('k: '.length), 1234567, 'KRW', 'de', 'receipt de KRW (0 dec, grouped)');
 }
 `;
 
 const PROMPT = `\
-This workspace contains 12 files. The function \`formatPrice\` in format.js
+This workspace contains 15 files. The function \`formatPrice\` in format.js
 currently hardcodes the currency to "USD" and the locale to a period decimal.
 
-Refactor format.js so that \`formatPrice(amount, currency, locale)\`:
-  - For locale === 'en': returns "<CCY> <amount.toFixed(2)>" with NO
-      thousands separator. e.g.
-        formatPrice(15.5,    'GBP', 'en') → "GBP 15.50"
-        formatPrice(12345.67,'USD', 'en') → "USD 12345.67"
-  - For locale === 'de': returns "<amount> <CCY>" where the integer
-      portion uses '.' as thousands separator and the decimal point is
-      replaced by ',' . e.g.
-        formatPrice(99,     'EUR', 'de') → "99,00 EUR"
-        formatPrice(1234.5, 'EUR', 'de') → "1.234,50 EUR"
+Refactor \`formatPrice(amount, currency, locale)\` so that its output
+round-trips through the canonical strict parser \`parsePrice\` exported by
+format-parse.js. For every (amount, currency, locale) the test asserts:
 
-  Always emit exactly two fraction digits (use \`amount.toFixed(2)\` as the
-  starting point and adjust the formatting from there).
+    parsePrice(formatPrice(amount, currency, locale), locale)
+        gives back { amount, currency }
 
-  Negative amounts: prepend a single '-' immediately before the first digit
-  (or the first thousands group). Do NOT use parenthesized accounting style.
-  Examples:
-    formatPrice(-42.5,    'USD', 'en') → "USD -42.50"
-    formatPrice(-1234.5,  'EUR', 'de') → "-1.234,50 EUR"
+Two configuration files together define the format — read both before
+implementing:
 
-  Multi-thousands grouping in de: group every three digits, e.g.
-    formatPrice(1234567.89, 'EUR', 'de') → "1.234.567,89 EUR"
+  - format-config.js     per-locale presentation rules (decimal char,
+                         thousands char, currency position, sep char,
+                         negative-sign placement)
+  - currency-config.js   per-currency fraction-digit count
+                         (some currencies use 0, some 2, some 3)
+
+The fraction-digit count comes from the CURRENCY, not the locale. When a
+currency has fractionDigits === 0, your output must contain NO decimal
+separator at all (just a signed integer with locale-appropriate thousands
+grouping). The parser is strict: anchored ^...$, exact whitespace, exact
+fraction-digit count per currency, [A-Z]{3} currency code, locale-correct
+thousands grouping — any deviation returns null and the assertion fails.
+
+Your formatter must handle:
+  - integer and fractional amounts of arbitrary integer-digit length
+  - negative amounts (sign immediately before the first digit/group)
+  - locales 'en' and 'de'
+  - currencies passed as 3-letter ISO codes (USD, EUR, GBP, JPY, KRW,
+    BHD, KWD, …; already uppercase)
 
 Then update every caller so it threads BOTH \`currency\` and \`locale\`
 through to formatPrice. Each caller obtains them from its own idiomatic
@@ -250,7 +425,8 @@ source — read each file to find out where the values come from:
   - summary.js: opts.currency, opts.locale (options-bag pattern)
   - taxes.js:   jurisdiction.currency, jurisdiction.locale
 
-After your edits, running \`node test.js\` must exit 0. Do not edit test.js.
+After your edits, running \`node test.js\` must exit 0. Do not edit
+test.js, format-config.js, currency-config.js, or format-parse.js.
 
 Files notify.js, helper.js, and constants.js are distractors that do NOT
 call formatPrice — leave them alone.`;
@@ -260,7 +436,10 @@ const CLAW_TIMEOUT = 285_000;
 describe(`twelve-file-refactor: thread two params through 7 call sites in 12 files (tier=${TIER_LABEL})`, () => {
   beforeEach(() => {
     workspace.reset();
-    fs.writeFileSync(path.join(workspace.WORKSPACE, 'format.js'),    FORMAT_JS);
+    fs.writeFileSync(path.join(workspace.WORKSPACE, 'format.js'),          FORMAT_JS);
+    fs.writeFileSync(path.join(workspace.WORKSPACE, 'format-config.js'),   FORMAT_CONFIG_JS);
+    fs.writeFileSync(path.join(workspace.WORKSPACE, 'currency-config.js'), CURRENCY_CONFIG_JS);
+    fs.writeFileSync(path.join(workspace.WORKSPACE, 'format-parse.js'),    FORMAT_PARSE_JS);
     fs.writeFileSync(path.join(workspace.WORKSPACE, 'cart.js'),      CART_JS);
     fs.writeFileSync(path.join(workspace.WORKSPACE, 'receipt.js'),   RECEIPT_JS);
     fs.writeFileSync(path.join(workspace.WORKSPACE, 'report.js'),    REPORT_JS);
