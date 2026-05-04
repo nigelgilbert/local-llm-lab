@@ -15,6 +15,20 @@
  * }
  */
 
+// What:  Implement totalPrice(packageIds) for a 6-tier subscription-package
+//        store. Six discount tiers [1, 0.93, 0.85, 0.76, 0.66, 0.62] reward
+//        larger distinct-item groups; UNIT_PRICE=1200 cents. Return both the
+//        cents total AND the grouping choice as a multiset.
+//
+// Why:   Strongest tier discriminator in the c21 N=3 corpus (t16 0/3, t64
+//        2/3 — clean floor with a reasonable ceiling). The 6-tier discount
+//        curve is hand-tuned so the canonical test basket [1,2,3,4,5,6,1,2,3,4]
+//        has a 5+5 vs 6+4 trap: 5+5=7920 cents beats the greedy 6+4=8112.
+//        Models that take the obvious "biggest distinct group first" path
+//        get the wrong answer; correct solutions enumerate or compare. The
+//        non-canonical discount values defeat memorized Exercism solutions.
+//        Primary axis: spec_precision. See difficulty-pack/good-tests.md row 1.
+
 import { describe, it, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';

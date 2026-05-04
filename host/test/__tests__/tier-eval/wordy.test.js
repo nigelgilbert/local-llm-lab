@@ -15,6 +15,22 @@
  * }
  */
 
+// What:  Implement evaluate(query) — a tiny English-prose calculator. Inputs
+//        look like "Compute 3 added to 2 scaled by 3." and must evaluate
+//        strictly left-to-right (NO operator precedence). Operators are
+//        renamed: added to, decreased by, scaled by, divided by. Bad input
+//        throws typed errors (UnsupportedOp / MalformedInput).
+//
+// Why:   Clean monotonic tier discriminator (c21 N=3: t16 1/3, t64 3/3 —
+//        floors hard at t16, perfect at t64). Two saturation defenses are
+//        load-bearing here:
+//        1) Renamed operators force the model to read the spec rather than
+//           recall the canonical Exercism solution from training.
+//        2) Left-to-right evaluation defeats models that auto-import
+//           standard precedence; the test cases ((3+2)*3=15, not 3+(2*3)=9)
+//           punish that exact mistake.
+//        Primary axis: spec_precision. See difficulty-pack/good-tests.md row 2.
+
 import { describe, it, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';

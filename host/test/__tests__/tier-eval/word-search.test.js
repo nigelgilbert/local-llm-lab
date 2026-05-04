@@ -15,6 +15,27 @@
  * }
  */
 
+// What:  Implement locate(grid, targets, anchors) on a 40x40 word-search
+//        grid. For each target, return ALL placements where (a) the cell
+//        immediately BEFORE `begin` equals anchors[target].prefix AND
+//        (b) the cell immediately AFTER `finish` equals anchors[target].suffix.
+//        Results sorted canonically by (begin.row, begin.col); [] for
+//        targets with zero matches. One of the five targets (FROST) is
+//        deliberately constructed to have zero anchor-matching placements.
+//
+// Why:   Weak monotonic tier discriminator, debug-capacity class (c21 N=3:
+//        t16 2/3, t64 3/3 — and the single t16 fail was the SSE deadlock
+//        documented in usability-pack/memos/bridge-sse-deadlock.md, NOT a
+//        difficulty signal; true t16 fail rate is closer to 1/3). v1
+//        saturated at 7 iters; v2.1 hardens against three saturation
+//        strategies at once:
+//          1) Dual prefix+suffix anchors (a single-anchor solution misses
+//             ~half the placements).
+//          2) Array return + canonical sort (greedy first-match is wrong).
+//          3) An engineered zero-match target ([]) — null/throw shortcuts fail.
+//        Primary axis: multi_file_context (grid + anchors.json schema).
+//        See difficulty-pack/good-tests.md row 4.
+
 import { describe, it, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';

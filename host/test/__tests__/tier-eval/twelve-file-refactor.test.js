@@ -15,6 +15,28 @@
  * }
  */
 
+// What:  Refactor formatPrice across 12 source files (7 call sites threading
+//        amount/currency/locale) so every formatted string round-trips
+//        through parsePrice in format-parse.js. Locale presentation rules
+//        live in format-config.js; per-currency fraction-digit counts live
+//        in currency-config.js (JPY/KRW=0, USD/EUR/GBP/CHF/CAD/AUD=2,
+//        BHD/KWD=3). Both configs are verifier-owned — the model cannot
+//        edit them.
+//
+// Why:   Weak monotonic tier discriminator, debug-capacity class (c21 N=3:
+//        t16 2/3, t64 3/3). Two earlier versions saturated cleanly:
+//          - v1 (c1, c2): one-shot formatPrice; fully saturated.
+//          - v2 (c18): round-trip invariant added; still saturated 20 iters
+//            because the model could infer locale rules from worked examples.
+//        v3 defeats that by splitting fraction-digits off the locale and
+//        into a separate currency-config.js with non-2-decimal currencies
+//        (JPY, BHD) actually exercised. A hardcoded toFixed(2) no longer
+//        round-trips; the model must read AND merge two configs. The c19
+//        defeat path was iter-storm + claw error at t16 (4 format.js
+//        rewrites). Primary axis: multi_file_context. Lineage and saturation
+//        story live in difficulty-pack/memos/twelve-file-refactor-v2-v3-redesign.md;
+//        c21 evidence in good-tests.md row 3.
+
 import { describe, it, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';

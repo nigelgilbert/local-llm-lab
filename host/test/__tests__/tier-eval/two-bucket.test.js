@@ -15,6 +15,28 @@
  * }
  */
 
+// What:  Implement findShortestPath(vesselA, vesselB, target, primary) — a
+//        BFS over (3,8,*) and (4,7,*) bucket capacities. Allowed actions:
+//        fill, empty, pour A→B / B→A. Return {actionCount, holder, residual,
+//        path: Array<[a,b]>} for the shortest sequence reaching `target` in
+//        either bucket; return null if unsolvable. `primary` constrains the
+//        opening move (the chosen bucket gets filled first).
+//
+// Why:   Softest cell in the c21 N=3 corpus — flat across tiers (t16 2/3,
+//        t64 2/3, with one t64 285s claw-timeout on a normal path). Earlier
+//        single-rep evidence (c3+c4 t16 0-1/3, t32 3/3) suggested a clean
+//        convergence discriminator; that did not replicate at N=3, so the
+//        cell is now flagged "candidate tier-sensitivity probe pending
+//        wider-N evidence" rather than a confirmed discriminator. Kept in
+//        the pack because the saturation defenses still look principled:
+//          1) Renamed function + result keys (actionCount/holder/residual)
+//             defeat memorized Exercism solutions.
+//          2) The path: Array<[a,b]> field forces actual BFS path
+//             reconstruction, not just an action count.
+//          3) null (not throw) on unsolvable punishes copy-paste shortcuts.
+//        Primary axis: convergence. See difficulty-pack/good-tests.md row 5.
+//        Rule-3 'forbid both at same amount < target' twist deferred to v2.
+
 import { describe, it, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
