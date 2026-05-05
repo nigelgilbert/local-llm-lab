@@ -1,25 +1,35 @@
 # Tier-Eval Suite v2 — Sprint Plan
 
-**Date:** 2026-04-29
-**Status:** Sprint 0 closed. Sprint 1 closed through 1.19 (2026-05-02) and 1.21 (difficulty-extension test pack, 2026-05-04). Sprint 1.20 (t16 harness-error triage, soft gate) and 1.22 (`lib/standardTest.js` helper) remain as open follow-ups before Sprint 2.
-**Source:** Derived from `Tier-Eval Suite Improvement Plan V2` (2026-04-29) plus the Q&A below.
-**Audience:** Harness engineers continuing this work across sessions/compactions.
+**Status (2026-05-04):** Sprint 0 + Sprint 1 (through 1.21) closed. Active: **Sprint 1.5** (pre-matrix cleanup) + **1.23** (sampler ablation, owner=user). Next: **Sprint 2** (Usability Pack) → **Sprint 3** (Discrimination Matrix v1) → **Sprint 4** (Hidden Holdouts, lighter scope). The productivity grader is deferred — see §"Deferred".
+**Why the re-order:** the N=10 `watch-20260504-0254` sweep surfaced a sampler×tier confound and three harness bugs that contaminate any matrix shipped today. Detail in §"Re-ordering 2026-05-04".
 
 ---
 
 ## Plan philosophy
 
-Sprint 0 is a hard gate: rows produced before the canonical schema lands become legacy-asterisked the moment it ships.
+Same evidentiary discipline as Sprint 0 (canonical schema before any keep/drop). Ships in order:
 
-This iteration ships five things, in order:
+1. **Sprint 1.5** — pre-matrix cleanup: N=10 follow-ups, t16 harness-error class, `standardTest.js` helper, sampler ablation (1.23). Hard gate to matrix.
+2. **Sprint 2** — Usability Pack: real Mac-local bug reports as public_verifier tests.
+3. **Sprint 3** — Discrimination matrix v1 against (1.21 ∪ usability), sampler×tier confound resolved.
+4. **Sprint 4** — Hidden holdouts, one sibling per Sprint 3 `core_discriminator_candidate`.
 
-1. Phase 0 foundation — registry, manifests, decision rule, thermal policy.
-2. One overnight cross-tier screen (Phase 1A) under the new schema.
-3. Discrimination matrix v1 — screening labels only, no test drops.
-4. Productivity grader **design** + calibration set — no productivity tests in core matrix yet.
-5. Hidden-holdout policy + Stage 0–4 model-trial funnel skeleton.
+**Deferred** (not killed): productivity grader / Opus-as-judge / calibration set — re-derive when subjective grading is the bar (criteria in §"Deferred"). DOE/sampler beyond 1.23, frontier stress, new test families beyond 1.21 + Sprint 2 output.
 
-**Deferred to next iteration:** DOE/sampler comparisons, full agentive expansion, frontier stress tests, new coding test families.
+---
+
+## Re-ordering 2026-05-04 — what changed and why
+
+The N=10 `watch-20260504-0254` sweep on `experiment/better-harness-tests` @ 35911e4 (989 rows) produced findings that gate any matrix shipping today:
+
+- **Per-cell, the 1.21 pack works.** `wordy` 4→6→10, `book-store` 8→5→10, `two-bucket` 10→5→9, `word-search` 8→8→10. The aggregate t16↔t32 plateau (13.3% / 13.9% fail) is the pack pushing into hard territory.
+- **Sampler×tier confound buried in the matrix.** t16 runs `qwen35-9b-iq4xs-ctx32k-v6antiloop-pp01`; t32 runs `qwen35-9b-q5kxl-ctx64k-v7noreppen-pp01`. `book-store` and `two-bucket` t32<t16 inversions are confounded — could be sampler, tier, or both. Shipping `discrimination_matrix_v1.csv` without resolving this contaminates every t16↔t32 row. → 1.23.
+- **Three pre-matrix harness bugs.** (a) `needle-haystack@t64` ctx-overflow on 8/9 rows (relocated to `frontier/`). (b) 1.20 detector regression: 19 rows have `terminal_status='error'` + matching stderr but no relabel — inflates fail-rate denominators (concentrated on `expression-eval`). (c) Expected-attempts planner reads manifest off `main`, so `observed=9` looks "extra" instead of "short" (masked the missing `needle-haystack@t64` rep). → 1.5-N10A/B/C.
+- **Product goal first.** "Useful local claw-code on Mac SoC" (primary) + staff-scientist rigor (secondary). Real bug reports exist (U1, U2, plus roommate-sourced); they're leading indicators of fixable harness/tool bugs. Capturing them as public_verifier tests is product work the matrix's signal-to-noise benefits from.
+
+**Rejected: "drop Sprint 4."** Wrong threat model. Not training-data contamination — **own-suite overfit during the user's own tuning**. Sprint 1.19 demonstrated it: t16 37.2% → 84.6% pass-all after sampler+model swaps tuned against the visible 26-test pack, no admission gate. Sprint 4 stays, lighter scope.
+
+**Rejected: "fold productivity grader into cleanup."** Wrong category. Calibration set + two human graders is heavyweight and only earns its keep when subjective grading is the bar; today's bar is decidable pass/fail. Sprint 2 is **public_verifier only**. Grader deferred, not killed.
 
 ---
 
@@ -27,156 +37,176 @@ This iteration ships five things, in order:
 
 | Question | Decision |
 |---|---|
-| Tier emulation vs. physical hardware | Single M5 Max MBP, serial. Tier configs swapped between runs. Apple SoC family treated as homogeneous in latency/throughput until evidence shows otherwise. Three-machine parallel is not available; do not re-pitch. |
-| Schema: `hardware_id` | Dropped. One physical machine per tier. |
-| Schema: `soc_generation` | Dropped. Decorative-only on a single machine. Reintroduce `machine_label` if a second physical unit lands. |
+| Tier emulation vs. physical hardware | Single M5 Max MBP, serial. Tier configs swapped between runs. Three-machine parallel not available; do not re-pitch. |
+| Schema: `hardware_id` / `soc_generation` | Dropped. One physical machine. Reintroduce `machine_label` if a second unit lands. |
 | Canonical hardware fields | `hardware_tier` (16/32/64) + `memory_gb`. |
 | Hidden-holdout storage | `host/test/__tests__/tier-eval-hidden/` (gitignored). Stage 3 emits visible warning if missing — never silently passes. |
-| Productivity judge | `claude-opus-4-7` via Claude API. Version recorded per row. Prompt caching on system + rubric. Local model never grades itself or peers. |
-| Sprint 1 latency labeling | Mandatory: every row records latency as **single-hardware config latency**, not final product-tier latency. |
+| Productivity judge | `claude-opus-4-7` via Claude API. Version per row. Prompt caching on system + rubric. Local model never grades itself or peers. *(Implementation deferred 2026-05-04.)* |
+| Sprint 1 latency labeling | Single-hardware config latency, not final product-tier latency. |
 
----
+## Decisions captured 2026-05-04 (locked)
 
-## Sprint 0 — Phase 0 foundation (gating)
-
-**Goal:** every subsequent run lands in the registry with provenance.
-
-| # | Deliverable | Lands in |
-|---|---|---|
-| 0.1 | `run_registry.schema.json` per §6.2 minus `hardware_id`/`soc_generation`. Includes `canonical_status` enum (`canonical`/`legacy-compatible`/`legacy-asterisked`/`excluded`) and `thermal_status` enum (`clean`/`warning`/`contaminated`/`unknown`). | `host/test/lib/registry.js` + JSON schema sidecar. |
-| 0.2 | `model_config.schema.json` — 9 fields per §5.3. | `host/test/lib/`. |
-| 0.3 | `test_manifest.schema.json` — primary axis, secondary axes, suite layer (A/B/C/D), difficulty band, oracle type, known confounds, keep/drop rule. | `host/test/lib/`. |
-| 0.4 | Migrate 35 tier-eval files to declare manifest header. Test bodies untouched. | `host/test/__tests__/tier-eval/*.test.js`. |
-| 0.5 | Historical bucketing pass: every existing CSV/run gets a status. | `host/test/docs/historical_bucketing.csv`. |
-| 0.6 | §9.2 decision rule: 25 pp + non-overlapping 80% Wilson, plus `provisional_discriminator` label. | `host/test/docs/EVAL-DESIGN.md` addendum. |
-| 0.7 | Thermal telemetry hook: start/end/peak SoC temp + tokens/sec. macOS best-effort. | `host/test/lib/telemetry.js`. |
-| 0.8 | Hidden-holdout policy memo (storage path, rotation, access). **No holdouts authored.** | `host/test/docs/`. |
-| 0.9 | Productivity-grader design memo. Pinned to `claude-opus-4-7`. Calibration spec, Opus budget. **Design only.** | `host/test/docs/`. |
-
-**Sign-off gate (all four required before Sprint 1):**
-
-1. Single dry-run lands in registry with all mandatory fields.
-2. Smoke run on each tier emits `thermal_status` and a resolvable `model_config_id`.
-3. Historical bucketing index reviewed; legacy comparisons display bucket label.
-4. §9.2 decision rule signed off in writing.
-
-**Scope discipline:** no test-body edits beyond manifest headers. No new tests, graders, or model trials.
-
----
-
-## Sprint 1 — Overnight cross-tier screen (Phase 1A)
-
-**Goal:** first cross-tier signal under the new schema.
-
-| Setting | Value |
+| Question | Decision |
 |---|---|
-| `run_kind` | `overnight_screen`. |
-| Hardware | Single M5 Max MBP, serial. tier-16/32/64 by config swap. |
-| Tier coverage | Full tier-16 + tier-32. tier-64 reused from canonical-compatible historical when available + 5-test × n=5–10 anchor panel. Fallback if no compatible history: t16+t32+t64 at n=8. |
-| Tests | Existing 35-test set with manifests. No new productivity/agentive families. |
-| Sampler | One — current product/default. No v3-deterministic. |
-| n | 10/cell; drop to 8 globally if projected runtime exceeds overnight. |
-| Order | Interleave by tier × test × seed. |
-| Thermal | Telemetry only, no blanket cooldown (would consume meaningful overnight budget on serial HW). Flag warning/contaminated rows. |
-| Hard stop | If wall clock projects past next workday, finish coverage at lower n. Don't deepen any cell. |
-| Output | `screening_only=true` on every row. |
-
-**Tight-night fallback:** one test per axis from §8 Phase 1A priority subset. Substitute closest sibling if missing.
-
-**Allowed conclusions:** "candidate discriminator", "appears ceiling/floor", "axis appears tier-sensitive", "run was contaminated".
-**Forbidden conclusions:** drop a test permanently, model passes admission, definitive tier deltas, sampler comparisons.
+| Sprint 2 ↔ Sprint 3 ordering | Swap. Sprint 2 = Usability Pack; Sprint 3 = Matrix. Matrix soft-gated on Sprint 2 corpus — ships with whatever exists at matrix-time, small-N footnotes if partial. |
+| Productivity grader | Deferred indefinitely. Re-entry: `research/productivity-grader-notes.md`. |
+| Sprint 1.5 scope | Expanded. Original slate + 1.20 + 1.22 + three N=10 follow-ups (N10A done; N10B, N10C open). |
+| Sprint 1.23 — sampler ablation | One overnight N=8 cell: t16+v7-noreppen OR t32+v6-antiloop, whichever swap is cheaper. Hard gate to Sprint 3. Owner: user. |
+| Sampler×tier confound | Resolve before Sprint 3 ships any `book-store` / `two-bucket` classification. *Unanswered* is the only unacceptable outcome. |
+| Sprint 4 scope | One hidden sibling per Sprint 3 `core_discriminator_candidate` (not per Layer-B core). Quarterly rotation + Stage 0–4 funnel unchanged. |
+| Usability Pack grading | Public_verifier only. No Opus-as-judge, no human-in-loop. |
 
 ---
 
-## Sprint 1.5 — Code review + maintenance-surface audit (gate to Sprint 2)
+## Sprint 0 — Phase 0 foundation
 
-**Goal:** trim Sprint 0–1 infra before Sprint 2 makes it load-bearing.
+Closed 2026-04-29. Deliverable table: §"Sprint 0 status".
 
-**Why now:** Sprint 2's matrix builder reads the registry, manifests, and telemetry hooks. Whatever lives there at Sprint 2 kickoff becomes load-bearing for axis scorecard, confirmatory planning, productivity grader wiring, and hidden-holdout admission.
+## Sprint 1 — Overnight cross-tier screen
 
-**Deliverable:** [CODE-REVIEW.md](CODE-REVIEW.md) — one row per item with: what it is, maintenance-surface cost (the load-bearing column — not engineer-hours; we're parallel-agentic and eval-wallclock-bound), removal cost, what's lost, verdict (`keep`/`cut`/`defer-decision`).
-
-- `cut` items → follow-on engineering tasks scoped before Sprint 2.
-- `defer-decision` items → written tripwire ("revisit if X happens").
-
-**Initial slate (expandable):**
-
-| # | Item | Initial concern |
-|---|---|---|
-| 1.5.1 | 4-state `canonical_status` enum | Could be 2-state + free-text `provenance_note`. Only meaningful if downstream tooling branches on the 4 states. |
-| 1.5.2 | Thermal-watch (`pmset` hint + drift advisory) | 0/650 pmset_contaminated rows in 1.18; lab runs 24/7 under external fan. **Verdict: cut. Executed 2026-05-04.** |
-| 1.5.3 | `expected-attempts.mjs` plan-vs-diff layer | Used and earning keep; verify no dead paths. |
-| 1.5.4 | Telemetry library split (`captureThermalStatus` / `captureThroughputAdvisory`) | Couples to 1.5.2; cut as part of same follow-on. **Executed 2026-05-04.** |
-
-**Retained without review entry:** 3-schema split, Stage 0–4 funnel memo, hidden-holdout memo, productivity-grader memo. Maintenance cost ≈ 0; locking value real.
-
-**Sign-off:**
-- Every slate item has a verdict.
-- All `cut` items merged or written reason for delay.
-- All `defer-decision` items have a tripwire.
-- Schema files reflect verdicts (e.g. enum collapse → migrate or grandfather historical rows).
-
-**Out of scope:** new features; reopening §9.2, hidden-holdout, or productivity-grader policy decisions.
-
-**Envelope:** ~1 day. Per-row review parallelizable across agents.
+Closed through 1.21 (difficulty-pack landed 2026-05-04). 1.20 + 1.22 moved to Sprint 1.5 Track A. Deliverable table: §"Sprint 1 status".
 
 ---
 
-## Sprint 2 — Discrimination matrix v1 + confirmatory plan
+## Sprint 1.5 — Pre-matrix cleanup + sampler disambiguation (HARD GATE to Sprint 3)
 
-**Goal:** classify tests as screening candidates; pick which deserve confirmatory night.
+**Goal:** every input the matrix reads is honest. Three known-broken inputs (1.20 detector, expected-attempts planner, sampler confound) and one large-gain product fix (1.20 t16 harness-error class) are cheap to clear before the matrix runs.
 
-**Deliverables:**
+### Track A — test-tooling cleanup (foreground engineering)
 
-- `discrimination_matrix_v1.csv` with §8 Phase 2 columns: pass rates + Wilson CIs, point spread, credible-spread flag, monotonicity, harness-error rate, thermal-contamination rate, p90 iters/wallclock, dominant trace tags, oracle type.
-- Per-test classification (§9.2): `core_discriminator_candidate`, `provisional_discriminator`, `likely_ceiling`, `likely_floor`, `noisy_diagnostic`, `harness_contaminated`, `thermal_contaminated`. Screening-only — no keep/drop yet.
-- Confirmatory-night plan: top ~6–10 `provisional_discriminator` cells. n from §9.3 power calc against 25 pp target. Paired seeds.
-- Axis scorecard v1 (§8 Phase 3) with explicit "Not measured" for productivity. No aggregate score.
+| # | Item | What | Why now |
+|---|---|---|---|
+| 1.5.1 | `canonical_status` enum review | Original 1.5 item: 4-state enum vs. 2-state + free-text `provenance_note`. Verdict-pending. | Decide before Sprint 3 freezes downstream tooling on whichever shape we keep. |
+| 1.5.3 | `expected-attempts.mjs` dead-path verify | Original 1.5 item: confirm no unreachable branches before the 1.5 review closes. | Sprint 3 confirmatory-night planner is one of its consumers. |
+| 1.20 | t16 harness-error triage | Cluster the 28/208 t16-confirm error rows by `test_id` (source: `host/test/.claw-runtime/run_registry.t{16,32}-confirm-n4-chunk{1,2}-*.csv`). If errors cluster, fix at the protocol/parse layer. | Recovers most of the 1.19 84.6→98.3 pp gap on t16 all-attempts. Same surface as roommate-bug fixes in Sprint 2. |
+| 1.22 | `lib/standardTest.js` control-flow helper | Extract the duplicated `workspace.reset` → seed-write → `runClaw` → post-script → `writeAssertionResult` → timeout-guard → assert sequence. Fixture content stays inline. | Pre-condition for Sprint 2 test authoring at scale. Migration mechanically verifiable via `expected-attempts.mjs` diff = 0/0 on a t64 N=1 sweep before/after. Design rationale: [`standardtest-helper.md`](../standardtest-helper.md). |
+| 1.5-N10A | `needle-haystack@t64` verdict | **Already executed 2026-05-03**: relocated to `host/test/__tests__/tier-eval/frontier/needle-haystack.test.js`, dropped from `NEW_TESTS` allowlist in `explore-cycle.sh`. Memo: [`usability-pack/memos/needle-haystack-t64-inversion.md`](../usability-pack/memos/needle-haystack-t64-inversion.md). | Confirm closed and remove from any active-pack manifest assumption in Sprint 3 planner. |
+| 1.5-N10B | 1.20 detector regression audit | 19 rows in `watch-20260504-0254` have `terminal_status='error'` + stderr matching the three 1.20 patterns (`BadRequestError` + "exceeds the available context size", `InternalServerError`/`APIError` + "Context size has been exceeded") but didn't relabel. Concentrated on `expression-eval` (9 t16 / 7 t32 / 3 t64) and the t32 sampler under load. | These rows inflate fail-rate denominators that should drop out as harness errors. Sprint 3 cannot ship honest pass-rates until the relabeler covers them. |
+| 1.5-N10C | Expected-attempts planner fix | Planner reads manifest off `main`, so all 7 active 1.21 pack tests show `planned=0`; any `observed=9` looks "extra" instead of "short." Two-line fix: read manifest off the working branch (or sweep-tagged ref). | Sprint 3 confirmatory-night planning depends on this diff being trustworthy. |
 
-**Forbidden in any leadership-facing artifact:** "tier-32 scored X%".
+### Track B — sampler ablation (1.23, parallelizable; user kicks off personally)
+
+One overnight sweep cell. Runs in parallel with Track A.
+
+- **Goal:** disentangle sampler vs. tier on the `book-store` and `two-bucket` t32<t16 inversions. The matrix cannot ship classifications on those cells while the answer is unknown.
+- **Cell:** **either** (a) t16 + v7-noreppen, **or** (b) t32 + v6-antiloop. Pick whichever is cheaper to swap on current `lib/model_configs.json` — one tier swap is the work.
+- **Pack:** 1.21 pack, 7 active tests (post-needle-haystack relocation).
+- **N:** 8 per cell.
+- **Output:** registry rows tagged `ablation-sampler-1.23` (e.g. `host/test/.claw-runtime/run_registry.ablation-sampler-1.23-<datestamp>.jsonl`) plus a one-page memo at `host/test/docs/difficulty-pack/memos/sampler-ablation-1.23.md` answering "sampler or tier?" for `book-store` and `two-bucket`.
+- **Schedule:** after-hours; consumes one tier's overnight slot. Owner: user (does not block engineering on Track A).
+
+### Sprint 1.5 sign-off (all required before Sprint 3 starts)
+
+- Every Track A item resolved: verdict written, fix merged, or written tripwire ("revisit if X happens").
+- Track B memo answers the sampler/tier question for both inverted cells. Either answer is acceptable; *being unanswered* is not.
+- One re-sweep at N=8 against the 1.21 pack on `experiment/better-harness-tests` shows zero unrelabeled harness-error rows (1.5-N10B closed) and the expected-attempts diff correctly counts missing vs. extra cells (1.5-N10C closed).
+
+### Out of scope for 1.5
+
+New features. Reopening §9.2, hidden-holdout, or productivity-grader policy decisions. Model swaps or sampler tuning beyond the 1.23 ablation cell. New tests beyond what's already in the 1.21 pack.
 
 ---
 
-## Sprint 3 — Productivity grader + calibration set
+## Sprint 2 — Usability Pack (HARD GATE on 1.5; SOFT GATE to Sprint 3)
 
-**Goal:** make productivity grading credible **before** it enters the matrix. §10.3: 1–2 sprint weeks.
+**Goal:** real-world Mac-local claw-code failures captured as public_verifier tests. Each test either drives a fix or surfaces a candidate usability-axis discriminator. No Opus-as-judge.
 
-**Deliverables:**
+### Sources
 
-- Pinned judge `claude-opus-4-7`. Version per row.
-- Calibration set: ~30 examples per family across pass/fail/borderline. Start with §10.1 cheapest two: changelog summarization + email rewrite.
-- Two humans grade calibration; disagreement adjudication recorded.
-- Judge–human agreement measured; "trust at scale" threshold written.
-- Hybrid grader scaffolding (deterministic + semantic match + judge), wired to two pilot productivity tests as `run_kind=pilot`. Not in core matrix yet.
-- Prompt caching on system + rubric.
+1. [U1 — `grep_search` walks `.claw-runtime/`](../usability-pack/memos/grep-search-claw-runtime-leak.md) — 108KB log-noise payload → ctx-overflow before reasoning. Tool-selection-conditioned.
+2. [U2 — needle-haystack@t64 runtime inversion](../usability-pack/memos/needle-haystack-t64-inversion.md) — 8.6s error + SSE deadlock + harness row-loss across 3 reps.
+3. `litellm/docs/bridge-sse-deadlock.md` — SSE deadlock class on `word-search` v2.1; likely same root cause as U2's timeout.
+4. **Roommate bug reports** — in the user's head; capture is Sprint 2's first deliverable.
 
-Productivity enters Layer B core only after sprint review confirms judge–human agreement is acceptable.
+### Target & trim filters
+
+- **N target:** 6–8 tests. Generate N+3 to N+5 candidates, trim by:
+  - Reproducibility on a non-user machine.
+  - Decidable pass/fail (no human, no LLM judge).
+  - Fits `lib/standardTest.js` from 1.22 — reshape or drop otherwise.
+  - Drives a shippable fix OR is a candidate usability-axis discriminator.
+- **Done:** trimmed pack lands in `host/test/__tests__/tier-eval/usability/` with manifest headers; one N=8 sweep across t16/t32/t64 lands cleanly; fix-driving tests' fixes shipped.
+
+### Workflow
+
+1. **Capture (½d).** Drain user's head into `host/test/docs/usability-pack/bug-reports.md` (symptom, who, hardware, reproducible?). Reference U1/U2/SSE-deadlock memos; don't recopy.
+2. **Triage (½d).** Classify each entry: (i) testable + fixable, (ii) testable but fix is large, (iii) not reproducible yet, (iv) not a bug.
+3. **Author (3–5d, parallelizable).** (i) + (ii) become tests via the 1.22 helper; ship fixes for (i); mark (ii) `expected_status='known-fail'` with a TODO link.
+4. **Sweep (one overnight).** N=8 × t16/t32/t64. Per-cell table, same shape as the 1.21 N=10 table.
+5. **Trim (½d).** Drop flaky/redundant/no-signal tests. Update [`usability-pack/README.md`](../usability-pack/README.md).
+
+### Out of scope
+
+Opus-as-judge or any human-in-loop grading. Synthetic tests not grounded in a real report. Model/sampler tuning. Holdout siblings (Sprint 4, gated on Sprint 3 labels).
 
 ---
 
-## Sprint 4 — Hidden holdouts + model-trial protocol skeleton
+## Sprint 3 — Discrimination Matrix v1 + confirmatory plan (was Sprint 2)
 
-**Goal:** make §15's Stage 0–4 funnel implementable so the next model trial doesn't enter through ad-hoc tuning.
+**Goal:** classify tests as screening candidates; pick which deserve a confirmatory night.
 
-**Deliverables:**
+Same scope as the original Sprint 2 in this plan, with two changes from the 2026-05-04 re-ordering:
 
-- `host/test/__tests__/tier-eval-hidden/` created + gitignored.
-- One hidden sibling per Layer-B core test (small reserve pool), authored from §7.4 generalization patterns.
-- Rotation cadence committed in writing.
-- `host/test/run-model-trial.sh` skeleton: Stage 0 (fit/harness gate) → Stage 1 (public core) → Stage 3 (hidden admission). **Stage 2 (config tuning) stays manual.**
-- Empty/missing `tier-eval-hidden/` → Stage 3 emits visible warning, never silent pass.
+1. **Test pack is expanded.** Matrix runs against (1.21 difficulty pack ∪ Sprint 2 usability pack), not just 1.21.
+2. **Sampler×tier confound is resolved** by the 1.23 ablation memo. Per-test classifications on `book-store` / `two-bucket` cite the ablation memo for sampler-vs-tier attribution.
 
-Sprint 4 can run parallel with Sprint 3 once Sprint 0 lands.
+### Deliverables
+
+- `discrimination_matrix_v1.csv` with §8 Phase 2 columns: pass rates + Wilson CIs, point spread, credible-spread flag, monotonicity, harness-error rate, p90 iters/wallclock, dominant trace tags, oracle type. Thermal columns retired (layer cut 2026-05-04 per CODE-REVIEW §1.5.2).
+- Per-test classification (§9.2): `core_discriminator_candidate`, `provisional_discriminator`, `likely_ceiling`, `likely_floor`, `noisy_diagnostic`, `harness_contaminated`. Screening-only — no keep/drop yet.
+- Confirmatory-night plan: top ~6–10 `provisional_discriminator` cells. N from §9.3 power calc against 25 pp target. Paired seeds.
+- Axis scorecard v1 (§8 Phase 3) with explicit "Not measured" for productivity. New `local_usability` axis if Sprint 2 produced enough material; otherwise "Not measured" with a footnote pointing at the in-flight Sprint 2.
+- **No aggregate score.**
+
+### Forbidden in any leadership-facing artifact
+
+"Tier-32 scored X%". Aggregate scores. Statements that bundle the sampler×tier confound back together post-1.23-resolution.
+
+---
+
+## Sprint 4 — Hidden Holdouts + model-trial protocol skeleton
+
+**Goal:** make §15's Stage 0–4 funnel implementable so the next model trial doesn't enter through ad-hoc tuning. Threat model: own-suite overfit (see §Re-ordering "Rejected: drop Sprint 4"), not training-data contamination.
+
+### Deliverables
+
+- `host/test/__tests__/tier-eval-hidden/` (gitignored, per 0.8 memo).
+- One hidden sibling per Sprint 3 `core_discriminator_candidate`.
+- `host/test/run-model-trial.sh`: Stage 0 (fit/harness) → Stage 1 (public core) → Stage 3 (hidden admission). Stage 2 (config tuning) stays manual.
+- Empty `tier-eval-hidden/` → Stage 3 emits visible warning, never silent pass.
+
+Sibling authoring blocked on Sprint 3 labels; directory + Stage skeleton + warning land independently in parallel with Sprint 3.
+
+---
+
+## Deferred — Productivity Grader (Opus-as-judge)
+
+The original Sprint 3 (calibration set, two human graders, agreement threshold, hybrid grader scaffolding) is **deferred indefinitely**, not killed.
+
+### Re-derivation criteria
+
+Re-open this sprint when *any* of the following becomes true:
+
+- A stakeholder asks "is this output actually helpful?" on a non-decidable task.
+- Sprint 2's usability pack hits a wall where pass/fail no longer captures the signal worth measuring.
+- A model trial reaches Stage 3 admission and the gate criterion needs subjective grading rather than decidable pass/fail.
+
+### Re-entry point
+
+`research/productivity-grader-notes.md` (moved 2026-05-01) holds the original design. Re-derivation should re-validate the design against whatever circumstance triggered the re-open — the original assumptions (Opus-4-7 pinned, calibration ~30 examples per family, two human graders) may no longer fit the new context.
+
+### Locked decisions that survive deferral
+
+The 2026-04-29 row "Productivity judge: `claude-opus-4-7` via Claude API; version recorded per row; prompt caching on system + rubric; local model never grades itself or peers" stays locked. If Opus-4-7 is retired before re-derivation, update to the then-current frontier Anthropic model and re-pin.
 
 ---
 
 ## Out of scope for this iteration
 
-- Sampler/prompt DOE (§14.3) — needs baseline matrix first.
-- New coding test families from §12.
-- Frontier/stress suite (Layer D).
-- Multi-physical-machine thermal isolation beyond telemetry + flagging.
-- Public leadership-facing scorecard. All output this iteration is internal R&D evidence.
+- Sampler/prompt DOE (§14.3) beyond 1.23 — needs the matrix first.
+- New coding test families from §12; frontier/stress suite (Layer D).
+- Multi-physical-machine isolation (thermal layer cut 2026-05-04).
+- Public leadership-facing scorecard — all output is internal R&D evidence.
 
 ---
 
@@ -184,32 +214,35 @@ Sprint 4 can run parallel with Sprint 3 once Sprint 0 lands.
 
 | Sprint | Wall clock | Notes |
 |---|---|---|
-| 0 | 1.5–2 weeks | Schema + migration + manifest tagging is long pole. |
-| 1 | 1 night + 1 day analysis | Triggered on Sprint 0 sign-off. |
-| 2 | 3–5 days + 1 confirmatory night. | |
-| 3 | 1.5–2 weeks | Gated on human reviewer availability. |
-| 4 | 1 week | Parallel with Sprint 3. |
+| 0 | done | 1.5–2 weeks (closed 2026-04-29). |
+| 1 | done | Closed through 1.21 (2026-05-04). |
+| 1.5 (Track A + Track B) | ~3–5 days | Track A foreground. Track B (1.23) one overnight, parallel, owner=user. |
+| 2 (Usability Pack) | 1.5–2 weeks | Capture (½d) + triage (½d) + author (3–5d, parallel) + sweep (1 overnight) + trim (½d). |
+| 3 (Matrix) | 3–5 days + 1 confirmatory night | Gated on 1.5 + 1.23. Soft-gated on Sprint 2 corpus. |
+| 4 (Holdouts) | 1 week | Parallel with Sprint 3. Sibling authoring blocked until Sprint 3 labels exist. |
 
-Total: ~5–6 weeks if 3+4 overlap. §9.3 caveat: `n=40` is a starting point, not a power guarantee — recompute per comparison.
+Total: ~3–4 weeks from 2026-05-04 if Sprint 2 and Sprint 3 don't overlap, ~3 weeks if Sprint 4 sibling-authoring overlaps Sprint 3's confirmatory-night write-up.
+
+§9.3 caveat unchanged: `n=40` is a starting point, not a power guarantee — recompute per comparison.
 
 ---
 
 ## Resume cheatsheet (for fresh sessions / post-`/compact`)
 
-1. Sections 1–2 = strategic frame + locked decisions.
-2. Check §"Sprint 0 status" / "Sprint 1 status" for current position.
-3. Sprint 0 is the only sprint that can run before any tests are written. Don't skip ahead.
-4. If Sprint 0 partially done, resume at lowest-numbered incomplete deliverable.
-5. Verify Sprint 0 sign-off gate before any sweep.
-6. Hardware is **single M5 Max MBP, serial.** Three-machine parallel is not available. Don't re-pitch.
+- **Current work:** Sprint 1.5 (Track A engineering) + 1.23 (Track B sampler ablation, owner=user). Everything before 1.5 is closed history.
+- **Hard gates to Sprint 3:** all of 1.5 Track A closed AND 1.23 memo written.
+- **Soft gate to Sprint 3:** Sprint 2 corpus — matrix ships with whatever exists at matrix-time.
+- **Sprint 2 = Usability Pack** (public_verifier, no Opus judge). **Sprint 3 = Matrix.** Productivity grader deferred (re-entry criteria in §Deferred).
+- **Hardware: single M5 Max MBP, serial.** Three-machine parallel not available — do not re-pitch.
 
 **Repo landmarks:**
-- Tier-eval tests: `host/test/__tests__/tier-eval/` (35 files; 26 emit-eligible post-trim 1.16c)
-- Runner library: `host/test/lib/` (`claw.js`, `tier.js`, `model.js`, `backend.js`, `bridge.js`, `workspace.js`, `telemetry.js`, `run_row.js`, `registry.js`, `model_config.js`, `test_manifest.js`)
-- Entry script: `host/test/run-tier-eval.sh`
-- Overnight wrapper: `host/test/scripts/run-overnight-screen.sh`
-- W1 sidecar: `/workspace/.claw-runtime/<run-id>/`
-- Adjacent docs: `EVAL-DESIGN.md`, `EVAL-CALIBRATION-REPORT.md`, `NEW-EVALS-REPORT.md`, `TIER-EVAL-MEMO-20260428-*.md`
+- Active tests: `host/test/__tests__/tier-eval/` — 1.21 difficulty-pack active; `frontier/needle-haystack.test.js` parked.
+- Sprint 2 lands at: `host/test/__tests__/tier-eval/usability/`.
+- Sprint 4 hidden siblings: `host/test/__tests__/tier-eval-hidden/` (gitignored, empty until Sprint 3 labels).
+- Runner library: `host/test/lib/` — `claw.js`, `tier.js`, `model.js`, `backend.js`, `bridge.js`, `workspace.js`, `run_row.js`, `registry.js`, `model_config.js`, `test_manifest.js`. `telemetry.js` cut 2026-05-04. 1.22 lands `standardTest.js`.
+- Entry: `host/test/run-tier-eval.sh`. Overnight wrapper: `host/test/scripts/run-overnight-screen.sh`. W1 sidecar: `/workspace/.claw-runtime/<run-id>/`.
+- Adjacent docs: `EVAL-DESIGN.md`, `EVAL-CALIBRATION-REPORT.md`, `NEW-EVALS-REPORT.md`, `TIER-EVAL-MEMO-20260428-*.md`, `usability-pack/memos/*.md`, `difficulty-pack/README.md`.
+- Plan-mode record: `~/.claude/plans/let-s-get-thru-this-cheerful-dragonfly.md`.
 
 ---
 
@@ -224,14 +257,16 @@ Total: ~5–6 weeks if 3+4 overlap. §9.3 caveat: `n=40` is a starting point, no
 | 0.5 | `historical_bucketing.csv` | **done** — 9 rows. 120-row prod CSV `legacy-compatible` (assumes `hardware_tier=64`, `oracle_type=public_verifier`, `thermal_status=unknown`, backfilled `model_config_id`). 2026-04-28 archive `legacy-asterisked`. W4 indices + 0-row partial-sweep `excluded`. ~351 `.claw-runtime/` dirs `legacy-compatible`. |
 | 0.6 | EVAL-DESIGN addendum | **done** — codifies two-stage screen-then-confirm, 25 pp + 80% Wilson rule, seven discrimination labels (incl. `provisional_discriminator`), power-derived-N for admission, prohibition on aggregate scores externally. Existing eight-rules section unchanged. |
 | 0.7 | Thermal telemetry | **done (library-only), then cut 2026-05-04** — built and shipped through 1.18; cut per CODE-REVIEW §1.5.2 after 0/650 contamination signal. Schema columns + `lib/telemetry.js` + `scripts/thermal-watch.sh` removed; thermal layer no longer exists. |
-| 0.8 | Hidden-holdout policy | **done** — `docs/HIDDEN-HOLDOUT-POLICY.md`. Storage `host/test/__tests__/tier-eval-hidden/` (gitignored), naming `<public_test_id>-h`, quarterly rotation, ≥2 per-axis reserve, retire-on-suspicion, no-leak reporting, Sprint-4 Stage-3 contract (visible warning + `admission_status=skipped` if empty — silent passes forbidden). No holdouts yet. |
-| 0.9 | Productivity-grader notes | **moved to research/** (2026-05-01) — `research/productivity-grader-notes.md`. Not commitment material; re-derive when a real productivity-grading need arises. |
+| 0.8 | Hidden-holdout policy | **done** — `docs/HIDDEN-HOLDOUT-POLICY.md`. Storage `host/test/__tests__/tier-eval-hidden/` (gitignored), naming `<public_test_id>-h`, quarterly rotation, ≥2 per-axis reserve, retire-on-suspicion, no-leak reporting, Sprint-4 Stage-3 contract (visible warning + `admission_status=skipped` if empty — silent passes forbidden). No holdouts yet. *(2026-05-04: per-axis reserve tightened to "one sibling per Sprint 3 `core_discriminator_candidate`" pending matrix labels.)* |
+| 0.9 | Productivity-grader notes | **moved to research/** (2026-05-01) — `research/productivity-grader-notes.md`. Not commitment material; re-derive when a real productivity-grading need arises. *(2026-05-04: status unchanged — grader formally deferred.)* |
 
 **Sign-off — all four met 2026-04-29:** dry-run lands fully-populated row; smoke emits `thermal_status` + resolvable `model_config_id` (3 tier baselines in `lib/model_configs.json`: t16 Qwen2.5-7B Q5_K_M, t32 Qwen3-14B Q4_K_M, t64 Qwen3.6-35B-A3B UD-Q4_K_XL); historical bucketed; decision rule written. `/tmp/sprint1-smoke.mjs` 28/28 in `node:24-bookworm-slim`.
 
 ---
 
-## Sprint 1 status (live)
+## Sprint 1 status (closed through 1.21)
+
+1.20 and 1.22 originally listed as "planned" under Sprint 1; the 2026-05-04 re-ordering moves their execution into Sprint 1.5 Track A. Status rows below reflect the move; the historical context (why each was queued in the first place) is preserved.
 
 | # | Deliverable | Status |
 |---|---|---|
@@ -247,19 +282,20 @@ Total: ~5–6 weeks if 3+4 overlap. §9.3 caveat: `n=40` is a starting point, no
 | 1.9 | Multi-tier confirmatory (16→32→64, EVAL_REPS=1) | **done** 2026-04-29 — 80 min wallclock, plist swaps clean (t32 cold-load 4s, t64 cold-load 6s). 32 rows: t16 9 (2P/7F), t32 11 (3P/8F), t64 12 (12P/0F). Auto-emit fired on every `runClaw` test calling `writeAssertionResult`. Six perfect FAIL→FAIL→PASS discriminators (`csv-parser`, `deep-equal`, `eight-functions`, `large-refactor`, `lru-cache`, `tool-confusion-redundant-verifies`). One ceiling/floor (`agent-single` PASS at all 3 tiers). Throughput-drift fired 4/9 t16 vs 1/12 t64 — likely real warmup-pattern signal on smaller models. |
 | 1.10 | Coverage gap fix: 23/35 tests didn't call `writeAssertionResult` | **done** 2026-04-29 — added emit to 20 emit-eligible tests (every `runClaw` test except 3 streamMessage-exempt: `latency`, `tool-discipline`, `prose-quality`). Pattern: compute `passed` from `r.code===0` AND target-file-exists AND post-script `status===0`; insert before assert chain so failed test still produces row. Tier-64 smoke: 31 rows (vs 12 in 1.9), all pass on t64, manifest joins clean. `mini-vm` missing — claw timed out at 240s → addressed by 1.13. Throughput-drift `contaminated` fired 5/31 on cleanest tier — threshold tuning still pending. |
 | 1.11 | Wrapper CSV export bug | **fixed** — `run-overnight-screen.sh` called `node` directly on host (not installed). Switched to `docker run --rm node:24-bookworm-slim`. JSONL is authoritative; warning didn't fail sweep. |
-| 1.12 | Demote drift-only thermal flags to advisory | **done** 2026-04-29 — `lib/telemetry.js` split: `captureThroughputSignal` → `captureThroughputAdvisory` returning `{advisory, drop_pct, ...}`. `combineStatuses` removed. `PMSET_LEVELS` rename `contaminated` → `pmset_contaminated`. `lib/run_row.js`: `thermal_status = thermalHint.status` (pmset only); new `thermal_drift_advisory` boolean column. Schema enum `{clean, warning, pmset_contaminated, unknown}` + `thermal_drift_advisory: boolean`. `/tmp/sprint1-12-smoke.mjs` 10/10. |
+| 1.12 | Demote drift-only thermal flags to advisory | **done** 2026-04-29 — `lib/telemetry.js` split: `captureThroughputSignal` → `captureThroughputAdvisory` returning `{advisory, drop_pct, ...}`. `combineStatuses` removed. `PMSET_LEVELS` rename `contaminated` → `pmset_contaminated`. `lib/run_row.js`: `thermal_status = thermalHint.status` (pmset only); new `thermal_drift_advisory` boolean column. Schema enum `{clean, warning, pmset_contaminated, unknown}` + `thermal_drift_advisory: boolean`. `/tmp/sprint1-12-smoke.mjs` 10/10. *(Layer cut 2026-05-04 per CODE-REVIEW §1.5.2.)* |
 | 1.13 | Timeout-as-row + schema loosening | **done** 2026-04-29 — `runClaw` resolves with `{code: null, signal: null, timeout: true, terminal_status: 'timeout', ...}` instead of rejecting. `maybeEmitRegistryRow` propagates `code: null`. No schema change needed: `passed` already `[boolean, null]`, `terminal_status` enum already had `timeout` + `harness_error`. Tests reach `writeAssertionResult` even on timeout; assertion fires after; row lands. |
-| 1.14 | Expected-attempts manifest + diff | **done** 2026-04-29 — `scripts/expected-attempts.mjs` (`plan` + `diff`). Eligibility: tier-eval test imports `writeAssertionResult` (excludes `latency`, `prose-quality`, `tool-discipline`). 32 emit-eligible. Wrapper writes `expected_attempts.<sweep>.csv` pre-sweep, runs `diff` post-sweep, tee'd to `.diff.txt`. Non-zero exit = divergence. Self-validated against 1.10 JSONL: correctly flagged `mini-vm tier=64 rep=1`. |
+| 1.14 | Expected-attempts manifest + diff | **done** 2026-04-29 — `scripts/expected-attempts.mjs` (`plan` + `diff`). Eligibility: tier-eval test imports `writeAssertionResult` (excludes `latency`, `prose-quality`, `tool-discipline`). 32 emit-eligible. Wrapper writes `expected_attempts.<sweep>.csv` pre-sweep, runs `diff` post-sweep, tee'd to `.diff.txt`. Non-zero exit = divergence. Self-validated against 1.10 JSONL: correctly flagged `mini-vm tier=64 rep=1`. *(2026-05-04: planner-reads-main bug filed as Sprint 1.5 item N10C.)* |
 | 1.15 | Short-timeout smoke for 1.13 | **done** 2026-04-29 — `/tmp/sprint1-15-smoke.mjs` with `timeoutMs=1500`. 10/10: no throw, `code=null`, `timeout=true`, `terminal_status='timeout'`, row lands with `passed=false`, `thermal_drift_advisory: boolean`. |
 | 1.16a | Timeout assertion guard | **done** 2026-04-29 (`629714d`) — 1.13 produced misleading `null !== 0` runner output on legitimate timeout rows (registry row was correct because emit ran first). Inserted `if (r.terminal_status === 'timeout') assert.fail(...)` ahead of existing `assert.equal(r.code, 0, …)` in 32 files via Python regex sweep. Verified by smoke (`smoke-sprint1-16-20260429-2221`, 26/26 t64 n=1, 1 timeout row produced clean message). |
-| 1.16b | `iters_count` registry enrichment | **done** 2026-04-29 (`629714d`) — `run_row.js` emits `iters_count: iterRecords.length` on every row (records already loaded for drift-advisory). Schema added `iters_count` (int, ≥0) — feeds Sprint 2 §8's "p90 iters/wallclock". Distribution: 4×12, 5×6, 6×2, 7×2, 9×2, 13×1, 19×1 across 26 cells. With `end_time - start_time` gives per-cell wallclock + iter p90s. |
+| 1.16b | `iters_count` registry enrichment | **done** 2026-04-29 (`629714d`) — `run_row.js` emits `iters_count: iterRecords.length` on every row (records already loaded for drift-advisory). Schema added `iters_count` (int, ≥0) — feeds Sprint 3 §8's "p90 iters/wallclock". Distribution: 4×12, 5×6, 6×2, 7×2, 9×2, 13×1, 19×1 across 26 cells. With `end_time - start_time` gives per-cell wallclock + iter p90s. |
 | 1.16c | Suite trim | **done** 2026-04-29 (`629714d`) — pilot n=3 (`overnight-eval8-20260429-1803`, 288 rows) flagged 6 ceiling/floor tests. Renamed to `*.test.js.skip` (preserves source, hides from Vitest discovery): `agent-parallel`, `agent-single`, `code-self-test`, `distractor`, `null-default` (likely_ceiling, 9/9 across all 3 tiers); `mini-vm` (likely_floor, 0/9 t16/t32, t64 timed out at 360s). Saved ~1.6h on deep run. **26 emit-eligible tests remain.** Re-validated: 26 × 3 × 8 = 624 cells. |
 | 1.17 | Pilot n=3 (`overnight-eval8-20260429-1803`) | **done** 2026-04-29 — 288 rows = 3 reps × 3 tiers × 32 emit-eligible (pre-trim). Wilson 95% CIs: t16 41.7% [32.3, 51.7], t32 39.6% [30.4, 49.6], t64 94.8% [88.4, 97.8]. **t16↔t32 plateau real** (CIs overlap massively); t64 cleanly separated. Stopped after rep 3 on graceful boundary. |
 | 1.18 | Deep n=8 (`eval8-trimmed-20260429-2240`) | **done** 2026-04-30 — 650 rows (624 planned + 26 over-emission on t16 from split kickoff → effectively n=9 t16, n=8 t32/t64). `expected-attempts` diff: 0 missing. Wilson 95% CIs: t16 37.2% [31.2, 43.5], t32 31.2% [25.3, 37.8], t64 98.6% [95.8, 99.5]. Done-only: t16 46.3%, t32 33.5%, t64 100%. **Discrimination matrix:** 16/26 t32↔t64, 14/26 t16↔t64, only 3/26 t16↔t32 (`dependency-graph` + `long-horizon-bugs` t16-favored; `parseISO-with-timezone` t32-favored). Wallclock p50/p90: t16 30.4s/224s, t32 24.7s/135s, t64 10.2s/37s — t64 3× faster median, 6× faster p90. **Thermal: 0/650 pmset_contaminated**; drift advisory 31% / 26% / 20% (smaller models thrash more, expected). **Headline:** t32 (Qwen3-14B Q4) does *not* Pareto-dominate t16 (Qwen2.5-7B Q5) — t16 wins on done-only. Bipolar per-test: t16 wins on algorithmic/long-horizon, t32 wins on structured-spec-following. Real model-selection finding worth surfacing in the manifesto. |
-| 1.19 | Tier-32 param-tuning + model swap; tier-16 model swap | **done** 2026-05-02 — model swap landed on both tiers (Qwen3.5-9B unified base) after sweeps 1–4. **Lock-ins:** t16 = `qwen35-9b-iq4xs-ctx32k-v6antiloop-pp01` (cell E), t32 = `qwen35-9b-q5kxl-ctx64k-v7noreppen-pp01` (cell B2). Old baselines `qwen25-7b-instruct-q5km-ctx32k-v1prod-pp01` / `qwen3-14b-q4km-ctx32k-v1prod-pp01` flipped to archived in `lib/model_configs.json`. **Confirm N=8 (208 attempts each, 4×N=4 chunks per tier):** t16 84.6% pass-all / 98.3% done-only; t32 88.9% pass-all / 99.5% done-only. vs 1.18 baseline: t16 +47.4 pp pass-all / +52.0 pp done-only; t32 +57.7 pp / +66.0 pp. **1.18 t16↔t32 Pareto inversion is closed** — t32 now cleanly dominates t16 on both metrics; manifesto framing of t32 as "instruction-following tier that doesn't dominate" must be revised before Sprint 2 ships. Failure modes shifted: t16 bottlenecked by harness-error rate (13.5%), t32 by 64k-context timeouts (7.7%). Both tiers now hit the 26-test pack ceiling — discrimination matrix needs a harder pack before Sprint 2 (see [`difficulty-pack/memos/n8-confirm-vs-baseline.md`](difficulty-pack/memos/n8-confirm-vs-baseline.md)). Source rows: `host/test/.claw-runtime/run_registry.t{16,32}-confirm-n4-chunk{1,2}-*.csv`. |
-| 1.20 | t16 harness-error triage | **planned** — N=8 confirm showed t16 failures dominated by 28/208 = 13.5% harness errors (vs 0.5% timeouts and 1.7% content fails); t32 already at 2.9% harness-error rate. Cluster the 28 t16-confirm rows by `test_id` (source: `run_registry.t16-confirm-n4-chunk{1,2}-*.csv`); if errors cluster, fix at the protocol/parse layer to recover most of the 84.6 → 98.3 pp gap on all-attempts. **Soft gate** for Sprint 2 — matrix can ship with a t16 harness-error footnote, but cheap to clear first (hours, parallelizable with 1.5 cuts). Per the 2026-05-02 N=8 memo "Recommended next actions" item 2. |
-| 1.21 | Difficulty-extension test pack | **done** 2026-05-04 — N=3 pilot over 4 cycles. Final: 6 core (`book-store`, `wordy`, `word-search`, `two-bucket`, `twelve-file-refactor`, `ini-parser`); 4 frontier (`alphametics`, `forth`, `semver-range`, `needle-haystack`); 3 dropped. New R9 ctx-efficiency axis from c3 — keep-band now "pass-rate cells ∪ R9-A cells, ≥6" (met). **Hard gate for Sprint 2 cleared.** Retrospective: [`difficulty-pack/README.md`](difficulty-pack/README.md). |
-| 1.22 | `lib/standardTest.js` control-flow helper | **planned** — Extract the duplicated `workspace.reset` → seed-write → `runClaw` → post-script → `writeAssertionResult` → timeout-guard → assert sequence into a single helper. Fixture *content* stays inline (license/contamination posture). Evidence the duplication is technical debt: Sprint 1.10 added `writeAssertionResult` to 20 tests one-by-one; Sprint 1.16a applied the timeout-guard fix across 32 files via Python regex sweep. Migration mechanically verifiable via `expected-attempts.mjs` diff = 0/0 on a t64 N=1 sweep before/after. **Soft gate** for any sprint touching all tier-eval test bodies; **hard gate** before any new control-flow concern (per-test wallclock cap, retry policy, etc.) lands. Deferred from 1.21 to avoid helper API churn during difficulty-pack authoring; design rationale in [`standardtest-helper.md`](standardtest-helper.md). |
+| 1.19 | Tier-32 param-tuning + model swap; tier-16 model swap | **done** 2026-05-02 — model swap landed on both tiers (Qwen3.5-9B unified base) after sweeps 1–4. **Lock-ins:** t16 = `qwen35-9b-iq4xs-ctx32k-v6antiloop-pp01` (cell E), t32 = `qwen35-9b-q5kxl-ctx64k-v7noreppen-pp01` (cell B2). Old baselines `qwen25-7b-instruct-q5km-ctx32k-v1prod-pp01` / `qwen3-14b-q4km-ctx32k-v1prod-pp01` flipped to archived in `lib/model_configs.json`. **Confirm N=8 (208 attempts each, 4×N=4 chunks per tier):** t16 84.6% pass-all / 98.3% done-only; t32 88.9% pass-all / 99.5% done-only. vs 1.18 baseline: t16 +47.4 pp pass-all / +52.0 pp done-only; t32 +57.7 pp / +66.0 pp. **1.18 t16↔t32 Pareto inversion is closed** — t32 now cleanly dominates t16 on both metrics; manifesto framing of t32 as "instruction-following tier that doesn't dominate" must be revised before Sprint 3 ships. Failure modes shifted: t16 bottlenecked by harness-error rate (13.5%), t32 by 64k-context timeouts (7.7%). Both tiers now hit the 26-test pack ceiling — discrimination matrix needs a harder pack before Sprint 3 (see [`difficulty-pack/memos/n8-confirm-vs-baseline.md`](../difficulty-pack/memos/n8-confirm-vs-baseline.md)). Source rows: `host/test/.claw-runtime/run_registry.t{16,32}-confirm-n4-chunk{1,2}-*.csv`. **2026-05-04: this sweep is also the case for Sprint 4 hidden holdouts — tuning landed gain with no admission gate.** |
+| 1.20 | t16 harness-error triage | **moved to Sprint 1.5 Track A** (was "planned" under Sprint 1) — N=8 confirm showed t16 failures dominated by 28/208 = 13.5% harness errors (vs 0.5% timeouts and 1.7% content fails); t32 already at 2.9% harness-error rate. Cluster the 28 t16-confirm rows by `test_id` (source: `run_registry.t16-confirm-n4-chunk{1,2}-*.csv`); if errors cluster, fix at the protocol/parse layer to recover most of the 84.6 → 98.3 pp gap on all-attempts. Per the 2026-05-02 N=8 memo "Recommended next actions" item 2. |
+| 1.21 | Difficulty-extension test pack | **done** 2026-05-04 — N=3 pilot over 4 cycles. Final: 6 core (`book-store`, `wordy`, `word-search`, `two-bucket`, `twelve-file-refactor`, `ini-parser`); 4 frontier (`alphametics`, `forth`, `semver-range`, `needle-haystack`); 3 dropped. New R9 ctx-efficiency axis from c3 — keep-band now "pass-rate cells ∪ R9-A cells, ≥6" (met). **N=10 follow-up sweep `watch-20260504-0254`:** 989 rows, per-cell discrimination clean (`wordy` 4/6/10, `book-store` 8/5/10, `two-bucket` 10/5/9, `word-search` 8/8/10), three pre-matrix fixes filed (see Sprint 1.5 N10A/B/C), sampler×tier confound surfaced (filed as 1.23). Retrospective: [`difficulty-pack/README.md`](../difficulty-pack/README.md). |
+| 1.22 | `lib/standardTest.js` control-flow helper | **moved to Sprint 1.5 Track A** (was "planned" under Sprint 1) — Extract the duplicated `workspace.reset` → seed-write → `runClaw` → post-script → `writeAssertionResult` → timeout-guard → assert sequence into a single helper. Fixture *content* stays inline (license/contamination posture). Evidence the duplication is technical debt: Sprint 1.10 added `writeAssertionResult` to 20 tests one-by-one; Sprint 1.16a applied the timeout-guard fix across 32 files via Python regex sweep. Migration mechanically verifiable via `expected-attempts.mjs` diff = 0/0 on a t64 N=1 sweep before/after. **Hard gate** before Sprint 2 test authoring (which lands ~6–8 new tests at scale). Design rationale in [`standardtest-helper.md`](../standardtest-helper.md). |
+| 1.23 | Sampler ablation (new) | **planned, Sprint 1.5 Track B** — One overnight cell at N=8 on the 1.21 pack: either t16+v7-noreppen OR t32+v6-antiloop. Output: `host/test/.claw-runtime/run_registry.ablation-sampler-1.23-<datestamp>.jsonl` + memo at `host/test/docs/difficulty-pack/memos/sampler-ablation-1.23.md`. Hard gate to Sprint 3 matrix shipping `book-store` / `two-bucket` classifications. Owner: user (kicks off personally). |
 
 **Sprint 1 entry criteria for the real overnight (met 2026-04-29):**
 
