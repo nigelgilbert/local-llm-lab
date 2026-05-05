@@ -43,6 +43,7 @@ function parseArgs(argv) {
     else if (k === '--tiers') opts.tiers = a[++i];
     else if (k === '--reps') opts.reps = parseInt(a[++i], 10);
     else if (k === '--out') opts.outPath = a[++i];
+    else if (k === '--filter') opts.filter = a[++i];
     else if (k === '--expected') opts.expectedPath = a[++i];
     else if (k === '--registry') opts.registryPath = a[++i];
     else if (k === '--help' || k === '-h') { printHelp(); process.exit(0); }
@@ -53,7 +54,7 @@ function parseArgs(argv) {
 
 function printHelp() {
   console.error(`Usage:
-  node expected-attempts.mjs plan --tests-dir <dir> --tiers "16 32 64" --reps 8 --out <csv>
+  node expected-attempts.mjs plan --tests-dir <dir> --tiers "16 32 64" --reps 8 --out <csv> [--filter "id1 id2 ..."]
   node expected-attempts.mjs diff --expected <csv> --registry <jsonl>`);
 }
 
@@ -86,7 +87,13 @@ function planCmd(opts) {
   for (const t of tiers) {
     if (![16, 32, 64].includes(t)) throw new Error(`invalid tier: ${t}`);
   }
-  const tests = listEligibleTests(opts.testsDir);
+  let tests = listEligibleTests(opts.testsDir);
+  if (opts.filter) {
+    const want = new Set(opts.filter.trim().split(/\s+/).filter(Boolean));
+    const missing = [...want].filter((s) => !tests.includes(s));
+    if (missing.length) throw new Error(`--filter mentions unknown test(s): ${missing.join(', ')}`);
+    tests = tests.filter((s) => want.has(s));
+  }
   if (tests.length === 0) throw new Error(`no emit-eligible tests under ${opts.testsDir}`);
 
   const lines = [HEADER];

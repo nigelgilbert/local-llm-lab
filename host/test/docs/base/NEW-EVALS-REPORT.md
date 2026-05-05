@@ -121,4 +121,4 @@ That's broadly confirmed, with two surprises:
 
 ## Files
 
-All 11 new tests live in [host/test/__tests__/tier-eval/](../__tests__/tier-eval/). Each follows the same shape as the existing tests: seed workspace → run claw → exec a `node verify.js` post-condition.
+All 11 new tests live in [host/test/__tests__/tier-eval/](../../__tests__/tier-eval/). Each follows the same shape as the existing tests: seed workspace → run claw → exec a `node verify.js` post-condition.

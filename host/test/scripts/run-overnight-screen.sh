@@ -20,10 +20,9 @@
 # pattern is acceptable — see plan §4 "Allowed conclusions."
 #
 # Pre-flight (operator):
-#   1. Start `host/test/scripts/thermal-watch.sh` in another terminal.
-#   2. Confirm the bridge is up and the model GGUFs for all requested
+#   1. Confirm the bridge is up and the model GGUFs for all requested
 #      tiers are on disk (this script's preflight checks them).
-#   3. Confirm the working tree is at the SHA you want recorded as
+#   2. Confirm the working tree is at the SHA you want recorded as
 #      harness_version — no rebuilds mid-sweep.
 #
 # Usage:
@@ -31,10 +30,15 @@
 #   EVAL_TIERS="16 32" EVAL_REPS=8 host/test/scripts/run-overnight-screen.sh
 #
 # Env knobs:
-#   EVAL_TIERS    space-separated tiers (default: "16 32 64")
-#   EVAL_REPS     full-suite passes per tier (default: 10)
-#   SWEEP_LABEL   subdir suffix under .claw-runtime/ (default: a timestamp)
-#   DRY_RUN       1 = print plan + tier installs but do not run claw
+#   EVAL_TIERS                   space-separated tiers (default: "16 32 64")
+#   EVAL_REPS                    full-suite passes per tier (default: 10)
+#   SWEEP_LABEL                  subdir suffix under .claw-runtime/ (default: a timestamp)
+#   DRY_RUN                      1 = print plan + tier installs but do not run claw
+#   AUTO_REBUILD                 1 (default) = rebuild mac-llm-lab-test:local if any
+#                                input under host/test/{Dockerfile,package.json,lib,
+#                                __tests__,entrypoint.sh} is newer than the image.
+#                                0 = refuse with rebuild instructions instead.
+#   SKIP_IMAGE_FRESHNESS_CHECK   1 = bypass the freshness check entirely (use with care).
 
 set -eu
 
@@ -82,6 +86,81 @@ docker image inspect mac-llm-lab-test:local >/dev/null 2>&1 \
 curl -fsS "$BRIDGE_HEALTH" >/dev/null 2>&1 \
   || err "bridge unreachable at $BRIDGE_HEALTH — start it: (cd $REPO_DIR/host/litellm && docker compose up -d)"
 
+# ---- image freshness check (Sprint 1.21 cycle-4 postmortem) ----
+# Test code is COPYed into mac-llm-lab-test:local at build time, NOT mounted.
+# c4 ran with a pre-corrective-work image because the operator (me) forgot to
+# rebuild after editing tests; result: cascade-eight checksum gate + two-bucket
+# revert silently did not run. RUN_REGISTRY_HARNESS_VERSION on rows is the
+# host's git rev, not the image's, so the misalignment is invisible until
+# forensics. Refuse (or auto-rebuild) when any input baked into the Dockerfile
+# (Dockerfile, package.json, lib/, __tests__/, entrypoint.sh) is newer than
+# the last successful build through this script.
+#
+# Implementation: a marker file (.image-fresh-marker) is `touch`ed after every
+# successful rebuild. We compare input mtimes against the marker, not against
+# the image's docker-reported `.Created`, because BuildKit is content-hash
+# cached: a `touch` of a file with unchanged bytes produces a no-op rebuild
+# and the image's `Created` timestamp does NOT advance. The marker sidesteps
+# that. If the marker is missing (first run, or operator built manually
+# outside this script), we rebuild conservatively — cheap when cache is warm.
+#
+# Caveat: this does NOT cover the claw-code:local upstream — if you rebuilt
+# claw, also rebuild this image manually (the marker won't notice). Quick
+# forcing knob: `touch host/test/Dockerfile` bumps a watched mtime and the
+# next sweep will rebuild. The smoke signal that you forgot is rows with an
+# unchanged RUN_REGISTRY_HARNESS_VERSION but visibly different claw behavior.
+FRESHNESS_MARKER="$TEST_DIR/.claw-runtime/.image-fresh-marker"
+stat_mtime() { stat -f %m "$1" 2>/dev/null || stat -c %Y "$1" 2>/dev/null; }
+
+if [ "${SKIP_IMAGE_FRESHNESS_CHECK:-0}" = "1" ]; then
+  log "[freshness] SKIP_IMAGE_FRESHNESS_CHECK=1 — skipping (operator override)"
+else
+  newest_epoch=0
+  newest_path=""
+  while IFS= read -r f; do
+    m=$(stat_mtime "$f") || continue
+    [ -z "$m" ] && continue
+    if [ "$m" -gt "$newest_epoch" ]; then
+      newest_epoch=$m
+      newest_path=$f
+    fi
+  done < <(find \
+      "$TEST_DIR/Dockerfile" \
+      "$TEST_DIR/package.json" \
+      "$TEST_DIR/lib" \
+      "$TEST_DIR/__tests__" \
+      "$TEST_DIR/entrypoint.sh" \
+      -type f 2>/dev/null)
+
+  marker_epoch=0
+  marker_reason="absent"
+  if [ -f "$FRESHNESS_MARKER" ]; then
+    marker_epoch=$(stat_mtime "$FRESHNESS_MARKER")
+    marker_reason="last build"
+  fi
+
+  if [ "$newest_epoch" -gt "$marker_epoch" ]; then
+    marker_human=$(date -r "$marker_epoch" '+%Y-%m-%dT%H:%M:%S' 2>/dev/null || echo "never")
+    newer_human=$(date -r "$newest_epoch" '+%Y-%m-%dT%H:%M:%S' 2>/dev/null || echo "$newest_epoch")
+    log ""
+    log "[freshness] mac-llm-lab-test:local marker is STALE ($marker_reason)"
+    log "[freshness]   marker mtime:   $marker_human"
+    log "[freshness]   newer on disk:  $newer_human  $newest_path"
+    if [ "${AUTO_REBUILD:-1}" = "1" ]; then
+      log "[freshness] AUTO_REBUILD=1 (default) — running 'docker compose build test' now"
+      log "[freshness]   to refuse instead of auto-rebuilding, set AUTO_REBUILD=0"
+      log ""
+      ( cd "$TEST_DIR" && docker compose build test ) \
+        || err "auto-rebuild failed — run manually: (cd $TEST_DIR && docker compose build test)"
+      touch "$FRESHNESS_MARKER"
+      log ""
+      log "[freshness] rebuild complete; marker bumped; continuing sweep"
+    else
+      err "image marker stale and AUTO_REBUILD=0 — rebuild manually: (cd $TEST_DIR && docker compose build test && touch $FRESHNESS_MARKER) [or set SKIP_IMAGE_FRESHNESS_CHECK=1 to ignore]"
+    fi
+  fi
+fi
+
 # Verify each tier has its GGUF and a manifest entry.
 # shellcheck source=../../llama-server/models.conf
 source "$REPO_DIR/host/llama-server/models.conf"
@@ -95,18 +174,6 @@ for t in $EVAL_TIERS; do
   grep -q "\"$cfg_id\"" "$TEST_DIR/lib/model_configs.json" \
     || err "tier ${t}GB: model_config_id '$cfg_id' missing from lib/model_configs.json"
 done
-
-# Friendly reminder — thermal-watch is silent and easy to forget.
-HINT_PATH="$TEST_DIR/.claw-runtime/.thermal-hint.json"
-if [ ! -f "$HINT_PATH" ]; then
-  log ""
-  log "WARNING: $HINT_PATH not present."
-  log "         Without thermal-watch.sh running in a separate terminal, every"
-  log "         row's thermal_status will fall back to throughput-drift only"
-  log "         (clean baseline + drift detection still works, but the pmset"
-  log "         hint is the load-bearing signal)."
-  log ""
-fi
 
 # ---- cleanup: always restore production (64GB) plist on exit ----
 # Skipped under DRY_RUN — we never touched the plist, so don't re-bootstrap.
@@ -152,15 +219,20 @@ fi
 # ---- write expected-attempts manifest (Sprint 1.14) ----
 log ""
 log "==> writing expected-attempts manifest..."
+EXPECTED_ARGS=(plan
+  --tests-dir /test/__tests__/tier-eval
+  --tiers "$EVAL_TIERS"
+  --reps "$EVAL_REPS"
+  --out "/test/.claw-runtime/$(basename "$EXPECTED_PATH")"
+)
+if [ -n "${TIER_EVAL_FILTER:-}" ]; then
+  EXPECTED_ARGS+=(--filter "${TIER_EVAL_FILTER}")
+fi
 docker run --rm \
   -v "$TEST_DIR:/test" \
   -w /test \
   node:24-bookworm-slim \
-  node /test/scripts/expected-attempts.mjs plan \
-    --tests-dir /test/__tests__/tier-eval \
-    --tiers "$EVAL_TIERS" \
-    --reps "$EVAL_REPS" \
-    --out "/test/.claw-runtime/$(basename "$EXPECTED_PATH")" \
+  node /test/scripts/expected-attempts.mjs "${EXPECTED_ARGS[@]}" \
   || err "failed to write expected-attempts manifest"
 
 # ---- header ----
@@ -172,7 +244,6 @@ docker run --rm \
   echo "- Reps per tier: $EVAL_REPS"
   echo "- Harness git SHA: $GIT_SHA"
   echo "- Registry: $REGISTRY_PATH"
-  echo "- Hint file: $([ -f "$HINT_PATH" ] && echo "present" || echo "MISSING — thermal_status will be throughput-drift only")"
   echo "- Order: rep-outer × tier-middle × test-inner (cheap interleave)"
   echo ""
 } > "$RESULTS_FILE"
@@ -215,8 +286,9 @@ run_one_pass() {
     -e BACKEND=llama-server \
     -e TIER="$tier" \
     -e TEST_SUITE=tier-eval \
+    -e TIER_EVAL_FILTER="${TIER_EVAL_FILTER:-}" \
     -e RUN_REGISTRY_EMIT=1 \
-    -e RUN_REGISTRY_KIND=overnight_screen \
+    -e RUN_REGISTRY_KIND="${RUN_REGISTRY_KIND:-overnight_screen}" \
     -e RUN_REGISTRY_HARDWARE_TIER="$tier" \
     -e RUN_REGISTRY_MEMORY_GB="$tier" \
     -e RUN_REGISTRY_MODEL_CONFIG_ID="$cfg_id" \

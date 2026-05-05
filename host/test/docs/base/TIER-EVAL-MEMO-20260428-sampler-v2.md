@@ -81,7 +81,7 @@ Each cell starts after a daemon reload. Iter 1 hits a cold KV cache; iters 2–3
 1. **Three cells tie at 15/15.** Cell 3 has the lowest sum-medians (143s), but the gap to cell 2 (173s) and cell 6 (212s) is **expression-eval-dominated** and within the variance floor measured by A2.
 2. **n=3 is below the within-cell variance floor.** The grid as designed cannot decide which cell wins.
 3. **Cold-KV bias affects iter-1.** Without a warm-up discard, ranking is reasonable but absolute medians are biased.
-4. **Reverting was cheap.** [models.conf](../../llama-server/models.conf) is back at v1 + the new ctx=65536 from A1.
+4. **Reverting was cheap.** [models.conf](../../../llama-server/models.conf) is back at v1 + the new ctx=65536 from A1.
 
 ## Required to lock in any change
 
@@ -97,5 +97,5 @@ If three cells still can't be separated at n=7, declare sampler tuning out-of-sc
 
 ## Action taken
 
-- [models.conf](../../llama-server/models.conf): ctx=65536 (from A1) retained; sampler reverted to v1 (`TIER_64_TEMP=0.7, PRESENCE_PENALTY=1.5`) pending the n=7 confirmation.
+- [models.conf](../../../llama-server/models.conf): ctx=65536 (from A1) retained; sampler reverted to v1 (`TIER_64_TEMP=0.7, PRESENCE_PENALTY=1.5`) pending the n=7 confirmation.
 - This memo updated to mark v2 as a *candidate*, not a decision.
