@@ -29,14 +29,10 @@
 //        non-canonical discount values defeat memorized Exercism solutions.
 //        Primary axis: spec_precision. See difficulty-pack/good-tests.md row 1.
 
-import { describe, it, beforeEach } from 'node:test';
-import assert from 'node:assert/strict';
-import fs from 'node:fs';
-import path from 'node:path';
-import { spawnSync } from 'node:child_process';
-import { runClaw, writeAssertionResult } from '../../lib/claw.js';
-import * as workspace from '../../lib/workspace.js';
-import { clawModel, TIER_LABEL } from '../../lib/tier.js';
+import { describe, it } from 'node:test';
+
+import { runAgentSetup } from '../../lib/runTest.js';
+import { TIER_LABEL } from '../../lib/tier.js';
 
 const VERIFY_JS = `\
 import assert from 'node:assert/strict';
@@ -162,41 +158,17 @@ Then ensure \`node verify.js\` exits 0. Do not edit verify.js.`;
 const CLAW_TIMEOUT = 285_000;
 
 describe(`book-store: minimum-cost partition with non-greedy trap (tier=${TIER_LABEL})`, () => {
-  beforeEach(() => {
-    workspace.reset();
-    fs.writeFileSync(path.join(workspace.WORKSPACE, 'verify.js'), VERIFY_JS);
-  });
-
   it('claw solves the task', { timeout: CLAW_TIMEOUT + 20_000 }, async () => {
-    const r = await runClaw({ prompt: PROMPT, model: clawModel, timeoutMs: CLAW_TIMEOUT });
-
-    const targetExists = workspace.exists('book-store.js');
-    let post = null;
-    if (r.code === 0 && targetExists) {
-      post = spawnSync('node', [path.join(workspace.WORKSPACE, 'verify.js')], {
-        encoding: 'utf8',
-        timeout: 10_000,
-      });
-    }
-    const passed = r.code === 0 && targetExists && post?.status === 0;
-
-    console.log(`\n=== book-store (${TIER_LABEL}) ===`);
-    console.log(`  claw: exit=${r.code} elapsed=${r.elapsedMs}ms files=${JSON.stringify(workspace.list())}`);
-    if (r.code !== 0) console.log(`  claw stderr (tail):\n${r.stderr.slice(-1500)}`);
-    if (post) console.log(`  verify: exit=${post.status} stderr=${post.stderr.slice(0, 400).trim()}`);
-
-    writeAssertionResult(r.runDir, {
-      passed,
-      claw_exit: r.code,
-      target_file_exists: targetExists,
-      post_status: post?.status ?? null,
-      post_stderr_tail: post?.stderr?.slice(0, 800) ?? null,
+    const ctx = await runAgentSetup({
+      prompt:    PROMPT,
+      seedFiles: { 'verify.js': VERIFY_JS },
+      timeoutMs: CLAW_TIMEOUT,
+      testLabel: 'book-store',
     });
-
-    if (r.terminal_status === 'timeout') assert.fail(`claw timed out after ${r.elapsedMs}ms`);
-
-    assert.equal(r.code, 0, 'claw must exit cleanly');
-    assert.equal(targetExists, true, 'book-store.js must be created');
-    assert.equal(post?.status, 0, `verify.js failed:\n${post?.stderr?.slice(0, 800)}`);
+    if (ctx.r.code === 0 && ctx.workspace.exists('book-store.js')) ctx.runPost('verify.js');
+    await ctx.finish({
+      targetFile: 'book-store.js',
+      expect:     { agentExit: 0, targetFileExists: true, postExit: 0 },
+    });
   });
 });

@@ -23,7 +23,7 @@
  *   "suite_layer": "B",
  *   "difficulty_band": "hard",
  *   "oracle_type": "public_verifier",
- *   "keep_drop_rule": "Keep \u2014 multi-cycle iteration is core to convergence axis.",
+ *   "keep_drop_rule": "Keep — multi-cycle iteration is core to convergence axis.",
  *   "expected_tier_signature": "monotonic_improving",
  *   "known_confounds": [
  *     "context_pressure_high"
@@ -31,15 +31,11 @@
  * }
  */
 
-import { describe, it, beforeEach } from 'node:test';
+import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
-import fs from 'node:fs';
-import path from 'node:path';
 
-import { runClaw, writeAssertionResult } from '../../lib/claw.js';
-import * as workspace from '../../lib/workspace.js';
-import { clawModel, TIER_LABEL } from '../../lib/tier.js';
+import { runAgentSetup } from '../../lib/runTest.js';
+import { TIER_LABEL } from '../../lib/tier.js';
 
 const A_JS = `\
 export function inc(n) { return n + 2; }   // bug: should be n + 1
@@ -88,48 +84,16 @@ const PROMPT =
 const TIMEOUT = 300_000;
 
 describe(`cascading-bugs: 5 sequential failures, one runner (tier=${TIER_LABEL})`, () => {
-  beforeEach(() => {
-    workspace.reset();
-    fs.writeFileSync(path.join(workspace.WORKSPACE, 'a.js'),    A_JS);
-    fs.writeFileSync(path.join(workspace.WORKSPACE, 'b.js'),    B_JS);
-    fs.writeFileSync(path.join(workspace.WORKSPACE, 'c.js'),    C_JS);
-    fs.writeFileSync(path.join(workspace.WORKSPACE, 'd.js'),    D_JS);
-    fs.writeFileSync(path.join(workspace.WORKSPACE, 'e.js'),    E_JS);
-    fs.writeFileSync(path.join(workspace.WORKSPACE, 'run.js'),  RUN_JS);
-  });
-
   it('claw iterates run/fix until run.js exits clean', { timeout: TIMEOUT }, async () => {
-    const pre = spawnSync('node', [path.join(workspace.WORKSPACE, 'run.js')], {
-      encoding: 'utf8',
-      timeout:  5_000,
+    const ctx = await runAgentSetup({
+      prompt:               PROMPT,
+      seedFiles:            { 'a.js': A_JS, 'b.js': B_JS, 'c.js': C_JS, 'd.js': D_JS, 'e.js': E_JS, 'run.js': RUN_JS },
+      preconditionMustFail: 'run.js',
+      timeoutMs:            TIMEOUT,
+      testLabel:            'cascading-bugs',
     });
-    assert.notEqual(pre.status, 0, 'pre-condition: run.js must fail before fixes');
-
-    const r = await runClaw({ prompt: PROMPT, model: clawModel });
-
-    console.log(`\n=== cascading-bugs (${TIER_LABEL}) ===`);
-    console.log(`  claw: exit=${r.code} elapsed=${r.elapsedMs}ms files=${JSON.stringify(workspace.list())}`);
-    if (r.code !== 0) console.log(`  claw stderr (tail):\n${r.stderr.slice(-1500)}`);
-
-    const post = spawnSync('node', [path.join(workspace.WORKSPACE, 'run.js')], {
-      encoding: 'utf8',
-      timeout:  5_000,
-    });
-
-    console.log(`  node post-fix: exit=${post.status} stdout=${post.stdout.trim()} stderr=${post.stderr.slice(0,300).trim()}`);
-
-    writeAssertionResult(r.runDir, {
-      passed: r.code === 0 && post.status === 0 && /all-pass/.test(post.stdout),
-      claw_exit: r.code,
-      target_file_exists: null,
-      post_status: post.status,
-      post_stderr_tail: post.stderr.slice(0, 800),
-    });
-
-    if (r.terminal_status === 'timeout') assert.fail(`claw timed out after ${r.elapsedMs}ms (terminal_status=timeout)`);
-
-    assert.equal(r.code, 0, 'claw must exit cleanly');
-    assert.equal(post.status, 0, `run.js still fails:\n${post.stderr.slice(0, 800)}`);
+    ctx.runPost('run.js');
+    const { post } = await ctx.finish({ expect: { agentExit: 0, postExit: 0 } });
     assert.match(post.stdout, /all-pass/, 'expected all-pass marker');
   });
 });

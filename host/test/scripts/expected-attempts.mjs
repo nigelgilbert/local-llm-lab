@@ -8,11 +8,12 @@
 // expected row count is clarified before kickoff" so Wilson CIs in Sprint 2
 // are computed against planned N rather than observed N.
 //
-// Eligibility rule: a tier-eval test is "emit-eligible" if it imports
-// writeAssertionResult from lib/claw.js. The three streamMessage-based tests
-// (latency, tool-discipline, prose-quality) do not call writeAssertionResult
-// and so do not produce registry rows; they're excluded from the expected
-// manifest.
+// Eligibility rule: a tier-eval test is "emit-eligible" if it invokes a
+// registry-writing entry point — either the lib/runTest.js helper (Sprint
+// 1.22) or the underlying writeAssertionResult primitive directly. The three
+// streamMessage-based tests (latency, tool-discipline, prose-quality) do not
+// call either and so do not produce registry rows; they're excluded from the
+// expected manifest.
 //
 // Subcommands:
 //   plan   — write expected_attempts.<sweep>.csv
@@ -59,11 +60,13 @@ function printHelp() {
 }
 
 function isEmitEligible(filePath) {
-  // The test imports writeAssertionResult from lib/claw.js iff its source
-  // names that import. Cheap textual scan; accurate enough for a fixed
-  // codebase whose import lines all parse trivially.
+  // A tier-eval test produces a registry row iff its source references one of
+  // the two registry-writing entry points: the lib/runTest.js helper (Sprint
+  // 1.22 migration target) or the underlying writeAssertionResult primitive
+  // (pre-migration tests + any future test that opts out of the helper).
+  // Family C (latency / prose-quality / tool-discipline) references neither.
   const src = fs.readFileSync(filePath, 'utf8');
-  return /writeAssertionResult/.test(src) && /from\s+['"][^'"]*claw\.js['"]/.test(src);
+  return /\b(runTest|writeAssertionResult)\b/.test(src);
 }
 
 function listEligibleTests(testsDir) {

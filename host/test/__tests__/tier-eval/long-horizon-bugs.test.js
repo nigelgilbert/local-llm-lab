@@ -33,15 +33,11 @@
  * }
  */
 
-import { describe, it, beforeEach } from 'node:test';
+import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
-import fs from 'node:fs';
-import path from 'node:path';
 
-import { runClaw, writeAssertionResult } from '../../lib/claw.js';
-import * as workspace from '../../lib/workspace.js';
-import { clawModel, TIER_LABEL } from '../../lib/tier.js';
+import { runAgentSetup } from '../../lib/runTest.js';
+import { TIER_LABEL } from '../../lib/tier.js';
 
 const MATH_JS = `\
 export function sum(a, b) {
@@ -120,50 +116,16 @@ const PROMPT =
 const TIMEOUT = 300_000;
 
 describe(`long-horizon: 4 bugs across 6 files (tier=${TIER_LABEL})`, () => {
-  beforeEach(() => {
-    workspace.reset();
-    fs.writeFileSync(path.join(workspace.WORKSPACE, 'math.js'),    MATH_JS);
-    fs.writeFileSync(path.join(workspace.WORKSPACE, 'strings.js'), STRINGS_JS);
-    fs.writeFileSync(path.join(workspace.WORKSPACE, 'arrays.js'),  ARRAYS_JS);
-    fs.writeFileSync(path.join(workspace.WORKSPACE, 'objects.js'), OBJECTS_JS);
-    fs.writeFileSync(path.join(workspace.WORKSPACE, 'test.js'),    TEST_JS);
-    fs.writeFileSync(path.join(workspace.WORKSPACE, 'README.md'),  README_MD);
-  });
-
   it('claw fixes every bug across the helper modules', { timeout: TIMEOUT }, async () => {
-    const pre = spawnSync('node', [path.join(workspace.WORKSPACE, 'test.js')], {
-      encoding: 'utf8',
-      timeout:  5_000,
+    const ctx = await runAgentSetup({
+      prompt:               PROMPT,
+      seedFiles:            { 'math.js': MATH_JS, 'strings.js': STRINGS_JS, 'arrays.js': ARRAYS_JS, 'objects.js': OBJECTS_JS, 'test.js': TEST_JS, 'README.md': README_MD },
+      preconditionMustFail: 'test.js',
+      timeoutMs:            TIMEOUT,
+      testLabel:            'long-horizon-bugs',
     });
-    assert.notEqual(pre.status, 0, 'pre-condition: test.js must fail before the fixes');
-
-    const r = await runClaw({ prompt: PROMPT, model: clawModel });
-
-    console.log(`\n=== long-horizon-bugs (${TIER_LABEL}) ===`);
-    console.log(`  claw: exit=${r.code} elapsed=${r.elapsedMs}ms files=${JSON.stringify(workspace.list())}`);
-    if (r.code !== 0) console.log(`  claw stderr (tail):\n${r.stderr.slice(-1500)}`);
-
-    const post = spawnSync('node', [path.join(workspace.WORKSPACE, 'test.js')], {
-      encoding: 'utf8',
-      timeout:  5_000,
-    });
-
-    console.log(`  node post-fix: exit=${post.status} stderr=${post.stderr.slice(0, 400).trim()}`);
-
-    const readmeUntouched = workspace.read('README.md') === README_MD;
-
-    writeAssertionResult(r.runDir, {
-      passed: r.code === 0 && post.status === 0 && readmeUntouched,
-      claw_exit: r.code,
-      target_file_exists: null,
-      post_status: post.status,
-      post_stderr_tail: post.stderr.slice(0, 800),
-    });
-
-    if (r.terminal_status === 'timeout') assert.fail(`claw timed out after ${r.elapsedMs}ms (terminal_status=timeout)`);
-
-    assert.equal(r.code, 0, 'claw must exit cleanly');
-    assert.equal(post.status, 0, `test.js still fails:\n${post.stderr.slice(0, 800)}`);
-    assert.equal(readmeUntouched, true, 'README.md must not be edited');
+    ctx.runPost('test.js');
+    await ctx.finish({ expect: { agentExit: 0, postExit: 0 } });
+    assert.equal(ctx.workspace.read('README.md'), README_MD, 'README.md must not be edited');
   });
 });
