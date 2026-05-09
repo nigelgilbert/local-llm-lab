@@ -71,15 +71,14 @@ const TIMEOUT = 300_000;
 describe(`spec-precedence: ordered transformation rules (tier=${TIER_LABEL})`, () => {
   it('claw applies the rules in the specified order', { timeout: TIMEOUT }, async () => {
     const ctx = await runAgentSetup({
-      prompt:    PROMPT,
-      seedFiles: { 'verify.js': VERIFY_JS },
-      timeoutMs: TIMEOUT,
-      testLabel: 'spec-precedence',
+      prompt:     PROMPT,
+      seedFiles:  { 'verify.js': VERIFY_JS },
+      postScript: 'verify.js',
+      timeoutMs:  TIMEOUT,
+      testLabel:  'spec-precedence',
     });
-    ctx.runPost('verify.js');
-    await ctx.finish({
-      targetFile: 'path.js',
-      expect:     { agentExit: 0, targetFileExists: true, postExit: 0 },
+    await ctx.finish(() => {
+      ctx.workspace.unchanged('verify.js', VERIFY_JS);
     });
   });
 });

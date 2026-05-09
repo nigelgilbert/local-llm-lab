@@ -83,10 +83,12 @@ describe(`comment-spec: implement from JSDoc (tier=${TIER_LABEL})`, () => {
       prompt:               PROMPT,
       seedFiles:            { 'collections.js': COLLECTIONS_JS, 'verify.js': VERIFY_JS },
       preconditionMustFail: 'verify.js',
+      postScript:           'verify.js',
       timeoutMs:            TIMEOUT,
       testLabel:            'comment-spec',
     });
-    ctx.runPost('verify.js');
-    await ctx.finish({ expect: { agentExit: 0, postExit: 0 } });
+    await ctx.finish(() => {
+      ctx.workspace.unchanged('verify.js', VERIFY_JS);
+    });
   });
 });

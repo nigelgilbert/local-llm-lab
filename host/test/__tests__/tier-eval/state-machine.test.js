@@ -72,15 +72,14 @@ const TIMEOUT = 300_000;
 describe(`state-machine: traffic light (tier=${TIER_LABEL})`, () => {
   it('claw implements the FSM with valid transitions and rejection of invalid ones', { timeout: TIMEOUT }, async () => {
     const ctx = await runAgentSetup({
-      prompt:    PROMPT,
-      seedFiles: { 'verify.js': VERIFY_JS },
-      timeoutMs: TIMEOUT,
-      testLabel: 'state-machine',
+      prompt:     PROMPT,
+      seedFiles:  { 'verify.js': VERIFY_JS },
+      postScript: 'verify.js',
+      timeoutMs:  TIMEOUT,
+      testLabel:  'state-machine',
     });
-    ctx.runPost('verify.js');
-    await ctx.finish({
-      targetFile: 'light.js',
-      expect:     { agentExit: 0, targetFileExists: true, postExit: 0 },
+    await ctx.finish(() => {
+      ctx.workspace.unchanged('verify.js', VERIFY_JS);
     });
   });
 });

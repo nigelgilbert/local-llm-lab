@@ -34,7 +34,6 @@
  */
 
 import { describe, it } from 'node:test';
-import assert from 'node:assert/strict';
 
 import { runAgentSetup } from '../../lib/runTest.js';
 import { TIER_LABEL } from '../../lib/tier.js';
@@ -121,11 +120,12 @@ describe(`long-horizon: 4 bugs across 6 files (tier=${TIER_LABEL})`, () => {
       prompt:               PROMPT,
       seedFiles:            { 'math.js': MATH_JS, 'strings.js': STRINGS_JS, 'arrays.js': ARRAYS_JS, 'objects.js': OBJECTS_JS, 'test.js': TEST_JS, 'README.md': README_MD },
       preconditionMustFail: 'test.js',
+      postScript:           'test.js',
       timeoutMs:            TIMEOUT,
       testLabel:            'long-horizon-bugs',
     });
-    ctx.runPost('test.js');
-    await ctx.finish({ expect: { agentExit: 0, postExit: 0 } });
-    assert.equal(ctx.workspace.read('README.md'), README_MD, 'README.md must not be edited');
+    await ctx.finish(() => {
+      ctx.workspace.unchanged('README.md', README_MD);
+    });
   });
 });

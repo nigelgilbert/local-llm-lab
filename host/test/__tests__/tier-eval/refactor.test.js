@@ -60,10 +60,10 @@ describe(`refactor: fix seeded off-by-one (tier=${TIER_LABEL})`, () => {
       prompt:               PROMPT,
       seedFiles:            { 'buggy.js': BUGGY_JS },
       preconditionMustFail: 'buggy.js',
+      postScript:           'buggy.js',
       timeoutMs:            CLAW_TIMEOUT,
       testLabel:            'refactor',
     });
-    ctx.runPost('buggy.js');
-    await ctx.finish({ expect: { agentExit: 0, postExit: 0 } });
+    await ctx.finish(() => {});
   });
 });

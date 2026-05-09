@@ -325,15 +325,14 @@ const CLAW_TIMEOUT = 285_000;
 describe(`ini-parser: line-by-line config parser with section reentry (tier=${TIER_LABEL})`, () => {
   it('claw solves the task', { timeout: CLAW_TIMEOUT + 20_000 }, async () => {
     const ctx = await runAgentSetup({
-      prompt:    PROMPT,
-      seedFiles: { 'verify.js': VERIFY_JS },
-      timeoutMs: CLAW_TIMEOUT,
-      testLabel: 'ini-parser',
+      prompt:     PROMPT,
+      seedFiles:  { 'verify.js': VERIFY_JS },
+      postScript: 'verify.js',
+      timeoutMs:  CLAW_TIMEOUT,
+      testLabel:  'ini-parser',
     });
-    if (ctx.r.code === 0 && ctx.workspace.exists('ini-parser.js')) ctx.runPost('verify.js');
-    await ctx.finish({
-      targetFile: 'ini-parser.js',
-      expect:     { agentExit: 0, targetFileExists: true, postExit: 0 },
+    await ctx.finish(() => {
+      ctx.workspace.unchanged('verify.js', VERIFY_JS);
     });
   });
 });

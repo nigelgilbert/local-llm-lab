@@ -57,15 +57,14 @@ const TIMEOUT = CLAW_TIMEOUT + 20_000;
 describe(`deep-equal: structural equality (tier=${TIER_LABEL})`, () => {
   it('claw implements deep equality including NaN', { timeout: TIMEOUT }, async () => {
     const ctx = await runAgentSetup({
-      prompt:    PROMPT,
-      seedFiles: { 'verify.js': VERIFY_JS },
-      timeoutMs: CLAW_TIMEOUT,
-      testLabel: 'deep-equal',
+      prompt:     PROMPT,
+      seedFiles:  { 'verify.js': VERIFY_JS },
+      postScript: 'verify.js',
+      timeoutMs:  CLAW_TIMEOUT,
+      testLabel:  'deep-equal',
     });
-    if (ctx.r.code === 0 && ctx.workspace.exists('eq.js')) ctx.runPost('verify.js');
-    await ctx.finish({
-      targetFile: 'eq.js',
-      expect:     { agentExit: 0, targetFileExists: true, postExit: 0 },
+    await ctx.finish(() => {
+      ctx.workspace.unchanged('verify.js', VERIFY_JS);
     });
   });
 });

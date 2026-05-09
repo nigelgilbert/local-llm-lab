@@ -74,10 +74,10 @@ describe(`two-step refactor: extract helper and fix latent bug (tier=${TIER_LABE
       prompt:               PROMPT,
       seedFiles:            { 'stats.js': STATS_JS },
       preconditionMustFail: 'stats.js',
+      postScript:           'stats.js',
       timeoutMs:            TIMEOUT,
       testLabel:            'two-step-refactor',
     });
-    ctx.runPost('stats.js');
-    await ctx.finish({ expect: { agentExit: 0, postExit: 0 } });
+    await ctx.finish(() => {});
   });
 });

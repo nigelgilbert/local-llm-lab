@@ -156,15 +156,14 @@ const TIMEOUT = 300_000;
 describe(`json-schema-validate: recursive validator (tier=${TIER_LABEL})`, () => {
   it('claw implements validate with recursive paths and error accumulation', { timeout: TIMEOUT }, async () => {
     const ctx = await runAgentSetup({
-      prompt:    PROMPT,
-      seedFiles: { 'verify.js': VERIFY_JS },
-      timeoutMs: TIMEOUT,
-      testLabel: 'json-schema-validate',
+      prompt:     PROMPT,
+      seedFiles:  { 'verify.js': VERIFY_JS },
+      postScript: 'verify.js',
+      timeoutMs:  TIMEOUT,
+      testLabel:  'json-schema-validate',
     });
-    ctx.runPost('verify.js');
-    await ctx.finish({
-      targetFile: 'validator.js',
-      expect:     { agentExit: 0, targetFileExists: true, postExit: 0 },
+    await ctx.finish(() => {
+      ctx.workspace.unchanged('verify.js', VERIFY_JS);
     });
   });
 });

@@ -68,13 +68,10 @@ describe(`api evolution: signature reorder across two files (tier=${TIER_LABEL})
       prompt:               PROMPT,
       seedFiles:            { 'pricing.js': PRICING_JS, 'app.js': APP_JS },
       preconditionMustFail: 'app.js',
+      postScript:           'app.js',
       timeoutMs:            CLAW_TIMEOUT,
       testLabel:            'api-evolution',
     });
-    if (ctx.r.code === 0) ctx.runPost('app.js');
-    await ctx.finish({
-      targetFile: 'pricing.js',
-      expect:     { agentExit: 0, postExit: 0 },
-    });
+    await ctx.finish(() => {});
   });
 });

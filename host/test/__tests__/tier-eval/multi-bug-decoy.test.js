@@ -125,10 +125,10 @@ describe(`multi-bug-decoy: 5 bugs + 1 correct helper (tier=${TIER_LABEL})`, () =
       prompt:               PROMPT,
       seedFiles:            { 'helpers.js': HELPERS_JS },
       preconditionMustFail: 'helpers.js',
+      postScript:           'helpers.js',
       timeoutMs:            TIMEOUT,
       testLabel:            'multi-bug-decoy',
     });
-    ctx.runPost('helpers.js');
-    await ctx.finish({ expect: { agentExit: 0, postExit: 0 } });
+    await ctx.finish(() => {});
   });
 });

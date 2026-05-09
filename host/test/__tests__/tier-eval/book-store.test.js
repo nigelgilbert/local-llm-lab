@@ -160,15 +160,14 @@ const CLAW_TIMEOUT = 285_000;
 describe(`book-store: minimum-cost partition with non-greedy trap (tier=${TIER_LABEL})`, () => {
   it('claw solves the task', { timeout: CLAW_TIMEOUT + 20_000 }, async () => {
     const ctx = await runAgentSetup({
-      prompt:    PROMPT,
-      seedFiles: { 'verify.js': VERIFY_JS },
-      timeoutMs: CLAW_TIMEOUT,
-      testLabel: 'book-store',
+      prompt:     PROMPT,
+      seedFiles:  { 'verify.js': VERIFY_JS },
+      postScript: 'verify.js',
+      timeoutMs:  CLAW_TIMEOUT,
+      testLabel:  'book-store',
     });
-    if (ctx.r.code === 0 && ctx.workspace.exists('book-store.js')) ctx.runPost('verify.js');
-    await ctx.finish({
-      targetFile: 'book-store.js',
-      expect:     { agentExit: 0, targetFileExists: true, postExit: 0 },
+    await ctx.finish(() => {
+      ctx.workspace.unchanged('verify.js', VERIFY_JS);
     });
   });
 });

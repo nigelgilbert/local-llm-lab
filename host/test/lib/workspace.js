@@ -1,6 +1,7 @@
 // Filesystem helpers around the test workspace (/workspace inside the
 // container — purely ephemeral, gone when --rm fires).
 
+import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -33,4 +34,11 @@ export function read(rel) {
 
 export function list() {
   return fs.existsSync(WORKSPACE) ? fs.readdirSync(WORKSPACE) : [];
+}
+
+// Asserts the file is byte-identical to `expected` — for prompts like
+// "Do not edit verify.js" where the agent obeying the instruction is part
+// of the spec, not just polite framing.
+export function unchanged(rel, expected) {
+  assert.equal(read(rel), expected, `${rel} must not be edited`);
 }

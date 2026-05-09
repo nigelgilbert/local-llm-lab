@@ -73,10 +73,12 @@ describe(`multi-file rename + signature change (tier=${TIER_LABEL})`, () => {
       prompt:               PROMPT,
       seedFiles:            { 'lib.js': LIB_JS, 'service.js': SERVICE_JS, 'index.js': INDEX_JS },
       preconditionMustFail: 'index.js',
+      postScript:           'index.js',
       timeoutMs:            TIMEOUT,
       testLabel:            'multi-file-rename',
     });
-    ctx.runPost('index.js');
-    await ctx.finish({ expect: { agentExit: 0, postExit: 0 } });
+    await ctx.finish(() => {
+      ctx.workspace.unchanged('index.js', INDEX_JS);
+    });
   });
 });

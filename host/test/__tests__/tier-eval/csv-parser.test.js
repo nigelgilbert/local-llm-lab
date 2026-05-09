@@ -134,15 +134,14 @@ const TIMEOUT = CLAW_TIMEOUT + 20_000;
 describe(`csv-parser: RFC 4180-ish parser (tier=${TIER_LABEL})`, () => {
   it('claw implements parseCSV handling every quoting case', { timeout: TIMEOUT }, async () => {
     const ctx = await runAgentSetup({
-      prompt:    PROMPT,
-      seedFiles: { 'verify.js': VERIFY_JS },
-      timeoutMs: CLAW_TIMEOUT,
-      testLabel: 'csv-parser',
+      prompt:     PROMPT,
+      seedFiles:  { 'verify.js': VERIFY_JS },
+      postScript: 'verify.js',
+      timeoutMs:  CLAW_TIMEOUT,
+      testLabel:  'csv-parser',
     });
-    if (ctx.r.code === 0 && ctx.workspace.exists('csv.js')) ctx.runPost('verify.js');
-    await ctx.finish({
-      targetFile: 'csv.js',
-      expect:     { agentExit: 0, targetFileExists: true, postExit: 0 },
+    await ctx.finish(() => {
+      ctx.workspace.unchanged('verify.js', VERIFY_JS);
     });
   });
 });

@@ -72,10 +72,10 @@ describe(`multi-bug: fix three independent bugs (tier=${TIER_LABEL})`, () => {
       prompt:               PROMPT,
       seedFiles:            { 'text.js': TEXT_JS },
       preconditionMustFail: 'text.js',
+      postScript:           'text.js',
       timeoutMs:            TIMEOUT,
       testLabel:            'multi-bug',
     });
-    ctx.runPost('text.js');
-    await ctx.finish({ expect: { agentExit: 0, postExit: 0 } });
+    await ctx.finish(() => {});
   });
 });

@@ -110,13 +110,12 @@ describe(`large-refactor: thread currency through 5 call sites (tier=${TIER_LABE
       prompt:               PROMPT,
       seedFiles:            { 'format.js': FORMAT_JS, 'cart.js': CART_JS, 'receipt.js': RECEIPT_JS, 'report.js': REPORT_JS, 'test.js': TEST_JS },
       preconditionMustFail: 'test.js',
+      postScript:           'test.js',
       timeoutMs:            CLAW_TIMEOUT,
       testLabel:            'large-refactor',
     });
-    if (ctx.r.code === 0) ctx.runPost('test.js');
-    await ctx.finish({
-      targetFile: 'format.js',
-      expect:     { agentExit: 0, postExit: 0 },
+    await ctx.finish(() => {
+      ctx.workspace.unchanged('test.js', TEST_JS);
     });
   });
 });

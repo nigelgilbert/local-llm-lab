@@ -58,15 +58,14 @@ const TIMEOUT = CLAW_TIMEOUT + 20_000;
 describe(`adversarial inputs: slugify (tier=${TIER_LABEL})`, () => {
   it('claw implements slugify robustly enough for adversarial inputs', { timeout: TIMEOUT }, async () => {
     const ctx = await runAgentSetup({
-      prompt:    PROMPT,
-      seedFiles: { 'verify.js': VERIFY_JS },
-      timeoutMs: CLAW_TIMEOUT,
-      testLabel: 'adversarial-input',
+      prompt:     PROMPT,
+      seedFiles:  { 'verify.js': VERIFY_JS },
+      postScript: 'verify.js',
+      timeoutMs:  CLAW_TIMEOUT,
+      testLabel:  'adversarial-input',
     });
-    if (ctx.r.code === 0 && ctx.workspace.exists('slugify.js')) ctx.runPost('verify.js');
-    await ctx.finish({
-      targetFile: 'slugify.js',
-      expect:     { agentExit: 0, targetFileExists: true, postExit: 0 },
+    await ctx.finish(() => {
+      ctx.workspace.unchanged('verify.js', VERIFY_JS);
     });
   });
 });

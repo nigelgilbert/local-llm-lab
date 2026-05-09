@@ -16,9 +16,16 @@
 // registry row) is intentionally out of scope.
 //
 // Usage:
-//   const ctx = await runAgentSetup({ prompt, seedFiles, ... });
-//   if (ctx.r.code === 0 && ctx.workspace.exists('foo.js')) ctx.runPost('verify.js');
-//   await ctx.finish({ targetFile: 'foo.js', expect: { agentExit: 0, postExit: 0 } });
+//   const ctx = await runAgentSetup({ prompt, seedFiles, postScript: 'verify.js', ... });
+//   await ctx.finish(() => {
+//     ctx.workspace.unchanged('verify.js', VERIFY_JS);
+//   });
+//
+// postScript is optional. When set, the helper runs `node <postScript>` after
+// the agent and populates ctx.post. When omitted, ctx.post stays null.
+//
+// finish() auto-asserts agent.code === 0 and (when postScript was set)
+// post.status === 0. The callback is for per-test invariants only.
 //
 // RunnerResult contract — any injected `runner` must resolve with:
 //   {
@@ -49,10 +56,62 @@ const PRE_CONDITION_TIMEOUT_MS = 5_000;
 const AGENT_STDERR_TAIL = 1_500;
 const POST_STDERR_TAIL = 800;
 
+/**
+ * @typedef {Object} RunnerResult
+ * @property {number|null} code              Agent process exit code; null on timeout.
+ * @property {string}      stdout
+ * @property {string}      stderr
+ * @property {number}      elapsedMs
+ * @property {string}      runDir            Directory used for the writeAssertionResult sidecar.
+ * @property {'timeout'=}  terminal_status   Set to 'timeout' when the runner aborted on timeoutMs.
+ */
+
+/**
+ * @typedef {import('node:child_process').SpawnSyncReturns<string>} PostResult
+ */
+
+/**
+ * @typedef {(opts: { prompt: string, timeoutMs: number }) => Promise<RunnerResult>} Runner
+ */
+
+/**
+ * @typedef {Object} AssertionPayload
+ * @property {boolean}     passed
+ * @property {number|null} claw_exit
+ * @property {number|null} post_status
+ * @property {string|null} post_stderr_tail
+ */
+
+/**
+ * @typedef {Object} AgentCtx
+ * @property {RunnerResult}            agent       Result record from the agent runner.
+ * @property {typeof workspace}        workspace   Workspace module (read/exists/list/reset/WORKSPACE/unchanged).
+ * @property {PostResult|null}         post        Post-script result; null when postScript was not set.
+ * @property {(asserts: () => void) => Promise<{ agent: RunnerResult, post: PostResult|null, payload: AssertionPayload }>} finish
+ *           Finalize the run: auto-assert agent (and post, when postScript was set) exited zero, invoke the per-test asserts callback, and write the registry payload.
+ */
+
+/**
+ * Prelude + postlude for tier-eval Family A/B tests. Resets the workspace,
+ * seeds files, optionally runs a pre-condition script that must fail, runs
+ * the agent, optionally runs a post-script, and returns a ctx whose
+ * `finish()` writes the registry assertion payload.
+ *
+ * @param {Object}   opts
+ * @param {string}   opts.prompt                  Required. Prompt to pass to the agent runner.
+ * @param {Object<string, string>} [opts.seedFiles={}]   Map of filename to file contents to write into the workspace before the agent runs.
+ * @param {string|null} [opts.preconditionMustFail=null] Filename of a script that must exit non-zero *before* the agent runs (asserts the test is well-posed). Family A pattern.
+ * @param {string|null} [opts.postScript=null]    Filename of a script to run *after* the agent. Result populates ctx.post. Optional — when omitted ctx.post stays null.
+ * @param {number}   [opts.timeoutMs=240000]      Agent run timeout. Forwarded to the runner; surfaced as terminal_status='timeout' on the RunnerResult.
+ * @param {string}   opts.testLabel               Required. Used in the run log header.
+ * @param {Runner}   [opts.runner=defaultRunner]  Inject a non-claw agent runner (Aider/Codex/etc.) under the same harness.
+ * @returns {Promise<AgentCtx>}
+ */
 export async function runAgentSetup({
   prompt,
   seedFiles = {},
   preconditionMustFail = null,
+  postScript = null,
   timeoutMs = 240_000,
   testLabel,
   runner = defaultRunner,
@@ -76,11 +135,11 @@ export async function runAgentSetup({
     );
   }
 
-  const r = await runner({ prompt, timeoutMs });
+  const agent = await runner({ prompt, timeoutMs });
 
   console.log(`\n=== ${testLabel} (${TIER_LABEL}) ===`);
-  console.log(`  agent: exit=${r.code} elapsed=${r.elapsedMs}ms files=${JSON.stringify(workspace.list())}`);
-  if (r.code !== 0) console.log(`  agent stderr (tail):\n${r.stderr.slice(-AGENT_STDERR_TAIL)}`);
+  console.log(`  agent: exit=${agent.code} elapsed=${agent.elapsedMs}ms files=${JSON.stringify(workspace.list())}`);
+  if (agent.code !== 0) console.log(`  agent stderr (tail):\n${agent.stderr.slice(-AGENT_STDERR_TAIL)}`);
 
   let post = null;
 
@@ -94,49 +153,52 @@ export async function runAgentSetup({
     return post;
   }
 
-  async function finish({ targetFile = null, expect = { agentExit: 0, postExit: 0 } } = {}) {
-    const targetFileExists = targetFile == null ? null : workspace.exists(targetFile);
+  if (postScript) runPost(postScript);
 
-    const passed = r.code === 0
-      && (targetFile == null || targetFileExists === true)
-      && post != null
-      && post.status === 0;
+  // `passed` is derived from "did anything throw inside the try block." All
+  // checks — auto-asserts and per-test invariants — live in one block, so
+  // there is no out-of-band place to put a check that escapes the registry
+  // payload.
+  async function finish(asserts = () => {}) {
+    let thrown = null;
+    try {
+      if (agent.terminal_status === 'timeout') {
+        assert.fail(`agent timed out after ${agent.elapsedMs}ms (terminal_status=timeout)`);
+      }
+      // Auto-assert the always-checks. Symmetric with preconditionMustFail
+      // (which asserts a script fails before the agent runs); these assert
+      // the agent exited cleanly and, when a postScript was set, that it
+      // also exited zero. The callback is for per-test invariants only.
+      assert.equal(agent.code, 0, 'agent must exit cleanly');
+      if (postScript) {
+        assert.equal(
+          post.status, 0,
+          `post-script (${postScript}) failed:\n${post.stderr.slice(0, POST_STDERR_TAIL)}`,
+        );
+      }
+      asserts();
+    } catch (e) {
+      thrown = e;
+    }
 
     const payload = {
-      passed,
-      claw_exit:           r.code,
-      target_file_exists:  targetFileExists,
-      post_status:         post ? post.status : null,
-      post_stderr_tail:    post ? post.stderr.slice(0, POST_STDERR_TAIL) : null,
+      passed:            thrown === null,
+      claw_exit:         agent.code,
+      post_status:       post ? post.status : null,
+      post_stderr_tail:  post ? post.stderr.slice(0, POST_STDERR_TAIL) : null,
     };
-    writeAssertionResult(r.runDir, payload);
+    writeAssertionResult(agent.runDir, payload);
 
-    if (r.terminal_status === 'timeout') {
-      assert.fail(`agent timed out after ${r.elapsedMs}ms (terminal_status=timeout)`);
-    }
-
-    if (expect !== 'manual') {
-      if (expect.agentExit !== undefined) {
-        assert.equal(r.code, expect.agentExit, 'agent must exit cleanly');
-      }
-      if (expect.targetFileExists !== undefined) {
-        assert.equal(
-          targetFileExists, expect.targetFileExists,
-          `${targetFile} must ${expect.targetFileExists ? 'be created' : 'not exist'}`,
-        );
-      }
-      if (expect.postExit !== undefined) {
-        assert.equal(
-          post?.status, expect.postExit,
-          `post-script failed:\n${post?.stderr?.slice(0, POST_STDERR_TAIL) ?? '(post-script did not run)'}`,
-        );
-      }
-    }
-
-    return { r, post, payload };
+    if (thrown) throw thrown;
+    return { agent, post, payload };
   }
 
-  return { r, workspace, runPost, finish };
+  return {
+    agent,
+    workspace,
+    finish,
+    get post() { return post; },
+  };
 }
 
 function defaultRunner({ prompt, timeoutMs }) {

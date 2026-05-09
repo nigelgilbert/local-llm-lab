@@ -79,15 +79,14 @@ const TIMEOUT = CLAW_TIMEOUT + 20_000;
 describe(`parseISO-with-timezone: ISO 8601 parser (tier=${TIER_LABEL})`, () => {
   it('claw implements parseISO with offset handling and invalid-input throws', { timeout: TIMEOUT }, async () => {
     const ctx = await runAgentSetup({
-      prompt:    PROMPT,
-      seedFiles: { 'verify.js': VERIFY_JS },
-      timeoutMs: CLAW_TIMEOUT,
-      testLabel: 'parseISO-with-timezone',
+      prompt:     PROMPT,
+      seedFiles:  { 'verify.js': VERIFY_JS },
+      postScript: 'verify.js',
+      timeoutMs:  CLAW_TIMEOUT,
+      testLabel:  'parseISO-with-timezone',
     });
-    if (ctx.r.code === 0 && ctx.workspace.exists('iso.js')) ctx.runPost('verify.js');
-    await ctx.finish({
-      targetFile: 'iso.js',
-      expect:     { agentExit: 0, targetFileExists: true, postExit: 0 },
+    await ctx.finish(() => {
+      ctx.workspace.unchanged('verify.js', VERIFY_JS);
     });
   });
 });

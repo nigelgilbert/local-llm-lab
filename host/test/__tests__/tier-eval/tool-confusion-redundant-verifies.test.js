@@ -101,19 +101,20 @@ const TIMEOUT = CLAW_TIMEOUT + 20_000;
 describe(`tool-confusion-redundant-verifies: parse() with red-herring verifiers (tier=${TIER_LABEL})`, () => {
   it('claw implements parse against verify.js, ignoring red-herring verifiers', { timeout: TIMEOUT }, async () => {
     const ctx = await runAgentSetup({
-      prompt:    PROMPT,
-      seedFiles: {
+      prompt:     PROMPT,
+      seedFiles:  {
         'verify.js':   VERIFY_JS,
         'check.js':    CHECK_JS,
         'validate.js': VALIDATE_JS,
       },
-      timeoutMs: CLAW_TIMEOUT,
-      testLabel: 'tool-confusion-redundant-verifies',
+      postScript: 'verify.js',
+      timeoutMs:  CLAW_TIMEOUT,
+      testLabel:  'tool-confusion-redundant-verifies',
     });
-    if (ctx.r.code === 0 && ctx.workspace.exists('parse.js')) ctx.runPost('verify.js');
-    await ctx.finish({
-      targetFile: 'parse.js',
-      expect:     { agentExit: 0, targetFileExists: true, postExit: 0 },
+    await ctx.finish(() => {
+      ctx.workspace.unchanged('verify.js', VERIFY_JS);
+      ctx.workspace.unchanged('check.js', CHECK_JS);
+      ctx.workspace.unchanged('validate.js', VALIDATE_JS);
     });
   });
 });

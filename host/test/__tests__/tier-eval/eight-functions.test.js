@@ -133,16 +133,18 @@ const TARGETS = [
 describe(`eight-functions: 12 helpers with cross-file deps (tier=${TIER_LABEL})`, () => {
   it('claw implements all twelve helpers with correct cross-file imports', { timeout: TIMEOUT }, async () => {
     const ctx = await runAgentSetup({
-      prompt:    PROMPT,
-      seedFiles: { 'verify.js': VERIFY_JS },
-      timeoutMs: CLAW_TIMEOUT,
-      testLabel: 'eight-functions',
+      prompt:     PROMPT,
+      seedFiles:  { 'verify.js': VERIFY_JS },
+      postScript: 'verify.js',
+      timeoutMs:  CLAW_TIMEOUT,
+      testLabel:  'eight-functions',
     });
-    const targetsPresent = TARGETS.map(f => ctx.workspace.exists(f));
-    const allTargetsExist = targetsPresent.every(Boolean);
-    if (ctx.r.code === 0 && allTargetsExist) ctx.runPost('verify.js');
-    await ctx.finish({ expect: { agentExit: 0, postExit: 0 } });
-    assert.equal(allTargetsExist, true,
-      `missing target files: ${TARGETS.filter((f, i) => !targetsPresent[i]).join(', ')}`);
+    await ctx.finish(() => {
+      ctx.workspace.unchanged('verify.js', VERIFY_JS);
+      const targetsPresent = TARGETS.map(f => ctx.workspace.exists(f));
+      const allTargetsExist = targetsPresent.every(Boolean);
+      assert.equal(allTargetsExist, true,
+        `missing target files: ${TARGETS.filter((f, i) => !targetsPresent[i]).join(', ')}`);
+    });
   });
 });

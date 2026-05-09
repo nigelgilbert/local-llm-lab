@@ -89,11 +89,13 @@ describe(`cascading-bugs: 5 sequential failures, one runner (tier=${TIER_LABEL})
       prompt:               PROMPT,
       seedFiles:            { 'a.js': A_JS, 'b.js': B_JS, 'c.js': C_JS, 'd.js': D_JS, 'e.js': E_JS, 'run.js': RUN_JS },
       preconditionMustFail: 'run.js',
+      postScript:           'run.js',
       timeoutMs:            TIMEOUT,
       testLabel:            'cascading-bugs',
     });
-    ctx.runPost('run.js');
-    const { post } = await ctx.finish({ expect: { agentExit: 0, postExit: 0 } });
-    assert.match(post.stdout, /all-pass/, 'expected all-pass marker');
+    await ctx.finish(() => {
+      ctx.workspace.unchanged('run.js', RUN_JS);
+      assert.match(ctx.post.stdout, /all-pass/, 'expected all-pass marker');
+    });
   });
 });

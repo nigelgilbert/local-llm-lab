@@ -462,19 +462,20 @@ const CLAW_TIMEOUT = 285_000;
 describe(`word-search v2.1: dual-anchor multi-match enumeration (tier=${TIER_LABEL})`, () => {
   it('claw solves the task', { timeout: CLAW_TIMEOUT + 20_000 }, async () => {
     const ctx = await runAgentSetup({
-      prompt:    PROMPT,
-      seedFiles: {
+      prompt:     PROMPT,
+      seedFiles:  {
         'verify.js':    VERIFY_JS,
         'board.txt':    BOARD_TXT,
         'anchors.json': ANCHORS_JSON,
       },
-      timeoutMs: CLAW_TIMEOUT,
-      testLabel: 'word-search',
+      postScript: 'verify.js',
+      timeoutMs:  CLAW_TIMEOUT,
+      testLabel:  'word-search',
     });
-    if (ctx.r.code === 0 && ctx.workspace.exists('word-search.js')) ctx.runPost('verify.js');
-    await ctx.finish({
-      targetFile: 'word-search.js',
-      expect:     { agentExit: 0, targetFileExists: true, postExit: 0 },
+    await ctx.finish(() => {
+      ctx.workspace.unchanged('verify.js', VERIFY_JS);
+      ctx.workspace.unchanged('board.txt', BOARD_TXT);
+      ctx.workspace.unchanged('anchors.json', ANCHORS_JSON);
     });
   });
 });

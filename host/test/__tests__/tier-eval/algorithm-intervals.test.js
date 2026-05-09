@@ -31,6 +31,7 @@ import { describe, it } from 'node:test';
 import { runAgentSetup } from '../../lib/runTest.js';
 import { TIER_LABEL } from '../../lib/tier.js';
 
+
 const VERIFY_JS = `\
 import assert from 'node:assert/strict';
 import { mergeIntervals } from './intervals.js';
@@ -56,15 +57,14 @@ const TIMEOUT = 300_000;
 describe(`algorithm: merge intervals (tier=${TIER_LABEL})`, () => {
   it('claw merges intervals across all edge cases', { timeout: TIMEOUT }, async () => {
     const ctx = await runAgentSetup({
-      prompt:    PROMPT,
-      seedFiles: { 'verify.js': VERIFY_JS },
-      timeoutMs: TIMEOUT,
-      testLabel: 'algorithm-intervals',
+      prompt:     PROMPT,
+      seedFiles:  { 'verify.js': VERIFY_JS },
+      postScript: 'verify.js',
+      timeoutMs:  TIMEOUT,
+      testLabel:  'algorithm-intervals',
     });
-    ctx.runPost('verify.js');
-    await ctx.finish({
-      targetFile: 'intervals.js',
-      expect:     { agentExit: 0, targetFileExists: true, postExit: 0 },
+    await ctx.finish(() => {
+      ctx.workspace.unchanged('verify.js', VERIFY_JS);
     });
   });
 });

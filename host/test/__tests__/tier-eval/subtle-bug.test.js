@@ -61,10 +61,10 @@ describe(`subtle bug: default-sort lexicographic (tier=${TIER_LABEL})`, () => {
       prompt:               PROMPT,
       seedFiles:            { 'median.js': MEDIAN_JS },
       preconditionMustFail: 'median.js',
+      postScript:           'median.js',
       timeoutMs:            TIMEOUT,
       testLabel:            'subtle-bug',
     });
-    ctx.runPost('median.js');
-    await ctx.finish({ expect: { agentExit: 0, postExit: 0 } });
+    await ctx.finish(() => {});
   });
 });

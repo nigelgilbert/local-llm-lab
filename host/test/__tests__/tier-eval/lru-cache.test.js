@@ -164,15 +164,14 @@ const CLAW_TIMEOUT = 240_000;
 describe(`lru-cache: LRU + TTL + eviction callback (tier=${TIER_LABEL})`, () => {
   it('claw implements LRUCache satisfying every spec bullet', { timeout: CLAW_TIMEOUT + 20_000 }, async () => {
     const ctx = await runAgentSetup({
-      prompt:    PROMPT,
-      seedFiles: { 'verify.js': VERIFY_JS },
-      timeoutMs: CLAW_TIMEOUT,
-      testLabel: 'lru-cache',
+      prompt:     PROMPT,
+      seedFiles:  { 'verify.js': VERIFY_JS },
+      postScript: 'verify.js',
+      timeoutMs:  CLAW_TIMEOUT,
+      testLabel:  'lru-cache',
     });
-    if (ctx.r.code === 0 && ctx.workspace.exists('lru.js')) ctx.runPost('verify.js');
-    await ctx.finish({
-      targetFile: 'lru.js',
-      expect:     { agentExit: 0, targetFileExists: true, postExit: 0 },
+    await ctx.finish(() => {
+      ctx.workspace.unchanged('verify.js', VERIFY_JS);
     });
   });
 });

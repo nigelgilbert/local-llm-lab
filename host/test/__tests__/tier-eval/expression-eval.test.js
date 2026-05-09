@@ -130,15 +130,14 @@ const TIMEOUT = CLAW_TIMEOUT + 20_000;
 describe(`expression-eval: recursive-descent parser (tier=${TIER_LABEL})`, () => {
   it('claw implements evaluate handling precedence, assoc, errors', { timeout: TIMEOUT }, async () => {
     const ctx = await runAgentSetup({
-      prompt:    PROMPT,
-      seedFiles: { 'verify.js': VERIFY_JS },
-      timeoutMs: CLAW_TIMEOUT,
-      testLabel: 'expression-eval',
+      prompt:     PROMPT,
+      seedFiles:  { 'verify.js': VERIFY_JS },
+      postScript: 'verify.js',
+      timeoutMs:  CLAW_TIMEOUT,
+      testLabel:  'expression-eval',
     });
-    if (ctx.r.code === 0 && ctx.workspace.exists('expr.js')) ctx.runPost('verify.js');
-    await ctx.finish({
-      targetFile: 'expr.js',
-      expect:     { agentExit: 0, targetFileExists: true, postExit: 0 },
+    await ctx.finish(() => {
+      ctx.workspace.unchanged('verify.js', VERIFY_JS);
     });
   });
 });

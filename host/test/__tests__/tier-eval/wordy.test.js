@@ -123,15 +123,14 @@ const CLAW_TIMEOUT = 285_000;
 describe(`wordy: arithmetic query parser (tier=${TIER_LABEL})`, () => {
   it('claw solves the task', { timeout: CLAW_TIMEOUT + 20_000 }, async () => {
     const ctx = await runAgentSetup({
-      prompt:    PROMPT,
-      seedFiles: { 'verify.js': VERIFY_JS },
-      timeoutMs: CLAW_TIMEOUT,
-      testLabel: 'wordy',
+      prompt:     PROMPT,
+      seedFiles:  { 'verify.js': VERIFY_JS },
+      postScript: 'verify.js',
+      timeoutMs:  CLAW_TIMEOUT,
+      testLabel:  'wordy',
     });
-    if (ctx.r.code === 0 && ctx.workspace.exists('wordy.js')) ctx.runPost('verify.js');
-    await ctx.finish({
-      targetFile: 'wordy.js',
-      expect:     { agentExit: 0, targetFileExists: true, postExit: 0 },
+    await ctx.finish(() => {
+      ctx.workspace.unchanged('verify.js', VERIFY_JS);
     });
   });
 });

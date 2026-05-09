@@ -473,13 +473,18 @@ describe(`twelve-file-refactor: thread two params through 7 call sites in 12 fil
         'test.js':            TEST_JS,
       },
       preconditionMustFail: 'test.js',
+      postScript:           'test.js',
       timeoutMs:            CLAW_TIMEOUT,
       testLabel:            'twelve-file-refactor',
     });
-    if (ctx.r.code === 0) ctx.runPost('test.js');
-    await ctx.finish({
-      targetFile: 'format.js',
-      expect:     { agentExit: 0, postExit: 0 },
+    await ctx.finish(() => {
+      ctx.workspace.unchanged('test.js', TEST_JS);
+      ctx.workspace.unchanged('format-config.js', FORMAT_CONFIG_JS);
+      ctx.workspace.unchanged('currency-config.js', CURRENCY_CONFIG_JS);
+      ctx.workspace.unchanged('format-parse.js', FORMAT_PARSE_JS);
+      ctx.workspace.unchanged('notify.js', NOTIFY_JS);
+      ctx.workspace.unchanged('helper.js', HELPER_JS);
+      ctx.workspace.unchanged('constants.js', CONSTANTS_JS);
     });
   });
 });
