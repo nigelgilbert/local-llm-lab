@@ -78,6 +78,6 @@ describe(`two-step refactor: extract helper and fix latent bug (tier=${TIER_LABE
       timeoutMs:            TIMEOUT,
       testLabel:            'two-step-refactor',
     });
-    await ctx.finish(() => {});
+    await ctx.finish();
   });
 });

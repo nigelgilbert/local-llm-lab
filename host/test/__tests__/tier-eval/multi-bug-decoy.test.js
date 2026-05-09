@@ -129,6 +129,6 @@ describe(`multi-bug-decoy: 5 bugs + 1 correct helper (tier=${TIER_LABEL})`, () =
       timeoutMs:            TIMEOUT,
       testLabel:            'multi-bug-decoy',
     });
-    await ctx.finish(() => {});
+    await ctx.finish();
   });
 });

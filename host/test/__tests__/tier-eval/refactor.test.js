@@ -64,6 +64,6 @@ describe(`refactor: fix seeded off-by-one (tier=${TIER_LABEL})`, () => {
       timeoutMs:            CLAW_TIMEOUT,
       testLabel:            'refactor',
     });
-    await ctx.finish(() => {});
+    await ctx.finish();
   });
 });

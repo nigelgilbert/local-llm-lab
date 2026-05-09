@@ -76,6 +76,6 @@ describe(`multi-bug: fix three independent bugs (tier=${TIER_LABEL})`, () => {
       timeoutMs:            TIMEOUT,
       testLabel:            'multi-bug',
     });
-    await ctx.finish(() => {});
+    await ctx.finish();
   });
 });

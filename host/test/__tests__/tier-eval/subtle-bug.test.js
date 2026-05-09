@@ -65,6 +65,6 @@ describe(`subtle bug: default-sort lexicographic (tier=${TIER_LABEL})`, () => {
       timeoutMs:            TIMEOUT,
       testLabel:            'subtle-bug',
     });
-    await ctx.finish(() => {});
+    await ctx.finish();
   });
 });

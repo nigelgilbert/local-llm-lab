@@ -72,6 +72,6 @@ describe(`api evolution: signature reorder across two files (tier=${TIER_LABEL})
       timeoutMs:            CLAW_TIMEOUT,
       testLabel:            'api-evolution',
     });
-    await ctx.finish(() => {});
+    await ctx.finish();
   });
 });
