@@ -54,7 +54,7 @@ describe(`agent: single-file write × ${N_SINGLE} (settings=${SETTINGS_LABEL})`,
 
       for (let i = 0; i < N_SINGLE; i++) {
         workspace.reset();
-        const r = await runClaw({ prompt: SINGLE_PROMPT, model: clawModel, signal});
+        const r = await runClaw({ prompt: SINGLE_PROMPT, model: clawModel, signal, timeoutMs: TIMEOUT });
         const ok = r.code === 0 && workspace.exists('hello.py');
         latencies.push(r.elapsedMs);
         if (!ok) failures.push(`run ${i + 1}: exit=${r.code} files=${JSON.stringify(workspace.list())}`);
@@ -87,7 +87,7 @@ describe(`agent: parallel-file write × ${N_PARALLEL} (settings=${SETTINGS_LABEL
 
       for (let i = 0; i < N_PARALLEL; i++) {
         workspace.reset();
-        const r  = await runClaw({ prompt: PARALLEL_PROMPT, model: clawModel, signal});
+        const r  = await runClaw({ prompt: PARALLEL_PROMPT, model: clawModel, signal, timeoutMs: TIMEOUT });
         const ok = r.code === 0 && EXPECTED.every((f) => workspace.exists(f));
         latencies.push(r.elapsedMs);
         if (!ok) failures.push(`run ${i + 1}: exit=${r.code} files=${JSON.stringify(workspace.list())}`);

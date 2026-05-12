@@ -44,7 +44,7 @@ describe(`prose density observation (settings=${SETTINGS_LABEL})`, () => {
 
       for (let i = 0; i < N; i++) {
         workspace.reset();   // prevent agent-timing artefacts contaminating context
-        const r        = await runClaw({ prompt: PROMPT, model: clawModel, signal});
+        const r        = await runClaw({ prompt: PROMPT, model: clawModel, signal, timeoutMs: TIMEOUT });
         const clean    = stripAnsi(r.stdout);
         const newlines = (r.stdout.match(/\n/g) ?? []).length;
         const bullets  = (clean.match(/^[ \t]*[-*•]\s/gm) ?? []).length;

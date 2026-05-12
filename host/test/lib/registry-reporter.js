@@ -3,8 +3,6 @@
 //     derived from the test:pass / test:fail event type (never null).
 //   - Logs the per-test header `=== <test_id> (<tier>) === PASS|FAIL` (plus the
 //     agent/post detail lines that used to live in runAgentSetup, pre-1.22).
-//   - Sets globalThis.__registryReporterLoaded so runAgent can detect a missing
-//     --test-reporter flag in RUN_REGISTRY_EMIT=1 sweeps.
 //
 // Wired in package.json + entrypoint.sh + the sweep scripts via:
 //   --test-reporter=./lib/registry-reporter.js --test-reporter-destination=stdout
@@ -24,8 +22,6 @@
 
 import { writeAssertionResult } from './claw.js';
 import { TIER_LABEL } from './tier.js';
-
-globalThis.__registryReporterLoaded = true;
 
 const POST_STDERR_TAIL = 800;
 

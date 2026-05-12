@@ -165,6 +165,7 @@ describe(`book-store: minimum-cost partition with non-greedy trap (tier=${TIER_L
       seedFiles:            { 'verify.js': VERIFY_JS },
       postScript:           'verify.js',
       postScriptTimeoutMs:  10_000,
+      clawTimeoutMs:    CLAW_TIMEOUT,
       testId:            'book-store',
       t,
     });

@@ -76,6 +76,7 @@ describe(`two-step refactor: extract helper and fix latent bug (tier=${TIER_LABE
       seedFiles:            { 'stats.js': STATS_JS },
       preconditionMustFail: 'stats.js',
       postScript:           'stats.js',
+      clawTimeoutMs:    TIMEOUT,
       testId:            'two-step-refactor',
       t,
     });

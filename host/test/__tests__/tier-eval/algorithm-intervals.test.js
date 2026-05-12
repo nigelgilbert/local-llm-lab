@@ -61,6 +61,7 @@ describe(`algorithm: merge intervals (tier=${TIER_LABEL})`, () => {
       prompt:     PROMPT,
       seedFiles:  { 'verify.js': VERIFY_JS },
       postScript: 'verify.js',
+      clawTimeoutMs:    TIMEOUT,
       testId:  'algorithm-intervals',
       t,
     });

@@ -90,6 +90,7 @@ describe(`cascading-bugs: 5 sequential failures, one runner (tier=${TIER_LABEL})
       seedFiles:            { 'a.js': A_JS, 'b.js': B_JS, 'c.js': C_JS, 'd.js': D_JS, 'e.js': E_JS, 'run.js': RUN_JS },
       preconditionMustFail: 'run.js',
       postScript:           'run.js',
+      clawTimeoutMs:    TIMEOUT,
       testId:            'cascading-bugs',
       t,
     });

@@ -70,6 +70,7 @@ describe(`api evolution: signature reorder across two files (tier=${TIER_LABEL})
       seedFiles:            { 'pricing.js': PRICING_JS, 'app.js': APP_JS },
       preconditionMustFail: 'app.js',
       postScript:           'app.js',
+      clawTimeoutMs:    CLAW_TIMEOUT,
       testId:            'api-evolution',
       t,
     });

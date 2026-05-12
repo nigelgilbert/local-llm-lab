@@ -112,6 +112,7 @@ describe(`large-refactor: thread currency through 5 call sites (tier=${TIER_LABE
       seedFiles:            { 'format.js': FORMAT_JS, 'cart.js': CART_JS, 'receipt.js': RECEIPT_JS, 'report.js': REPORT_JS, 'test.js': TEST_JS },
       preconditionMustFail: 'test.js',
       postScript:           'test.js',
+      clawTimeoutMs:    CLAW_TIMEOUT,
       testId:            'large-refactor',
       t,
     });

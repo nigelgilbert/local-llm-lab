@@ -470,6 +470,7 @@ describe(`word-search v2.1: dual-anchor multi-match enumeration (tier=${TIER_LAB
         'anchors.json': ANCHORS_JSON,
       },
       postScript: 'verify.js',
+      clawTimeoutMs:    CLAW_TIMEOUT,
       testId:  'word-search',
       t,
     });

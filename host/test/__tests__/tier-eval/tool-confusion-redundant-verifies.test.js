@@ -109,6 +109,7 @@ describe(`tool-confusion-redundant-verifies: parse() with red-herring verifiers 
         'validate.js': VALIDATE_JS,
       },
       postScript: 'verify.js',
+      clawTimeoutMs:    CLAW_TIMEOUT,
       testId:  'tool-confusion-redundant-verifies',
       t,
     });

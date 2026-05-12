@@ -61,6 +61,7 @@ describe(`deep-equal: structural equality (tier=${TIER_LABEL})`, () => {
       prompt:     PROMPT,
       seedFiles:  { 'verify.js': VERIFY_JS },
       postScript: 'verify.js',
+      clawTimeoutMs:    CLAW_TIMEOUT,
       testId:  'deep-equal',
       t,
     });

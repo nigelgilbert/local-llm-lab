@@ -74,6 +74,7 @@ describe(`multi-bug: fix three independent bugs (tier=${TIER_LABEL})`, () => {
       seedFiles:            { 'text.js': TEXT_JS },
       preconditionMustFail: 'text.js',
       postScript:           'text.js',
+      clawTimeoutMs:    TIMEOUT,
       testId:            'multi-bug',
       t,
     });

@@ -475,6 +475,7 @@ describe(`twelve-file-refactor: thread two params through 7 call sites in 12 fil
       },
       preconditionMustFail: 'test.js',
       postScript:           'test.js',
+      clawTimeoutMs:    CLAW_TIMEOUT,
       testId:            'twelve-file-refactor',
       t,
     });

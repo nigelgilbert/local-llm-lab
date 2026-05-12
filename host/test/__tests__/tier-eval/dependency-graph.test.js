@@ -92,6 +92,7 @@ describe(`dependency-graph: topological sort with cycle detection (tier=${TIER_L
       prompt:     PROMPT,
       seedFiles:  { 'verify.js': VERIFY_JS },
       postScript: 'verify.js',
+      clawTimeoutMs:    TIMEOUT,
       testId:  'dependency-graph',
       t,
     });

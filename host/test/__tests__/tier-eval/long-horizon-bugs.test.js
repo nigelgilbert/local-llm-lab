@@ -122,6 +122,7 @@ describe(`long-horizon: 4 bugs across 6 files (tier=${TIER_LABEL})`, () => {
       seedFiles:            { 'math.js': MATH_JS, 'strings.js': STRINGS_JS, 'arrays.js': ARRAYS_JS, 'objects.js': OBJECTS_JS, 'test.js': TEST_JS, 'README.md': README_MD },
       preconditionMustFail: 'test.js',
       postScript:           'test.js',
+      clawTimeoutMs:    TIMEOUT,
       testId:            'long-horizon-bugs',
       t,
     });

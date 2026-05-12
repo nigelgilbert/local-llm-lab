@@ -37,7 +37,7 @@ describe(`eval B — three parallel writes (backend=${BACKEND}, model=${clawMode
   beforeEach(() => workspace.reset());
 
   it('claw creates a.py, b.py, c.py with matching contents', { timeout: TIMEOUT }, async ({ signal }) => {
-    const r = await runClaw({ prompt: PROMPT, model: clawModel, signal});
+    const r = await runClaw({ prompt: PROMPT, model: clawModel, signal, timeoutMs: TIMEOUT });
 
     console.log(`\n=== eval-b (${BACKEND}) ===`);
     console.log(`  exit=${r.code} elapsed=${r.elapsedMs}ms files=${JSON.stringify(workspace.list())}`);

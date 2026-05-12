@@ -136,6 +136,7 @@ describe(`eight-functions: 12 helpers with cross-file deps (tier=${TIER_LABEL})`
       prompt:     PROMPT,
       seedFiles:  { 'verify.js': VERIFY_JS },
       postScript: 'verify.js',
+      clawTimeoutMs:    CLAW_TIMEOUT,
       testId:  'eight-functions',
       t,
     });

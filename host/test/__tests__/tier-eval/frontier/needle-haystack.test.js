@@ -368,7 +368,7 @@ describe(`needle-haystack: 30-file NIAH apply-the-needle (tier=${TIER_LABEL})`, 
   });
 
   it('claw locates REGION_KEY and writes solve.js', { timeout: CLAW_TIMEOUT + 20_000 }, async ({ signal }) => {
-    const r = await runClaw({ prompt: PROMPT, model: clawModel, signal});
+    const r = await runClaw({ prompt: PROMPT, model: clawModel, signal, timeoutMs: CLAW_TIMEOUT });
 
     const targetExists = workspace.exists('solve.js');
     let post = null;

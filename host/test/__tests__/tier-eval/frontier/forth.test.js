@@ -155,7 +155,7 @@ describe(`forth: stack interpreter with def/end and parse-time binding (tier=${T
   });
 
   it('claw solves the task', { timeout: CLAW_TIMEOUT + 20_000 }, async ({ signal }) => {
-    const r = await runClaw({ prompt: PROMPT, model: clawModel, signal});
+    const r = await runClaw({ prompt: PROMPT, model: clawModel, signal, timeoutMs: CLAW_TIMEOUT });
 
     const targetExists = workspace.exists('forth.js');
     let post = null;

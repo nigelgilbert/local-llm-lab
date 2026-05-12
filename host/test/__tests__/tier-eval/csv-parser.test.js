@@ -138,6 +138,7 @@ describe(`csv-parser: RFC 4180-ish parser (tier=${TIER_LABEL})`, () => {
       prompt:     PROMPT,
       seedFiles:  { 'verify.js': VERIFY_JS },
       postScript: 'verify.js',
+      clawTimeoutMs:    CLAW_TIMEOUT,
       testId:  'csv-parser',
       t,
     });

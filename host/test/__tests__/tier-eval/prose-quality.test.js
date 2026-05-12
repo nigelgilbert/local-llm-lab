@@ -125,7 +125,7 @@ describe(`prose quality via claw renderer (tier=${TIER_LABEL}, informational)`, 
     async ({ signal }) => {
       const results = [];
       for (let i = 0; i < N; i++) {
-        const r     = await runClaw({ prompt: PROMPT, model: clawModel, signal});
+        const r     = await runClaw({ prompt: PROMPT, model: clawModel, signal, timeoutMs: TIMEOUT });
         const clean = stripAnsi(r.stdout);
         const { newlines, bullets } = countText(clean);
         results.push({ code: r.code, elapsedMs: r.elapsedMs, rawLen: r.stdout.length, cleanLen: clean.length, newlines, bullets, clean });

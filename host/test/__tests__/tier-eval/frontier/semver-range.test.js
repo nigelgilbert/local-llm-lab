@@ -171,7 +171,7 @@ describe(`semver-range: dense semver/range parser (tier=${TIER_LABEL})`, () => {
   });
 
   it('claw solves the task', { timeout: CLAW_TIMEOUT + 20_000 }, async ({ signal }) => {
-    const r = await runClaw({ prompt: PROMPT, model: clawModel, signal});
+    const r = await runClaw({ prompt: PROMPT, model: clawModel, signal, timeoutMs: CLAW_TIMEOUT });
 
     const targetExists = workspace.exists('semver-range.js');
     let post = null;

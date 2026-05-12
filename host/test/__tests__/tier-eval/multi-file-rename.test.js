@@ -75,6 +75,7 @@ describe(`multi-file rename + signature change (tier=${TIER_LABEL})`, () => {
       seedFiles:            { 'lib.js': LIB_JS, 'service.js': SERVICE_JS, 'index.js': INDEX_JS },
       preconditionMustFail: 'index.js',
       postScript:           'index.js',
+      clawTimeoutMs:    TIMEOUT,
       testId:            'multi-file-rename',
       t,
     });

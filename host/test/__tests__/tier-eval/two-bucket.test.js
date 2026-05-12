@@ -221,6 +221,7 @@ describe(`two-bucket: shortest-path BFS with explicit path reconstruction (tier=
       prompt:     PROMPT,
       seedFiles:  { 'verify.js': VERIFY_JS },
       postScript: 'verify.js',
+      clawTimeoutMs:    CLAW_TIMEOUT,
       testId:  'two-bucket',
       t,
     });

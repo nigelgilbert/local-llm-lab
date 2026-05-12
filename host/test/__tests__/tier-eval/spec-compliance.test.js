@@ -62,6 +62,7 @@ describe(`spec compliance: multi-requirement formatPrice (tier=${TIER_LABEL})`, 
       prompt:     PROMPT,
       seedFiles:  { 'verify.js': VERIFY_JS },
       postScript: 'verify.js',
+      clawTimeoutMs:    TIMEOUT,
       testId:  'spec-compliance',
       t,
     });

@@ -15,7 +15,7 @@ describe(`eval A — single-file write (backend=${BACKEND}, model=${clawModel})`
   beforeEach(() => workspace.reset());
 
   it('claw creates hello.py with the requested content', { timeout: TIMEOUT }, async ({ signal }) => {
-    const r = await runClaw({ prompt: PROMPT, model: clawModel, signal});
+    const r = await runClaw({ prompt: PROMPT, model: clawModel, signal, timeoutMs: TIMEOUT });
 
     console.log(`\n=== eval-a (${BACKEND}) ===`);
     console.log(`  exit=${r.code} elapsed=${r.elapsedMs}ms files=${JSON.stringify(workspace.list())}`);

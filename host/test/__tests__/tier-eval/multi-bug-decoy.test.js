@@ -127,6 +127,7 @@ describe(`multi-bug-decoy: 5 bugs + 1 correct helper (tier=${TIER_LABEL})`, () =
       seedFiles:            { 'helpers.js': HELPERS_JS },
       preconditionMustFail: 'helpers.js',
       postScript:           'helpers.js',
+      clawTimeoutMs:    TIMEOUT,
       testId:            'multi-bug-decoy',
       t,
     });

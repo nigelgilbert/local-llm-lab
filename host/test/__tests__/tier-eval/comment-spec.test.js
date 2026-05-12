@@ -85,6 +85,7 @@ describe(`comment-spec: implement from JSDoc (tier=${TIER_LABEL})`, () => {
       seedFiles:            { 'collections.js': COLLECTIONS_JS, 'verify.js': VERIFY_JS },
       preconditionMustFail: 'verify.js',
       postScript:           'verify.js',
+      clawTimeoutMs:    TIMEOUT,
       testId:            'comment-spec',
       t,
     });

@@ -329,6 +329,7 @@ describe(`ini-parser: line-by-line config parser with section reentry (tier=${TI
       prompt:     PROMPT,
       seedFiles:  { 'verify.js': VERIFY_JS },
       postScript: 'verify.js',
+      clawTimeoutMs:    CLAW_TIMEOUT,
       testId:  'ini-parser',
       t,
     });

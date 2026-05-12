@@ -48,7 +48,7 @@ const POST_STDERR_TAIL  = 800;
  */
 
 /** @typedef {import('node:child_process').SpawnSyncReturns<string>} PostResult */
-/** @typedef {(opts: { prompt: string, signal: AbortSignal }) => Promise<RunnerResult>} Runner */
+/** @typedef {(opts: { prompt: string, signal: AbortSignal, timeoutMs?: number }) => Promise<RunnerResult>} Runner */
 
 /**
  * @typedef {Object} AgentCtx
@@ -65,6 +65,11 @@ const POST_STDERR_TAIL  = 800;
  * @param {number}                [opts.preconditionTimeoutMs=5000]
  * @param {string|null}           [opts.postScript=null]
  * @param {number}                [opts.postScriptTimeoutMs=5000]
+ * @param {number}                [opts.clawTimeoutMs]  claw's internal ceiling.
+ *   Must be strictly less than the test's `{timeout}` so claw aborts itself in
+ *   time for runAgent to emit diagnostics before node:test cancels the test.
+ *   The test-body convention is `{timeout: CLAW_TIMEOUT + 20_000}` and
+ *   `clawTimeoutMs: CLAW_TIMEOUT`.
  * @param {string}                opts.testId
  * @param {Runner}                [opts.runner=defaultRunner]
  * @param {import('node:test').TestContext} opts.t  node:test context; runAgent
@@ -79,6 +84,7 @@ export async function runAgent({
   preconditionTimeoutMs = DEFAULT_PRECONDITION_TIMEOUT_MS,
   postScript = null,
   postScriptTimeoutMs = DEFAULT_POST_SCRIPT_TIMEOUT_MS,
+  clawTimeoutMs,
   testId,
   runner = defaultRunner,
   t,
@@ -90,16 +96,13 @@ export async function runAgent({
   }
   const signal = t.signal;
 
-  // RUN_REGISTRY_EMIT sweeps depend on registry-reporter.js being wired into
-  // node:test. Fail loud if the flag is missing — otherwise the sweep would
-  // run, claw would emit telemetry, and zero registry rows would land.
-  if (process.env.RUN_REGISTRY_EMIT === '1' && !globalThis.__registryReporterLoaded) {
-    throw new Error(
-      'RUN_REGISTRY_EMIT=1 but registry-reporter is not loaded. ' +
-      'Add --test-reporter=./lib/registry-reporter.js --test-reporter-destination=stdout ' +
-      'to the node --test invocation.',
-    );
-  }
+  // Sprint 1.22 originally guarded RUN_REGISTRY_EMIT=1 against a missing
+  // registry-reporter via globalThis.__registryReporterLoaded — but node:test
+  // runs each test file under --test-isolation=process and custom reporters
+  // run in the parent's context, so a global set by the reporter is invisible
+  // here. The backstop now is expected-attempts.mjs's diff: a sweep with the
+  // reporter accidentally unwired produces zero sidecars and the diff flags
+  // every cell as missing.
 
   // run_summary.json's test_id field is populated from this env var in
   // claw.js's buildRunSummary. Reporter doesn't read it; it's for the
@@ -122,7 +125,7 @@ export async function runAgent({
     );
   }
 
-  const agent = await runner({ prompt, signal });
+  const agent = await runner({ prompt, signal, timeoutMs: clawTimeoutMs });
   t.diagnostic(`runDir=${agent.runDir}`);
   t.diagnostic(`test_id=${testId}`);
   t.diagnostic(`agent_result=${JSON.stringify({
@@ -150,6 +153,6 @@ export async function runAgent({
   return { agent, workspace, post };
 }
 
-function defaultRunner({ prompt, signal }) {
-  return runClaw({ prompt, model: clawModel, signal });
+function defaultRunner({ prompt, signal, timeoutMs }) {
+  return runClaw({ prompt, model: clawModel, signal, timeoutMs });
 }

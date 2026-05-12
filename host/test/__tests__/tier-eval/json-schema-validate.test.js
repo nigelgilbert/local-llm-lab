@@ -160,6 +160,7 @@ describe(`json-schema-validate: recursive validator (tier=${TIER_LABEL})`, () =>
       prompt:     PROMPT,
       seedFiles:  { 'verify.js': VERIFY_JS },
       postScript: 'verify.js',
+      clawTimeoutMs:    TIMEOUT,
       testId:  'json-schema-validate',
       t,
     });

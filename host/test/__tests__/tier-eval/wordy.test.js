@@ -127,6 +127,7 @@ describe(`wordy: arithmetic query parser (tier=${TIER_LABEL})`, () => {
       prompt:     PROMPT,
       seedFiles:  { 'verify.js': VERIFY_JS },
       postScript: 'verify.js',
+      clawTimeoutMs:    CLAW_TIMEOUT,
       testId:  'wordy',
       t,
     });

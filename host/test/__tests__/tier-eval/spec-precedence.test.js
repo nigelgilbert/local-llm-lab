@@ -75,6 +75,7 @@ describe(`spec-precedence: ordered transformation rules (tier=${TIER_LABEL})`, (
       prompt:     PROMPT,
       seedFiles:  { 'verify.js': VERIFY_JS },
       postScript: 'verify.js',
+      clawTimeoutMs:    TIMEOUT,
       testId:  'spec-precedence',
       t,
     });

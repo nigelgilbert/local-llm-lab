@@ -79,6 +79,7 @@ export function runClaw({
   prompt,
   model,
   signal,
+  timeoutMs,
   extraArgs = [],
 }) {
   return new Promise((resolve, reject) => {
@@ -86,11 +87,19 @@ export function runClaw({
     const runId = randomUUID();
     const runStartedMs = Date.now();
 
-    // Sprint 1.22: cancellation is delegated to the caller's AbortSignal
-    // (typically node:test's t.signal). The harness no longer holds a
-    // setTimeout — node:test's per-test timeout is the single source of truth,
-    // so a single dial governs both the assertion failure ('agent timed out')
-    // and the child reap.
+    // Combine claw's internal ceiling (timeoutMs) with the caller's signal
+    // (typically node:test's t.signal). The internal timer must fire first —
+    // when only node:test's outer timeout exists, it cancels the test before
+    // runAgent's diagnostics can land, so no registry row gets written for
+    // timeout cells. Callers set timeoutMs strictly less than node:test's
+    // per-test timeout (test-body convention: timeout = CLAW_TIMEOUT + 20_000).
+    const inputs = [];
+    if (signal) inputs.push(signal);
+    if (typeof timeoutMs === 'number' && timeoutMs > 0) inputs.push(AbortSignal.timeout(timeoutMs));
+    const combinedSignal = inputs.length === 0 ? undefined
+                         : inputs.length === 1 ? inputs[0]
+                         : AbortSignal.any(inputs);
+
     const child = spawn('claw', args, {
       cwd: WORKSPACE,
       // CLAW_RUN_ID is informational — claw itself does not read it. The
@@ -98,7 +107,7 @@ export function runClaw({
       // assigned harness-side and bridge records are joined by time-window.
       env: { ...process.env, CLAW_RUN_ID: runId },
       stdio: ['ignore', 'pipe', 'pipe'],
-      signal,
+      signal: combinedSignal,
       killSignal: 'SIGKILL',
     });
 
@@ -115,7 +124,7 @@ export function runClaw({
     child.on('close', (code, killSig) => {
       const runFinishedMs = Date.now();
       const elapsedMs = runFinishedMs - runStartedMs;
-      const aborted = !!signal?.aborted;
+      const aborted = !!combinedSignal?.aborted;
 
       let extras = { runId };
       if (!TELEMETRY_DISABLED) {
