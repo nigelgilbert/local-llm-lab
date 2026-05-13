@@ -74,7 +74,7 @@ describe(`prose quality via raw bridge (tier=${TIER_LABEL})`, () => {
   it(
     `${N}× markdown via streamMessage: len ≥ ${MIN_TEXT_LEN}, newlines ≥ ${MIN_NEWLINES}, bullets ≥ ${MIN_BULLETS}`,
     { timeout: OUTER_TIMEOUT },
-    async ({ signal }) => {
+    async () => {
       const results = [];
       for (let i = 0; i < N; i++) {
         const t0 = Date.now();
