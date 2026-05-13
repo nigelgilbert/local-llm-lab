@@ -1,8 +1,13 @@
 // node:test stream reporter that:
-//   - Writes <runDir>/assertion_result.json for every leaf test, with `passed`
-//     derived from the test:pass / test:fail event type (never null).
-//   - Logs the per-test header `=== <test_id> (<tier>) === PASS|FAIL` (plus the
-//     agent/post detail lines that used to live in runAgentSetup, pre-1.22).
+//   - Logs the per-test header `=== <test_id> (<tier>) === PASS|FAIL` for every
+//     leaf test (plus the agent/post detail lines that used to live in
+//     runAgentSetup, pre-1.22).
+//   - Writes <runDir>/assertion_result.json for tests that emit a `runDir`
+//     diagnostic (i.e. went through runAgent and reached its entry-time
+//     diagnostics). Tests without a runDir — Family C, model-ab, or runAgent
+//     failures before the diagnostic flush — get the header but no sidecar.
+//     `passed` is derived from the test:pass / test:fail event type (never
+//     null).
 //
 // Wired in package.json + entrypoint.sh + the sweep scripts via:
 //   --test-reporter=./lib/registry-reporter.js --test-reporter-destination=stdout
