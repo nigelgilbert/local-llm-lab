@@ -63,8 +63,13 @@ function isEmitEligible(filePath) {
   // A tier-eval test produces a registry row iff its source references one of
   // the two registry-writing entry points: the lib/runAgent.js helper (Sprint
   // 1.22, ex-runAgentSetup) or the underlying writeAssertionResult primitive
-  // (custom tests that opt out of the helper, e.g. frontier/*). Family C
-  // (latency / prose-quality / tool-discipline) references neither.
+  // (for tests that opt out of the helper). Family C (latency / prose-quality
+  // / tool-discipline) references neither.
+  //
+  // Note: listEligibleTests() below does not recurse, so direct-primitive
+  // callers under __tests__/tier-eval/frontier/ are not reached — see that
+  // directory's README for why frontier tests are deliberately excluded from
+  // the screening pipeline.
   const src = fs.readFileSync(filePath, 'utf8');
   return /\b(runAgent|writeAssertionResult)\b/.test(src);
 }
