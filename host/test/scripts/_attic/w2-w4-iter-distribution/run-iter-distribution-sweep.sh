@@ -199,7 +199,7 @@ with open(manifest_path, "w") as f:
 PY
 
 # Build the run table.
-python3 "$SCRIPT_DIR/analysis/build-run-table.py"
+python3 "$SCRIPT_DIR/build-run-table.py"
 
 log "wrote sweep manifest: $MANIFEST"
 log "wrote run table: $RUNTIME_DIR/iter-distribution-runs.csv"

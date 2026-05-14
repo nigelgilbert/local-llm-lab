@@ -173,7 +173,7 @@ PY
 
 # Build the run table (covers all .claw-runtime/<run-id>/ entries; pilot rows
 # are identifiable by test_id ∈ TESTS).
-python3 "$SCRIPT_DIR/analysis/build-run-table.py"
+python3 "$SCRIPT_DIR/build-run-table.py"
 
 # ---- pilot summary: per-(test, sampler) pass-rate filtered to pilot tests ----
 TESTS_CSV=$(IFS=,; echo "${TESTS[*]}")
