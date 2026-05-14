@@ -41,4 +41,7 @@ printf '  %s\n' "${matches[@]}" >&2
 docker compose run --rm \
   -v "$PWD/__tests__:/test/__tests__" \
   -v "$PWD/lib:/test/lib" \
-  test node --test "$@" "${matches[@]}"
+  test node --test \
+    --test-reporter=spec --test-reporter-destination=stdout \
+    --test-reporter=./lib/registry-reporter.js --test-reporter-destination=stdout \
+    "$@" "${matches[@]}"
