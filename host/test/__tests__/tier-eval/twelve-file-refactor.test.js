@@ -37,14 +37,11 @@
 //        story live in difficulty-pack/memos/twelve-file-refactor-v2-v3-redesign.md;
 //        c21 evidence in good-tests.md row 3.
 
-import { describe, it, beforeEach } from 'node:test';
+import { describe, it } from 'node:test';
+
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
-import path from 'node:path';
-import { spawnSync } from 'node:child_process';
-import { runClaw, writeAssertionResult } from '../../lib/claw.js';
-import * as workspace from '../../lib/workspace.js';
-import { clawModel, TIER_LABEL } from '../../lib/tier.js';
+import { runAgent } from '../../lib/runAgent.js';
+import { TIER_LABEL } from '../../lib/tier.js';
 
 // formatPrice — formats an amount. Currency and locale are currently hardcoded.
 // Refactor target: take (amount, currency, locale) and emit a string that
@@ -453,63 +450,46 @@ test.js, format-config.js, currency-config.js, or format-parse.js.
 Files notify.js, helper.js, and constants.js are distractors that do NOT
 call formatPrice — leave them alone.`;
 
-const CLAW_TIMEOUT = 285_000;
+const TIMEOUT = 285_000;
 
 describe(`twelve-file-refactor: thread two params through 7 call sites in 12 files (tier=${TIER_LABEL})`, () => {
-  beforeEach(() => {
-    workspace.reset();
-    fs.writeFileSync(path.join(workspace.WORKSPACE, 'format.js'),          FORMAT_JS);
-    fs.writeFileSync(path.join(workspace.WORKSPACE, 'format-config.js'),   FORMAT_CONFIG_JS);
-    fs.writeFileSync(path.join(workspace.WORKSPACE, 'currency-config.js'), CURRENCY_CONFIG_JS);
-    fs.writeFileSync(path.join(workspace.WORKSPACE, 'format-parse.js'),    FORMAT_PARSE_JS);
-    fs.writeFileSync(path.join(workspace.WORKSPACE, 'cart.js'),      CART_JS);
-    fs.writeFileSync(path.join(workspace.WORKSPACE, 'receipt.js'),   RECEIPT_JS);
-    fs.writeFileSync(path.join(workspace.WORKSPACE, 'report.js'),    REPORT_JS);
-    fs.writeFileSync(path.join(workspace.WORKSPACE, 'invoice.js'),   INVOICE_JS);
-    fs.writeFileSync(path.join(workspace.WORKSPACE, 'audit.js'),     AUDIT_JS);
-    fs.writeFileSync(path.join(workspace.WORKSPACE, 'summary.js'),   SUMMARY_JS);
-    fs.writeFileSync(path.join(workspace.WORKSPACE, 'taxes.js'),     TAXES_JS);
-    fs.writeFileSync(path.join(workspace.WORKSPACE, 'notify.js'),    NOTIFY_JS);
-    fs.writeFileSync(path.join(workspace.WORKSPACE, 'helper.js'),    HELPER_JS);
-    fs.writeFileSync(path.join(workspace.WORKSPACE, 'constants.js'), CONSTANTS_JS);
-    fs.writeFileSync(path.join(workspace.WORKSPACE, 'test.js'),      TEST_JS);
-  });
-
-  it('claw threads two parameters through every caller', { timeout: CLAW_TIMEOUT + 20_000 }, async () => {
-    const pre = spawnSync('node', [path.join(workspace.WORKSPACE, 'test.js')], {
-      encoding: 'utf8',
-      timeout: 5_000,
+  it('claw threads two parameters through every caller', { timeout: TIMEOUT }, async (t) => {
+    const ctx = await runAgent({
+      prompt:               PROMPT,
+      seedFiles:            {
+        'format.js':          FORMAT_JS,
+        'format-config.js':   FORMAT_CONFIG_JS,
+        'currency-config.js': CURRENCY_CONFIG_JS,
+        'format-parse.js':    FORMAT_PARSE_JS,
+        'cart.js':            CART_JS,
+        'receipt.js':         RECEIPT_JS,
+        'report.js':          REPORT_JS,
+        'invoice.js':         INVOICE_JS,
+        'audit.js':           AUDIT_JS,
+        'summary.js':         SUMMARY_JS,
+        'taxes.js':           TAXES_JS,
+        'notify.js':          NOTIFY_JS,
+        'helper.js':          HELPER_JS,
+        'constants.js':       CONSTANTS_JS,
+        'test.js':            TEST_JS,
+      },
+      preconditionMustFail: 'test.js',
+      postScript:           'test.js',
+      clawTimeoutMs:    TIMEOUT,
+      testId:            'twelve-file-refactor',
+      t,
     });
-    assert.notEqual(pre.status, 0, 'pre-condition: test.js must fail before the refactor');
-
-    const r = await runClaw({ prompt: PROMPT, model: clawModel, timeoutMs: CLAW_TIMEOUT });
-
-    let post = null;
-    if (r.code === 0) {
-      post = spawnSync('node', [path.join(workspace.WORKSPACE, 'test.js')], {
-        encoding: 'utf8',
-        timeout: 5_000,
-      });
-    }
-
-    const passed = r.code === 0 && post != null && post.status === 0;
-
-    console.log(`\n=== twelve-file-refactor (${TIER_LABEL}) ===`);
-    console.log(`  claw: exit=${r.code} elapsed=${r.elapsedMs}ms files=${JSON.stringify(workspace.list())}`);
-    if (r.code !== 0) console.log(`  claw stderr (tail):\n${r.stderr.slice(-1500)}`);
-    if (post) console.log(`  node post-fix: exit=${post.status} stderr=${post.stderr.slice(0, 400).trim()}`);
-
-    writeAssertionResult(r.runDir, {
-      passed,
-      claw_exit: r.code,
-      target_file_exists: workspace.exists('format.js'),
-      post_status: post?.status ?? null,
-      post_stderr_tail: post?.stderr?.slice(0, 800) ?? null,
-    });
-
-    if (r.terminal_status === 'timeout') assert.fail(`claw timed out after ${r.elapsedMs}ms`);
-
-    assert.equal(r.code, 0, 'claw must exit cleanly');
-    assert.equal(post?.status, 0, `test.js still fails:\n${post?.stderr?.slice(0, 800)}`);
+    assert.equal(ctx.agent.code, 0, 'agent must exit cleanly');
+    ctx.workspace.unchanged('test.js', TEST_JS);
+    ctx.workspace.unchanged('format-config.js', FORMAT_CONFIG_JS);
+    ctx.workspace.unchanged('currency-config.js', CURRENCY_CONFIG_JS);
+    ctx.workspace.unchanged('format-parse.js', FORMAT_PARSE_JS);
+    ctx.workspace.unchanged('notify.js', NOTIFY_JS);
+    ctx.workspace.unchanged('helper.js', HELPER_JS);
+    ctx.workspace.unchanged('constants.js', CONSTANTS_JS);
+    assert.equal(
+      ctx.post.status, 0,
+      `post-script failed:\n${ctx.post.stderr.slice(0, 800)}`,
+    );
   });
 });

@@ -36,15 +36,11 @@
  * }
  */
 
-import { describe, it, beforeEach } from 'node:test';
+import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
-import fs from 'node:fs';
-import path from 'node:path';
 
-import { runClaw, writeAssertionResult } from '../../lib/claw.js';
-import * as workspace from '../../lib/workspace.js';
-import { clawModel, TIER_LABEL } from '../../lib/tier.js';
+import { runAgent } from '../../lib/runAgent.js';
+import { TIER_LABEL } from '../../lib/tier.js';
 
 const VERIFY_JS = `\
 import assert from 'node:assert/strict';
@@ -125,8 +121,7 @@ const PROMPT =
   'applies flatten repeatedly until the array contains no nested arrays.\n\n' +
   'Then ensure `node verify.js` exits 0. Do not edit verify.js.';
 
-const CLAW_TIMEOUT = 240_000;
-const TIMEOUT = CLAW_TIMEOUT + 60_000;
+const TIMEOUT = 240_000;
 
 const TARGETS = [
   'pad.js', 'clamp.js', 'unique.js', 'chunk.js',
@@ -135,45 +130,24 @@ const TARGETS = [
 ];
 
 describe(`eight-functions: 12 helpers with cross-file deps (tier=${TIER_LABEL})`, () => {
-  beforeEach(() => {
-    workspace.reset();
-    fs.writeFileSync(path.join(workspace.WORKSPACE, 'verify.js'), VERIFY_JS);
-  });
-
-  it('claw implements all twelve helpers with correct cross-file imports', { timeout: TIMEOUT }, async () => {
-    const r = await runClaw({ prompt: PROMPT, model: clawModel, timeoutMs: CLAW_TIMEOUT });
-
-    console.log(`\n=== eight-functions (${TIER_LABEL}) ===`);
-    console.log(`  claw: exit=${r.code} elapsed=${r.elapsedMs}ms files=${JSON.stringify(workspace.list())}`);
-    if (r.code !== 0) console.log(`  claw stderr (tail):\n${r.stderr.slice(-1500)}`);
-
-    const targetsPresent = TARGETS.map(f => workspace.exists(f));
-    const allTargetsExist = targetsPresent.every(Boolean);
-    let post = null;
-    if (r.code === 0 && allTargetsExist) {
-      post = spawnSync('node', [path.join(workspace.WORKSPACE, 'verify.js')], {
-        encoding: 'utf8',
-        timeout:  5_000,
-      });
-      console.log(`  node post-fix: exit=${post.status} stderr=${post.stderr.slice(0, 400).trim()}`);
-    } else if (r.code === 0) {
-      const missing = TARGETS.filter((f, i) => !targetsPresent[i]);
-      console.log(`  missing target files: ${JSON.stringify(missing)}`);
-    }
-
-    writeAssertionResult(r.runDir, {
-      passed: r.code === 0 && allTargetsExist && post != null && post.status === 0,
-      claw_exit: r.code,
-      target_file_exists: allTargetsExist,
-      post_status: post ? post.status : null,
-      post_stderr_tail: post ? post.stderr.slice(0, 800) : null,
+  it('claw implements all twelve helpers with correct cross-file imports', { timeout: TIMEOUT }, async (t) => {
+    const ctx = await runAgent({
+      prompt:     PROMPT,
+      seedFiles:  { 'verify.js': VERIFY_JS },
+      postScript: 'verify.js',
+      clawTimeoutMs:    TIMEOUT,
+      testId:  'eight-functions',
+      t,
     });
-
-    if (r.terminal_status === 'timeout') assert.fail(`claw timed out after ${r.elapsedMs}ms (terminal_status=timeout)`);
-
-    assert.equal(r.code, 0, 'claw must exit cleanly');
+    assert.equal(ctx.agent.code, 0, 'agent must exit cleanly');
+    ctx.workspace.unchanged('verify.js', VERIFY_JS);
+    const targetsPresent = TARGETS.map(f => ctx.workspace.exists(f));
+    const allTargetsExist = targetsPresent.every(Boolean);
     assert.equal(allTargetsExist, true,
       `missing target files: ${TARGETS.filter((f, i) => !targetsPresent[i]).join(', ')}`);
-    assert.equal(post.status, 0, `verify.js failed:\n${post.stderr.slice(0, 800)}`);
+    assert.equal(
+      ctx.post.status, 0,
+      `post-script failed:\n${ctx.post.stderr.slice(0, 800)}`,
+    );
   });
 });

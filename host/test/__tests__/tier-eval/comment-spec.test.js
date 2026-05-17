@@ -29,15 +29,11 @@
  * }
  */
 
-import { describe, it, beforeEach } from 'node:test';
-import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
-import fs from 'node:fs';
-import path from 'node:path';
+import { describe, it } from 'node:test';
 
-import { runClaw, writeAssertionResult } from '../../lib/claw.js';
-import * as workspace from '../../lib/workspace.js';
-import { clawModel, TIER_LABEL } from '../../lib/tier.js';
+import assert from 'node:assert/strict';
+import { runAgent } from '../../lib/runAgent.js';
+import { TIER_LABEL } from '../../lib/tier.js';
 
 const COLLECTIONS_JS = `\
 /**
@@ -83,43 +79,21 @@ const PROMPT =
 const TIMEOUT = 300_000;
 
 describe(`comment-spec: implement from JSDoc (tier=${TIER_LABEL})`, () => {
-  beforeEach(() => {
-    workspace.reset();
-    fs.writeFileSync(path.join(workspace.WORKSPACE, 'collections.js'), COLLECTIONS_JS);
-    fs.writeFileSync(path.join(workspace.WORKSPACE, 'verify.js'),      VERIFY_JS);
-  });
-
-  it('claw implements both functions per JSDoc', { timeout: TIMEOUT }, async () => {
-    const pre = spawnSync('node', [path.join(workspace.WORKSPACE, 'verify.js')], {
-      encoding: 'utf8',
-      timeout:  5_000,
+  it('claw implements both functions per JSDoc', { timeout: TIMEOUT }, async (t) => {
+    const ctx = await runAgent({
+      prompt:               PROMPT,
+      seedFiles:            { 'collections.js': COLLECTIONS_JS, 'verify.js': VERIFY_JS },
+      preconditionMustFail: 'verify.js',
+      postScript:           'verify.js',
+      clawTimeoutMs:    TIMEOUT,
+      testId:            'comment-spec',
+      t,
     });
-    assert.notEqual(pre.status, 0, 'pre-condition: verify.js must fail before implementation');
-
-    const r = await runClaw({ prompt: PROMPT, model: clawModel });
-
-    console.log(`\n=== comment-spec (${TIER_LABEL}) ===`);
-    console.log(`  claw: exit=${r.code} elapsed=${r.elapsedMs}ms files=${JSON.stringify(workspace.list())}`);
-    if (r.code !== 0) console.log(`  claw stderr (tail):\n${r.stderr.slice(-1500)}`);
-
-    const post = spawnSync('node', [path.join(workspace.WORKSPACE, 'verify.js')], {
-      encoding: 'utf8',
-      timeout:  5_000,
-    });
-
-    console.log(`  node post-fix: exit=${post.status} stderr=${post.stderr.slice(0, 400).trim()}`);
-
-    writeAssertionResult(r.runDir, {
-      passed: r.code === 0 && post.status === 0,
-      claw_exit: r.code,
-      target_file_exists: null,
-      post_status: post.status,
-      post_stderr_tail: post.stderr.slice(0, 800),
-    });
-
-    if (r.terminal_status === 'timeout') assert.fail(`claw timed out after ${r.elapsedMs}ms (terminal_status=timeout)`);
-
-    assert.equal(r.code, 0, 'claw must exit cleanly');
-    assert.equal(post.status, 0, `verify.js failed:\n${post.stderr.slice(0, 800)}`);
+    assert.equal(ctx.agent.code, 0, 'agent must exit cleanly');
+    ctx.workspace.unchanged('verify.js', VERIFY_JS);
+    assert.equal(
+      ctx.post.status, 0,
+      `post-script failed:\n${ctx.post.stderr.slice(0, 800)}`,
+    );
   });
 });

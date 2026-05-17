@@ -37,14 +37,11 @@
 //        Primary axis: convergence. See difficulty-pack/good-tests.md row 5.
 //        Rule-3 'forbid both at same amount < target' twist deferred to v2.
 
-import { describe, it, beforeEach } from 'node:test';
+import { describe, it } from 'node:test';
+
 import assert from 'node:assert/strict';
-import fs from 'node:fs';
-import path from 'node:path';
-import { spawnSync } from 'node:child_process';
-import { runClaw, writeAssertionResult } from '../../lib/claw.js';
-import * as workspace from '../../lib/workspace.js';
-import { clawModel, TIER_LABEL } from '../../lib/tier.js';
+import { runAgent } from '../../lib/runAgent.js';
+import { TIER_LABEL } from '../../lib/tier.js';
 
 const VERIFY_JS = `\
 import assert from 'node:assert/strict';
@@ -216,44 +213,23 @@ Worked example for \`findShortestPath(3, 8, 5, 'A')\`:
 
 Then ensure \`node verify.js\` exits 0. Do not edit verify.js.`;
 
-const CLAW_TIMEOUT = 285_000;
+const TIMEOUT = 285_000;
 
 describe(`two-bucket: shortest-path BFS with explicit path reconstruction (tier=${TIER_LABEL})`, () => {
-  beforeEach(() => {
-    workspace.reset();
-    fs.writeFileSync(path.join(workspace.WORKSPACE, 'verify.js'), VERIFY_JS);
-  });
-
-  it('claw solves the task', { timeout: CLAW_TIMEOUT + 20_000 }, async () => {
-    const r = await runClaw({ prompt: PROMPT, model: clawModel, timeoutMs: CLAW_TIMEOUT });
-
-    const targetExists = workspace.exists('two-bucket.js');
-    let post = null;
-    if (r.code === 0 && targetExists) {
-      post = spawnSync('node', [path.join(workspace.WORKSPACE, 'verify.js')], {
-        encoding: 'utf8',
-        timeout: 10_000,
-      });
-    }
-    const passed = r.code === 0 && targetExists && post?.status === 0;
-
-    console.log(`\n=== two-bucket (${TIER_LABEL}) ===`);
-    console.log(`  claw: exit=${r.code} elapsed=${r.elapsedMs}ms files=${JSON.stringify(workspace.list())}`);
-    if (r.code !== 0) console.log(`  claw stderr (tail):\n${r.stderr.slice(-1500)}`);
-    if (post) console.log(`  verify: exit=${post.status} stderr=${post.stderr.slice(0, 400).trim()}`);
-
-    writeAssertionResult(r.runDir, {
-      passed,
-      claw_exit: r.code,
-      target_file_exists: targetExists,
-      post_status: post?.status ?? null,
-      post_stderr_tail: post?.stderr?.slice(0, 800) ?? null,
+  it('claw solves the task', { timeout: TIMEOUT }, async (t) => {
+    const ctx = await runAgent({
+      prompt:     PROMPT,
+      seedFiles:  { 'verify.js': VERIFY_JS },
+      postScript: 'verify.js',
+      clawTimeoutMs:    TIMEOUT,
+      testId:  'two-bucket',
+      t,
     });
-
-    if (r.terminal_status === 'timeout') assert.fail(`claw timed out after ${r.elapsedMs}ms`);
-
-    assert.equal(r.code, 0, 'claw must exit cleanly');
-    assert.equal(targetExists, true, 'two-bucket.js must be created');
-    assert.equal(post?.status, 0, `verify.js failed:\n${post?.stderr?.slice(0, 800)}`);
+    assert.equal(ctx.agent.code, 0, 'agent must exit cleanly');
+    ctx.workspace.unchanged('verify.js', VERIFY_JS);
+    assert.equal(
+      ctx.post.status, 0,
+      `post-script failed:\n${ctx.post.stderr.slice(0, 800)}`,
+    );
   });
 });

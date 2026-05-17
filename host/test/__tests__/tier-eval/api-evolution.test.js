@@ -24,7 +24,7 @@
  *   "suite_layer": "B",
  *   "difficulty_band": "hard",
  *   "oracle_type": "public_verifier",
- *   "keep_drop_rule": "Keep \u2014 multi-file signature change is core to multi_file_context axis.",
+ *   "keep_drop_rule": "Keep — multi-file signature change is core to multi_file_context axis.",
  *   "expected_tier_signature": "monotonic_improving",
  *   "known_confounds": [
  *     "repo_size_dependent"
@@ -32,15 +32,11 @@
  * }
  */
 
-import { describe, it, beforeEach } from 'node:test';
-import assert from 'node:assert/strict';
-import { spawnSync } from 'node:child_process';
-import fs from 'node:fs';
-import path from 'node:path';
+import { describe, it } from 'node:test';
 
-import { runClaw, writeAssertionResult } from '../../lib/claw.js';
-import * as workspace from '../../lib/workspace.js';
-import { clawModel, TIER_LABEL } from '../../lib/tier.js';
+import assert from 'node:assert/strict';
+import { runAgent } from '../../lib/runAgent.js';
+import { TIER_LABEL } from '../../lib/tier.js';
 
 const PRICING_JS = `\
 export function discount(price, percent) {
@@ -64,49 +60,23 @@ const PROMPT =
   'call sites pass arguments in the new order, and ensure that running ' +
   '`node app.js` exits 0. Do not change the assertions in app.js.';
 
-const CLAW_TIMEOUT = 240_000;
-const TIMEOUT = CLAW_TIMEOUT + 60_000;
+const TIMEOUT = 240_000;
 
 describe(`api evolution: signature reorder across two files (tier=${TIER_LABEL})`, () => {
-  beforeEach(() => {
-    workspace.reset();
-    fs.writeFileSync(path.join(workspace.WORKSPACE, 'pricing.js'), PRICING_JS);
-    fs.writeFileSync(path.join(workspace.WORKSPACE, 'app.js'),     APP_JS);
-  });
-
-  it('claw reorders the signature and updates the call site', { timeout: TIMEOUT }, async () => {
-    const pre = spawnSync('node', [path.join(workspace.WORKSPACE, 'app.js')], {
-      encoding: 'utf8',
-      timeout:  5_000,
+  it('claw reorders the signature and updates the call site', { timeout: TIMEOUT }, async (t) => {
+    const ctx = await runAgent({
+      prompt:               PROMPT,
+      seedFiles:            { 'pricing.js': PRICING_JS, 'app.js': APP_JS },
+      preconditionMustFail: 'app.js',
+      postScript:           'app.js',
+      clawTimeoutMs:    TIMEOUT,
+      testId:            'api-evolution',
+      t,
     });
-    assert.notEqual(pre.status, 0, 'pre-condition: app.js must fail before the refactor');
-
-    const r = await runClaw({ prompt: PROMPT, model: clawModel, timeoutMs: CLAW_TIMEOUT });
-
-    console.log(`\n=== api-evolution (${TIER_LABEL}) ===`);
-    console.log(`  claw: exit=${r.code} elapsed=${r.elapsedMs}ms files=${JSON.stringify(workspace.list())}`);
-    if (r.code !== 0) console.log(`  claw stderr (tail):\n${r.stderr.slice(-1500)}`);
-
-    let post = null;
-    if (r.code === 0) {
-      post = spawnSync('node', [path.join(workspace.WORKSPACE, 'app.js')], {
-        encoding: 'utf8',
-        timeout:  5_000,
-      });
-      console.log(`  node post-fix: exit=${post.status} stderr=${post.stderr.slice(0, 400).trim()}`);
-    }
-
-    writeAssertionResult(r.runDir, {
-      passed: r.code === 0 && post != null && post.status === 0,
-      claw_exit: r.code,
-      target_file_exists: workspace.exists('pricing.js'),
-      post_status: post ? post.status : null,
-      post_stderr_tail: post ? post.stderr.slice(0, 800) : null,
-    });
-
-    if (r.terminal_status === 'timeout') assert.fail(`claw timed out after ${r.elapsedMs}ms (terminal_status=timeout)`);
-
-    assert.equal(r.code, 0, 'claw must exit cleanly');
-    assert.equal(post.status, 0, `app.js still fails:\n${post.stderr.slice(0, 800)}`);
+    assert.equal(ctx.agent.code, 0, 'agent must exit cleanly');
+    assert.equal(
+      ctx.post.status, 0,
+      `post-script failed:\n${ctx.post.stderr.slice(0, 800)}`,
+    );
   });
 });

@@ -74,27 +74,33 @@ const ERROR_CLASS_PATTERNS = [
   [/(?:^|\s)not exit code 0|exited with code [^0]/i, 'nonzero_exit'],
 ];
 
+/** @returns {Promise<import('./runAgent.js').RunnerResult>} — minimum contract; extra telemetry fields ride along untyped. */
 export function runClaw({
   prompt,
   model,
-  timeoutMs = 240_000,
+  signal,
+  timeoutMs,
   extraArgs = [],
 }) {
-  // Best-effort: if ITER_DIST_TEST_ID isn't set, infer it from the caller's
-  // stack frame. Lets RUN_REGISTRY_EMIT=1 produce rows from the existing
-  // tier-eval tests without touching test files. Falls back to null
-  // (preserving the existing iter-distribution-driver behavior).
-  if (!process.env.ITER_DIST_TEST_ID) {
-    const inferred = inferTestIdFromStack();
-    if (inferred) process.env.ITER_DIST_TEST_ID = inferred;
-  }
   return new Promise((resolve, reject) => {
     const args = ['-p', prompt, '--model', model, ...extraArgs];
     const runId = randomUUID();
     const runStartedMs = Date.now();
 
-    const ac = new AbortController();
-    const timer = setTimeout(() => ac.abort(), timeoutMs);
+    // Combine claw's internal ceiling (timeoutMs) with the caller's signal
+    // (typically node:test's t.signal). The internal timer must fire first —
+    // when only node:test's outer timeout exists, it cancels the test before
+    // runAgent's diagnostics can land, so no registry row gets written for
+    // timeout cells. runAgent enforces this by subtracting per-call slack
+    // from clawTimeoutMs before passing it here; direct callers (e.g. the
+    // frontier tier tests that call runClaw without runAgent) must keep
+    // timeoutMs strictly less than node:test's per-test timeout themselves.
+    const inputs = [];
+    if (signal) inputs.push(signal);
+    if (typeof timeoutMs === 'number' && timeoutMs > 0) inputs.push(AbortSignal.timeout(timeoutMs));
+    const combinedSignal = inputs.length === 0 ? undefined
+                         : inputs.length === 1 ? inputs[0]
+                         : AbortSignal.any(inputs);
 
     const child = spawn('claw', args, {
       cwd: WORKSPACE,
@@ -103,7 +109,7 @@ export function runClaw({
       // assigned harness-side and bridge records are joined by time-window.
       env: { ...process.env, CLAW_RUN_ID: runId },
       stdio: ['ignore', 'pipe', 'pipe'],
-      signal: ac.signal,
+      signal: combinedSignal,
       killSignal: 'SIGKILL',
     });
 
@@ -114,15 +120,13 @@ export function runClaw({
 
     child.on('error', (err) => {
       if (err.name === 'AbortError') return;
-      clearTimeout(timer);
       reject(err);
     });
 
-    child.on('close', (code, signal) => {
-      clearTimeout(timer);
+    child.on('close', (code, killSig) => {
       const runFinishedMs = Date.now();
       const elapsedMs = runFinishedMs - runStartedMs;
-      const aborted = ac.signal.aborted;
+      const aborted = !!combinedSignal?.aborted;
 
       let extras = { runId };
       if (!TELEMETRY_DISABLED) {
@@ -131,10 +135,10 @@ export function runClaw({
             runId,
             runStartedMs,
             runFinishedMs,
-            timeoutMs,
             code,
             timeout: aborted,
             model,
+            timeoutMs,
           });
           extras = { ...extras, ...meta };
         } catch (e) {
@@ -146,14 +150,15 @@ export function runClaw({
       }
 
       // Sprint 1.13 (research-team direction, 2026-04-29 memo): on timeout,
-      // resolve with a structured result instead of rejecting. This lets the
-      // caller still call writeAssertionResult, so every attempted (test ×
-      // tier × rep) cell produces a registry row. Without this, a timeout
-      // throws before assertion_result.json is written and Sprint 2's Wilson
-      // CIs would be computed against observed N rather than planned N.
-      // Test files see r.code === null and r.terminal_status === 'timeout',
-      // and their existing assert.equal(r.code, 0) still fails the test —
-      // but the row has already landed.
+      // resolve with a structured result instead of rejecting. Test files
+      // see r.code === null and r.terminal_status === 'timeout' and their
+      // existing assert.equal(r.code, 0) still fails the test — but the
+      // test:fail event lands cleanly so the registry reporter (Sprint
+      // 1.22, lib/registry-reporter.js) still writes assertion_result.json
+      // from the buffered diagnostics. Without this, a timeout rejection
+      // would surface as an uncaught error before runAgent's diagnostics
+      // are emitted and the cell would produce no row, leaving Sprint 2's
+      // Wilson CIs computed against observed N rather than planned N.
       if (aborted) {
         resolve({
           code: null,
@@ -167,7 +172,7 @@ export function runClaw({
         });
         return;
       }
-      resolve({ code, signal, stdout, stderr, elapsedMs, ...extras });
+      resolve({ code, signal: killSig, stdout, stderr, elapsedMs, ...extras });
     });
   });
 }
@@ -281,10 +286,10 @@ function collectRunArtifacts({
   runId,
   runStartedMs,
   runFinishedMs,
-  timeoutMs,
   code,
   timeout,
   model,
+  timeoutMs,
 }) {
   const runDir = path.join(RUNTIME_ROOT, runId);
   fs.mkdirSync(runDir, { recursive: true });
@@ -488,10 +493,10 @@ function collectRunArtifacts({
     runId,
     runStartedMs,
     runFinishedMs,
-    timeoutMs,
     code,
     timeout,
     model,
+    timeoutMs,
     iterRecords,
     sessionMeta,
     bridgeRecords,
@@ -623,10 +628,10 @@ function buildRunSummary({
   runId,
   runStartedMs,
   runFinishedMs,
-  timeoutMs,
   code,
   timeout,
   model,
+  timeoutMs,
   iterRecords,
   sessionMeta,
   bridgeRecords,
@@ -674,7 +679,7 @@ function buildRunSummary({
     presence_penalty: floatEnv('SAMPLER_PRESENCE_PENALTY'),
     hardware_instance: process.env.HARDWARE_INSTANCE ?? 'M5',
     concurrency: 1,
-    timeout_ms: timeoutMs,
+    timeout_ms: typeof timeoutMs === 'number' && timeoutMs > 0 ? timeoutMs : null,
     max_iterations: process.env.CLAW_MAX_ITERATIONS ? parseInt(process.env.CLAW_MAX_ITERATIONS, 10) : null,
     run_started_ms: runStartedMs,
     run_finished_ms: runFinishedMs,
@@ -808,19 +813,3 @@ function intEnv(name) {
   return Number.isFinite(n) ? n : null;
 }
 
-// Walk the V8 stack at runClaw entry to find the .test.js file that called
-// us, and derive `test_id` from its basename. This is the same convention
-// the test_manifest accessor uses to map filename → test_id (the manifest
-// header carries the canonical id; we only need to find the file).
-//
-// Matches any path ending in /<name>.test.js. The first match wins. Returns
-// null on no match (preserving the existing ITER_DIST_TEST_ID-or-null path).
-function inferTestIdFromStack() {
-  const stack = new Error().stack || '';
-  const re = /\/([A-Za-z0-9_-]+)\.test\.js/g;
-  let m;
-  while ((m = re.exec(stack)) !== null) {
-    return m[1];
-  }
-  return null;
-}

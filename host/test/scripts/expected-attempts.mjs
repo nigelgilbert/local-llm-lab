@@ -8,11 +8,12 @@
 // expected row count is clarified before kickoff" so Wilson CIs in Sprint 2
 // are computed against planned N rather than observed N.
 //
-// Eligibility rule: a tier-eval test is "emit-eligible" if it imports
-// writeAssertionResult from lib/claw.js. The three streamMessage-based tests
-// (latency, tool-discipline, prose-quality) do not call writeAssertionResult
-// and so do not produce registry rows; they're excluded from the expected
-// manifest.
+// Eligibility rule: a tier-eval test is "emit-eligible" if it invokes a
+// registry-writing entry point — either the lib/runAgent.js helper (Sprint
+// 1.22) or the underlying writeAssertionResult primitive directly. The three
+// streamMessage-based tests (latency, tool-discipline, prose-quality) do not
+// call either and so do not produce registry rows; they're excluded from the
+// expected manifest.
 //
 // Subcommands:
 //   plan   — write expected_attempts.<sweep>.csv
@@ -30,6 +31,7 @@
 
 import fs from 'node:fs';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
 
 const HEADER = 'test_id,hardware_tier,rep_index';
 
@@ -58,12 +60,19 @@ function printHelp() {
   node expected-attempts.mjs diff --expected <csv> --registry <jsonl>`);
 }
 
-function isEmitEligible(filePath) {
-  // The test imports writeAssertionResult from lib/claw.js iff its source
-  // names that import. Cheap textual scan; accurate enough for a fixed
-  // codebase whose import lines all parse trivially.
+export function isEmitEligible(filePath) {
+  // A tier-eval test produces a registry row iff its source references one of
+  // the two registry-writing entry points: the lib/runAgent.js helper (Sprint
+  // 1.22, ex-runAgentSetup) or the underlying writeAssertionResult primitive
+  // (for tests that opt out of the helper). Family C (latency / prose-quality
+  // / tool-discipline) references neither.
+  //
+  // Note: listEligibleTests() below does not recurse, so direct-primitive
+  // callers under __tests__/tier-eval/frontier/ are not reached — see that
+  // directory's README for why frontier tests are deliberately excluded from
+  // the screening pipeline.
   const src = fs.readFileSync(filePath, 'utf8');
-  return /writeAssertionResult/.test(src) && /from\s+['"][^'"]*claw\.js['"]/.test(src);
+  return /\b(runAgent|writeAssertionResult)\b/.test(src);
 }
 
 function listEligibleTests(testsDir) {
@@ -182,12 +191,19 @@ function diffCmd(opts) {
   process.exit(missing.length === 0 && extras.length === 0 ? 0 : 1);
 }
 
-const { cmd, opts } = parseArgs(process.argv);
-try {
-  if (cmd === 'plan') planCmd(opts);
-  else if (cmd === 'diff') diffCmd(opts);
-  else { printHelp(); process.exit(2); }
-} catch (e) {
-  console.error(`error: ${e.message}`);
-  process.exit(2);
+// Main guard — only run the CLI when this file is the entry point. Imports
+// from unit tests (host/test/__tests__/scripts/expected-attempts.test.js) hit
+// this module for `isEmitEligible`; without the guard, parseArgs would consume
+// the test runner's argv and exit non-zero.
+const isMain = process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href;
+if (isMain) {
+  const { cmd, opts } = parseArgs(process.argv);
+  try {
+    if (cmd === 'plan') planCmd(opts);
+    else if (cmd === 'diff') diffCmd(opts);
+    else { printHelp(); process.exit(2); }
+  } catch (e) {
+    console.error(`error: ${e.message}`);
+    process.exit(2);
+  }
 }
