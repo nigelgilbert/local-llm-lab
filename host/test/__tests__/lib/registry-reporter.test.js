@@ -179,6 +179,33 @@ describe('registryReporter (synthetic event stream)', () => {
     assert.equal(fs.existsSync(path.join(runDirB, 'assertion_result.json')), true);
   });
 
+  it('silently ignores unknown key=value diagnostics emitted at the same call site', async () => {
+    // The reporter's diagnostic parser splits on the first `=` and dispatches
+    // by key — there's no namespace prefix, so any future caller (or a
+    // library that happens to call `t.diagnostic('foo=bar')`) could land
+    // unknown keys in the pending bucket. Confirm they're inert: sidecar
+    // contents match the known-keys-only case, and a value containing `=`
+    // doesn't break the splitter.
+    const runDir = makeRunDir();
+    const l = loc('/fake/file.test.js', 100, 3);
+    await drain([
+      passEv(l, 'unknown-keys'),
+      diag(l, `runDir=${runDir}`),
+      diag(l, 'test_id=unknown-keys'),
+      diag(l, 'foo=bar'),                         // unknown key
+      diag(l, 'weird=value=with=equals=signs'),   // unknown key, value contains `=`
+      diag(l, `agent_result=${JSON.stringify({ code: 0, elapsedMs: 1, files: [] })}`),
+      diag(l, 'another_unknown=42'),
+      diag(l, 'runAgent_done=1'),
+    ]);
+
+    const sc = readSidecar(runDir);
+    assert.deepEqual(
+      { passed: sc.passed, claw_exit: sc.claw_exit, post_status: sc.post_status, post_stderr_tail: sc.post_stderr_tail },
+      { passed: true, claw_exit: 0, post_status: null, post_stderr_tail: null },
+    );
+  });
+
   it('distinguishes two tests by file:line:column and writes the correct sidecar to each', async () => {
     const runDirA = makeRunDir();
     const runDirB = makeRunDir();
