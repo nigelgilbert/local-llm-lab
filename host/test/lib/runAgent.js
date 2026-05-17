@@ -27,6 +27,17 @@
 // this helper and call runClaw + writeAssertionResult directly. Don't migrate
 // them blindly; expected-attempts.mjs treats both entry points as
 // emit-eligible by design.
+//
+// Concurrency assumption: serial execution within the test process. Two
+// things would race if violated: workspace.reset() wipes /workspace globally,
+// and ITER_DIST_TEST_ID is a process-wide env var that's mutated for the
+// duration of each call (restored in a finally on the way out, but two
+// overlapping calls would still clobber each other mid-run).
+// Today the package.json `test` script pins --test-concurrency=1 and
+// node:test's default isolation (Node 22+) runs each file in its own
+// subprocess; don't lower either without auditing this file. Multiple
+// `it(...)` blocks per file are fine because node:test runs them sequentially
+// within a describe — but `t.test(..., { concurrent: true })` would break it.
 
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
@@ -140,64 +151,75 @@ export async function runAgent({
 
   // run_summary.json's test_id field is populated from this env var in
   // claw.js's buildRunSummary. Reporter doesn't read it; it's for the
-  // downstream registry-row joiner.
+  // downstream registry-row joiner. Captured-and-restored in the finally
+  // so a same-file caller that invokes runClaw directly after a runAgent
+  // call doesn't inherit a stale test_id.
+  const priorTestIdEnv = process.env.ITER_DIST_TEST_ID;
   process.env.ITER_DIST_TEST_ID = testId;
 
-  workspace.reset();
-  for (const [name, body] of Object.entries(seedFiles)) {
-    fs.writeFileSync(path.join(workspace.WORKSPACE, name), body);
-  }
+  try {
+    workspace.reset();
+    for (const [name, body] of Object.entries(seedFiles)) {
+      fs.writeFileSync(path.join(workspace.WORKSPACE, name), body);
+    }
 
-  if (preconditionMustFail) {
-    const pre = spawnSync('node', [path.join(workspace.WORKSPACE, preconditionMustFail)], {
-      encoding: 'utf8',
-      timeout:  preconditionTimeoutMs,
-    });
-    assert.notEqual(
-      pre.status, 0,
-      `pre-condition: ${preconditionMustFail} must fail before the fix`,
-    );
-  }
+    if (preconditionMustFail) {
+      const pre = spawnSync('node', [path.join(workspace.WORKSPACE, preconditionMustFail)], {
+        encoding: 'utf8',
+        timeout:  preconditionTimeoutMs,
+      });
+      assert.notEqual(
+        pre.status, 0,
+        `pre-condition: ${preconditionMustFail} must fail before the fix`,
+      );
+    }
 
-  const agent = await runner({ prompt, signal, timeoutMs: runnerTimeoutMs });
-  if (typeof agent.runDir === 'string' && agent.runDir.length > 0) {
-    t.diagnostic(`runDir=${agent.runDir}`);
-  } else {
-    // Telemetry hiccup in claw.js's collectRunArtifacts left runDir unset
-    // (best-effort by design; see lib/claw.js). Skip the diagnostic so the
-    // reporter doesn't write a sidecar under the literal path "undefined".
-    // expected-attempts.mjs's diff catches the resulting missing registry row.
-    console.error(`[runAgent] no runDir from runner for testId=${testId}; sidecar will not be written`);
-  }
-  t.diagnostic(`test_id=${testId}`);
-  t.diagnostic(`agent_result=${JSON.stringify({
-    code:       agent.code,
-    elapsedMs:  agent.elapsedMs,
-    files:      workspace.list(),
-    stderrTail: agent.code !== 0 ? agent.stderr.slice(-AGENT_STDERR_TAIL) : undefined,
-  })}`);
-
-  let post = null;
-  if (postScript) {
-    post = spawnSync('node', [path.join(workspace.WORKSPACE, postScript)], {
-      encoding: 'utf8',
-      timeout:  postScriptTimeoutMs,
-      cwd:      workspace.WORKSPACE,
-    });
-    t.diagnostic(`post_result=${JSON.stringify({
-      script:     postScript,
-      status:     post.status,
-      stderrTrim: post.stderr.slice(0, 400),
-      stderrTail: post.stderr.slice(-POST_STDERR_TAIL),
+    const agent = await runner({ prompt, signal, timeoutMs: runnerTimeoutMs });
+    if (typeof agent.runDir === 'string' && agent.runDir.length > 0) {
+      t.diagnostic(`runDir=${agent.runDir}`);
+    } else {
+      // Telemetry hiccup in claw.js's collectRunArtifacts left runDir unset
+      // (best-effort by design; see lib/claw.js). Skip the diagnostic so the
+      // reporter doesn't write a sidecar under the literal path "undefined".
+      // expected-attempts.mjs's diff catches the resulting missing registry row.
+      console.error(`[runAgent] no runDir from runner for testId=${testId}; sidecar will not be written`);
+    }
+    t.diagnostic(`test_id=${testId}`);
+    t.diagnostic(`agent_result=${JSON.stringify({
+      code:       agent.code,
+      elapsedMs:  agent.elapsedMs,
+      files:      workspace.list(),
+      stderrTail: agent.code !== 0 ? agent.stderr.slice(-AGENT_STDERR_TAIL) : undefined,
     })}`);
+
+    let post = null;
+    if (postScript) {
+      post = spawnSync('node', [path.join(workspace.WORKSPACE, postScript)], {
+        encoding: 'utf8',
+        timeout:  postScriptTimeoutMs,
+        cwd:      workspace.WORKSPACE,
+      });
+      t.diagnostic(`post_result=${JSON.stringify({
+        script:     postScript,
+        status:     post.status,
+        stderrTrim: post.stderr.slice(0, 400),
+        stderrTail: post.stderr.slice(-POST_STDERR_TAIL),
+      })}`);
+    }
+
+    // Sentinel for the registry reporter's per-test flush. Must be the last
+    // diagnostic this function emits; the reporter writes the sidecar +
+    // deletes the pending entry on receipt. See registry-reporter.js.
+    t.diagnostic('runAgent_done=1');
+
+    return { agent, workspace, post };
+  } finally {
+    // Restore the prior env state. Use `delete` (not `= undefined`) when the
+    // var was previously unset, since assignment would coerce to the string
+    // "undefined" — collectRunArtifacts would then bake that into run_summary.
+    if (priorTestIdEnv === undefined) delete process.env.ITER_DIST_TEST_ID;
+    else process.env.ITER_DIST_TEST_ID = priorTestIdEnv;
   }
-
-  // Sentinel for the registry reporter's per-test flush. Must be the last
-  // diagnostic this function emits; the reporter writes the sidecar +
-  // deletes the pending entry on receipt. See registry-reporter.js.
-  t.diagnostic('runAgent_done=1');
-
-  return { agent, workspace, post };
 }
 
 function defaultRunner({ prompt, signal, timeoutMs }) {

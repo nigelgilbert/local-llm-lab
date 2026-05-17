@@ -212,6 +212,59 @@ describe('runAgent diagnostic emission', () => {
   });
 });
 
+describe('runAgent ITER_DIST_TEST_ID env restoration', () => {
+  // claw.js reads process.env.ITER_DIST_TEST_ID inside collectRunArtifacts
+  // (synchronously, on the child-close event) and bakes it into
+  // run_summary.test_id. A same-file caller that invokes runClaw directly
+  // after a runAgent call would otherwise inherit a stale testId; these
+  // tests pin the capture-and-restore contract.
+  function withPriorEnv(prior, fn) {
+    const had = Object.prototype.hasOwnProperty.call(process.env, 'ITER_DIST_TEST_ID');
+    const orig = process.env.ITER_DIST_TEST_ID;
+    if (prior === undefined) delete process.env.ITER_DIST_TEST_ID;
+    else process.env.ITER_DIST_TEST_ID = prior;
+    return Promise.resolve(fn()).finally(() => {
+      if (!had) delete process.env.ITER_DIST_TEST_ID;
+      else process.env.ITER_DIST_TEST_ID = orig;
+    });
+  }
+
+  it('sets the env during the runner call and restores `undefined` afterwards', async () => {
+    await withPriorEnv(undefined, async () => {
+      let seenDuringRun;
+      const runner = async () => {
+        seenDuringRun = process.env.ITER_DIST_TEST_ID;
+        return { code: 0, stdout: '', stderr: '', elapsedMs: 0, runDir: '/tmp/none' };
+      };
+      await runAgent({ ...BASE, testId: 'unit-restore', t: makeT(), clawTimeoutMs: 60_000, runner });
+      assert.equal(seenDuringRun, 'unit-restore');
+      assert.equal(
+        Object.prototype.hasOwnProperty.call(process.env, 'ITER_DIST_TEST_ID'),
+        false,
+        'env must be deleted (not set to the string "undefined") when previously unset',
+      );
+    });
+  });
+
+  it('restores a prior non-empty value after the call', async () => {
+    await withPriorEnv('prior-id', async () => {
+      await runAgent({ ...BASE, testId: 'unit-restore', t: makeT(), clawTimeoutMs: 60_000, runner: makeRunner([]) });
+      assert.equal(process.env.ITER_DIST_TEST_ID, 'prior-id');
+    });
+  });
+
+  it('restores the env even when the runner rejects', async () => {
+    await withPriorEnv('prior-id', async () => {
+      const runner = async () => { throw new Error('runner boom'); };
+      await assert.rejects(
+        () => runAgent({ ...BASE, testId: 'unit-restore', t: makeT(), clawTimeoutMs: 60_000, runner }),
+        /runner boom/,
+      );
+      assert.equal(process.env.ITER_DIST_TEST_ID, 'prior-id');
+    });
+  });
+});
+
 describe('runAgent at-most-once per TestContext', () => {
   it('throws on a second call with the same `t`', async () => {
     const t = makeT();
